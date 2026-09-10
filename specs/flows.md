@@ -318,6 +318,8 @@ class Place(NamedTuple):
 class Running(NamedTuple):
     flow: str
     since: float
+    depth: int = 0
+    under: Running | None = None
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]: ...
@@ -441,22 +443,66 @@ run another. `hmz.runner` asks this and then opens an epic around the answer.
 - A called flow that says it can be picked up MUST be handed its own kept state, under its own
   name, in the epic of the run that called it: a flow that called another is two flows, each
   with its own to keep, and both of them part of one run.
-- A called flow MUST be written into a record of its own, in the epic of the run that called
-  it, and what it opens while it runs MUST go there rather than into the record of whatever
-  started the run: a flow that called another is two flows, and each of them ran. Its agents
-  MUST be pointed back at what they were writing to when the call returns, however it returns,
-  the way they are handed back the skills they carried. A call from a flow that nothing is
-  keeping a record of MUST run and write nothing rather than fail.
-- `running` MUST report every flow running now, the one that was started first and whatever it
-  called after it. Nothing else can say: a flow is a Python file that may branch any way it
-  likes, so what it is doing is only visible where it was started and where it asked for
-  another. A flow MUST leave that list however it ends, and a call MUST be written into the
-  epic at both ends, saying which record it was written to, a run being what it did as well
-  as what it was started as.
+- A called flow MUST be written into a record of its own, inside the record of the flow that
+  called it, and what it opens while it runs MUST go there rather than into the record of
+  whatever started the run: a flow that called another is two flows, and each of them ran.
+  Which record a call goes under MUST be read off the flow that made it rather than off the
+  agents it was made with, or a call made from inside one of two flows sharing agents would be
+  filed under whichever of the two moved those agents last. Its agents MUST be pointed back at
+  what they were writing to when the call returns, however it returns, the way they are handed
+  back the skills they carried. A call from a flow that nothing is keeping a record of MUST run
+  and write nothing rather than fail.
+- A run of flows calling flows MUST be tracked as the tree it is rather than as a list. Each
+  flow MUST say what called it and how deep it is, and which flow called it MUST be read off
+  the task the call was made from: a flow written as a coroutine may have two calls going at
+  once, those two run at the same moment and on one thread, and neither of them is under the
+  other. A list would say one of them was.
+- `running` MUST answer with the branch it is asked from where it is asked from inside a flow:
+  the one somebody started, then each flow that had to be called to get here, innermost last.
+  That is the whole of what a flow can truthfully be told -- a flow gathering two calls has a
+  sibling running beside it that is not running under it and is none of its business -- and it
+  MUST NOT report one level twice however many of that level are running at once. Asked from
+  outside every flow it MUST answer with all of them, oldest first, since from outside there is
+  no branch to be on and the interface has a whole run to draw. Nothing else can say either:
+  a flow is a Python file that may branch any way it likes, so what it is doing is only visible
+  where it was started and where it asked for another. A flow MUST come off that branch however
+  it ends -- being cancelled where it waited among them included -- and a call MUST be written
+  into the epic at both ends, saying which record it was written to, a run being what it did as
+  well as what it was started as.
+- A call that never ran MUST have taken nothing. A flow written as a coroutine has not run when
+  the call to it is written, and one gathered and then cancelled before its first step never
+  runs at all: a call put on the branch, given a record and handed the agents by the making of
+  it would be a call nothing ever ends, holding agents nothing ever hands back. So all of that
+  MUST happen where the flow itself starts -- which is also the only place it can, the branch
+  being the task's and two gathered calls being two tasks. What a call is refused for MUST go
+  on being said where the call was written: the wrong agents, a config the flow will not take,
+  a chain with no bottom.
 - What is running MUST be checked against the threads running it. A flow says it has ended as
   it ends, but only one that got the chance to: a flow abandoned where it stood -- an interface
   taken down under it -- would otherwise be reported as running for the life of the process,
   and everything that reads this would name a flow that is no longer there.
+- An agent that two calls are driving at once MUST go on writing where both of them were
+  called from, and MUST carry what that flow gave it. Neither call may have it: a session
+  opened by an agent two flows share is part of the flow they share, and writing it into
+  whichever of the two started last would file it under a flow that merely happened to be
+  there. A branch that wants a record of its own MUST hand over an agent of its own, which is
+  what `Agent.clone` and `drives` are for. However two such calls end, and in whatever order,
+  every agent MUST be handed back what it was before the first of them took it rather than
+  what the call that is ending happened to see.
+- A caller MAY say what the flow it is calling drives one of its places at, naming the place by
+  what the called flow calls it or by what the agent filling it is called. What fills that place
+  MUST then be a clone at that config rather than the agent set up again -- what an agent is is
+  settled where it is made -- and MUST be checked exactly as the agent it stands in for would
+  have been. A name the called flow does not drive MUST be refused where the call was written,
+  and so MUST the person at the prompt, who takes no turn anywhere and so runs nothing to be
+  driven at.
+- A chain of flows calling flows MUST have a bottom, and a call past it MUST be refused as
+  `NotAFlow` naming the flow and how it got there. There is no natural one -- a flow may call
+  itself, and one that decides how deep to go from its own config or from what a model said may
+  decide wrong -- and what an unbounded chain comes to is a `RecursionError` out of whatever
+  the innermost call happened to be importing, which names no flow and blames the wrong line.
+  The bottom MUST be higher than any chain written on purpose reaches and lower than the
+  interpreter's own limit, since it is there to name a mistake rather than to ration a design.
 - What a report of a failure says about the run it happened in MUST be registered here, and
   MUST be names and never contents: which flow, how long it has been going, and for each of its
   agents what it drives and at what. What the flow was told, what any agent said and what is in

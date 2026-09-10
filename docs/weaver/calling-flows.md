@@ -64,6 +64,27 @@ load("official/rlar")(agents, task, {"rounds": 9})
 The settings are read back through the flow's own model **at the moment it is called**. A flow
 that takes no settings, or different ones, says so instead of quietly ignoring them.
 
+## Say what it is driven at
+
+A call may also say what the flow it is calling runs at, which is `drives` — the name of one of
+the called flow's places, or of the agent filling it, and the config that branch runs at:
+
+```python
+from dataclasses import replace
+
+careful = replace(agents.reviewer.config, effort="max")
+load("official/rlar")(agents, task, {"rounds": 9}, drives={"reviewer": careful})
+```
+
+What fills that place is a **clone** at that config rather than your agent set up again — an
+agent is what it was made as, so two efforts are two agents, and a trace that read them as one
+would read a comparison as one agent changing its mind. The clone is the call's own: written
+into that call's record, carrying the called flow's skills, and gone when the call returns.
+Your own agent is untouched.
+
+A name the flow does not drive is refused where you wrote it. So is the person at the prompt,
+who takes no turn anywhere and so runs nothing to be driven at.
+
 ## Await a coroutine flow
 
 A called flow answers with whatever it answers with, and one written as `async def` is awaited
@@ -74,6 +95,53 @@ by whoever called it:
 async def run(agents: tuple[Agent], task: str) -> None:
     await load("official/rlar")(agents, task)
 ```
+
+## Run several calls at once
+
+Gather them. Each is a branch of the run in its own right: its own record, its own skills, its
+own place on the [status line](#see-that-both-are-running), and its own unwinding when the run
+is stopped.
+
+```python
+@flow
+async def run(agents: tuple[Agent, Agent], task: str) -> None:
+    await asyncio.gather(
+        load("official/rlar")([agents[0].clone()], task),
+        load("official/rlar")([agents[1].clone()], task),
+    )
+```
+
+**Give each branch an agent of its own.** A conversation belongs to one agent, so two branches
+driving the same agent are two flows sharing one — and a session it opens then belongs to
+neither of them. humanize does not guess: an agent two calls hold at once goes on writing where
+they were both called from, and carries what *that* flow gave it. `clone()` (or `drives=`) is
+how a branch gets one to itself.
+
+## Call as deep as you like
+
+A flow may call itself, and may work out how deep to go from its own settings or from what a
+model just said:
+
+```python
+@flow
+async def run(agents: tuple[Agent], task: str, config: Config | None = None) -> None:
+    setting = config or Config()
+    if setting.left <= 0:
+        agents[0].new()(task)
+        return
+    await asyncio.gather(*(
+        load("split")([agents[0].clone()], part, {"left": setting.left - 1})
+        for part in split(task)
+    ))
+```
+
+Every level is tracked on the branch it is on, and the [epic](/user/tracing) reads back as the
+tree it ran as: a record per call, inside the record of the call that made it.
+
+**A chain of calls has a bottom: 64.** Deeper than that is refused, naming the flow and how it
+got there. A recursion with no base case would otherwise end as a `RecursionError` out of
+whatever the innermost call happened to be importing, which names no flow and blames the wrong
+line.
 
 ## Pass wrapper skills through
 
@@ -110,13 +178,20 @@ def run(agents: Agents, task: str) -> None:
 ```python
 from hmz.flows import running
 
-running()                       # one Running(flow, since) apiece, in the order they started
+running()                       # one Running(flow, since, depth, under) apiece
 [one.flow for one in running()] # ["planned", "official/humanize1:gen-plan"]
 ```
 
-This lists the flow you started and whatever it called, **innermost last**. The interface names
-them on its status line and on `/status` as `chat ▸ official/rlar`. The
-[epic](/user/tracing#what-a-run-writes-down) records each call and each return.
+Asked from inside a flow, this is **the branch you are on**: the flow somebody started, then
+each flow that had to be called to get here, innermost last. Never a sibling — a call gathered
+beside yours is not running under you and is none of your business — and never one level twice,
+however many of that level are running at once.
+
+Asked from outside every flow — the interface drawing its status line, a crash report being
+written — it is every flow of the run, oldest first, each saying how `deep` it is and what it is
+`under`. That is what the interface reads: it names them on its status line and on `/status` as
+`chat ▸ official/rlar`. The [epic](/user/tracing#what-a-run-writes-down) records each call and
+each return.
 
 A flow that called another does not read as the flow somebody chose. That is the point: a
 five-hour trace where phase two was `gen-plan` should say so.

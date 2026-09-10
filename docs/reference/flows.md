@@ -679,16 +679,49 @@ async def run(agents: tuple[Agent], task: str) -> None:
     await load("official/rlar")(agents, task)
 ```
 
-**What is running is both of them.** `hmz.flows.running()` reports the flow that was started
-and whatever it called, innermost last; the interface names them on its status line and on
-`/status`, and the [epic](/reference/tracing) records each call and each return. A flow that called
-another does not read as the flow somebody chose.
+**A call may say what the called flow drives one of its places at**, by the name that flow
+gives the place or the name of the agent filling it:
+
+```python
+load("official/rlar")(agents, task, drives={"reviewer": replace(config, effort="max")})
+```
+
+What fills the place is a clone at that config rather than the agent set up again — two efforts
+are two agents — written into that call's own record and gone when it returns. A name the flow
+does not drive is refused where the call was written, and so is the person at the prompt.
+
+**Calls may be gathered, and may go as deep as you like.** Give each branch an agent of its
+own — `clone()`, or `drives=` — so that what it opens is its own:
+
+```python
+await asyncio.gather(
+    load("split")([agents[0].clone()], left, {"left": n - 1}),
+    load("split")([agents[0].clone()], right, {"left": n - 1}),
+)
+```
+
+A chain of calls has a bottom: **64 deep**, and past it the call is refused as `NotAFlow`
+naming the flow and how it got there, rather than becoming a `RecursionError` inside whatever
+the innermost call was importing.
+
+**What is running is the branch you are on.** `hmz.flows.running()` reports, from inside a flow,
+the flow that was started and each flow called to get here, innermost last — never a sibling
+gathered beside you, and never one level twice. From outside every flow it reports all of them,
+oldest first, each with its `depth` and the flow it is `under` — which is what the interface
+reads to name them on its status line and on `/status`. The [epic](/reference/tracing) records
+each call and each return. A flow that called another does not read as the flow somebody chose.
+
+**An agent two calls hold at once** goes on writing where they were both called from and
+carries what that flow gave it. A session opened by an agent two flows share belongs to the
+flow they share; humanize will not file it under whichever of the two started last.
 
 **And each call is written down as a run of its own.** A called flow opens sessions, keeps its
 own state and calls flows of its own, so the epic gives every call a record of its own beside
 the run's — `epic.<flow>_<hex>.jsonl` — and the record of whatever called it says `called` and
-`returned` with that filename. What the called flow opened is in its record rather than in the
-record of whatever started the run. See [Records of called
+`returned` with that filename. Records nest: a call made from inside a called flow is written
+under *that* flow's record, so a five-deep recursion with siblings at every level reads back as
+the tree it ran as. `hmz.epic.tree()` reads it that way. What the called flow opened is in its
+record rather than in the record of whatever started the run. See [Records of called
 flows](/reference/tracing#records-of-called-flows).
 
 ## Where flows live

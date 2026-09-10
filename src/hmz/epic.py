@@ -29,6 +29,11 @@ that called it does. So each call gets a record of its own beside the run's own,
 record of whatever called it says what it called and which file to read it in. Still one run
 and still one directory: a called flow is part of the run that called it, not another run.
 
+One directory and one tree. A call made from inside a called flow is written under *that*
+flow's record rather than under the run's, and says which one it was under, so a run five
+flows deep with two of every level going at once reads back as the shape it ran in rather
+than as thirty-one things one run did -- which is what :func:`tree` reads it as.
+
 It opens when the flow starts and closes when the flow stops, however it stops -- finished,
 failed, or interrupted. A closed epic is never reopened: running the flow again is another
 run, with sessions of its own, and so another epic -- which is what a flow that says it can
@@ -80,6 +85,7 @@ __all__ = [
     "resumed",
     "sessions",
     "state",
+    "tree",
     "under",
     "where",
 ]
@@ -152,6 +158,9 @@ class Session(NamedTuple):
         down because the backend does not: its log shows a session that began knowing things,
         and only the run can say which conversation it got them from. Which is what makes two
         branches of one conversation readable afterwards as the branches they were.
+      record: The record of this epic it was written into, which is which *call* of that flow
+        opened it. A flow called five times in one run is five records, and the name alone
+        would make one flow of the five.
     """
 
     agent: str
@@ -162,6 +171,7 @@ class Session(NamedTuple):
     at: str = ""
     flow: str = ""
     parent: str = ""
+    record: str = ""
 
 
 class Drove(NamedTuple):
@@ -206,6 +216,9 @@ class Called(NamedTuple):
         are and where whatever it called in turn is written down.
       began: When it was called.
       ended: When it returned, or "" for a call that never did -- a run killed under it.
+      calls: What that call called in turn, read out of its own record: a run of flows
+        calling flows is a tree, and reading it as a list would say a flow ran under the
+        wrong one. Empty unless it was read as one -- :func:`tree`.
     """
 
     flow: str
@@ -213,6 +226,7 @@ class Called(NamedTuple):
     record: str
     began: str = ""
     ended: str = ""
+    calls: tuple[Called, ...] = ()
 
 
 class Ran(NamedTuple):
@@ -1076,6 +1090,7 @@ def sessions(epic: Path) -> list[Session]:
                     at=str(said.get("at") or ""),
                     flow=flow,
                     parent=str(said.get("parent") or ""),
+                    record=at.name,
                 )
             )
     # By when each was opened rather than by which record it is in: the records are one run,
@@ -1178,6 +1193,46 @@ def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
             if at is not None:
                 held[at] = held[at]._replace(ended=str(said.get("at") or ""))
     return held
+
+
+def tree(epic: Path) -> tuple[Called, ...]:
+    """Every flow one run called, as the tree of calls it actually was.
+
+    A run is one directory of records and each record says which one called it, so what a run
+    was is a tree however deep it went: a flow that called a flow that called a flow, five
+    of them gathered at once, the same flow called again from inside itself. Read as a list
+    it would be five things one run did, and nothing would say which of them ran under which.
+
+    Args:
+      epic: The epic's directory.
+
+    Returns:
+      The calls the run itself made, in the order it made them, each carrying what it called
+      in turn under `calls`. Two calls going at once are two of these, with times that
+      overlap and a record apiece -- which is what tells them from one another.
+    """
+    return _tree(epic, JOURNAL, frozenset())
+
+
+def _tree(epic: Path, record: str, walked: frozenset[str]) -> tuple[Called, ...]:
+    """What one record of an epic called, and what each of those called in turn.
+
+    Args:
+      epic: The epic's directory.
+      record: The record to read, by its name inside that directory.
+      walked: The records already read on the way here, so that an epic somebody wrote by
+        hand into a ring is read once rather than forever.
+
+    Returns:
+      One apiece, in the order that record called them.
+    """
+    if record in walked:
+        return ()
+    walked = walked | {record}
+    return tuple(
+        one._replace(calls=_tree(epic, one.record, walked)) if one.record else one
+        for one in _calls(_events(epic / record))
+    )
 
 
 def where(epic: Path, session: Session) -> Path:

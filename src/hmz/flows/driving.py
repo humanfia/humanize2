@@ -9,8 +9,16 @@ a hook on, is refused where it was written down rather than hours into a loop.
 
 And a loop worth having is one another loop can reach for, which is :func:`load`: a flow
 found by the same name `-f` takes, handed the agents the calling flow was given, carrying its
-own skills and its own kept state, and written down -- in a record of its own, beside the
-record of the run that called it -- as running under whatever called it.
+own skills and its own kept state, and written down -- in a record of its own, inside the
+record of the flow that called it -- as running under whatever called it.
+
+A run of flows calling flows is a tree rather than a list, and it is tracked as one. Each
+flow says which flow called it, and which that was is read off the task the call was made
+from rather than off the process: a flow written as a coroutine may gather two calls at once,
+those two run at the same moment on one thread, and neither of them is under the other. So a
+call made from inside either lands under the one it was made from, a session opened inside it
+is written into that one's record, and what is running, read from inside a flow, is the
+branch that flow is on and not everything the run happens to be doing.
 
 Nothing here reads a command line and nothing here opens an epic: :mod:`hmz.runner` does both,
 and asks this what the flow it was named says about itself. A call asks the epic already open
@@ -20,6 +28,7 @@ for a record to be written into, which is not a second epic: it is part of the o
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import inspect
 import os
 import threading
@@ -39,14 +48,14 @@ from typing import (
 from hmz import telemetry
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Generator, Sequence
+    from collections.abc import Awaitable, Callable, Generator, Mapping, Sequence
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentBase, Isolated, Moment, Remote
+    from hmz.agents import AgentBase, AgentConfig, Isolated, Moment, Remote
     from hmz.agents.base import Journal
     from hmz.agents.skills import Loaded
-    from hmz.epic import Sub
+    from hmz.epic import Epic, Sub
     from hmz.machines import MachineBase, MachineConfig, Mapped
 
     from . import Flow as Marked
@@ -96,39 +105,82 @@ class NotAFlow(ValueError):  # noqa: N818  -- the name the SPEC gives it
 
 
 class Running(NamedTuple):
-    """One flow that is running now.
+    """One flow that is running now, on the branch of the run it is running on.
 
     Attributes:
       flow: What it was asked for as -- the name a command line gave, or the one a flow asked
         another for, which is the name worth showing either way.
       since: When it started, on the monotonic clock.
+      depth: How far down the calls it is: 0 for the flow somebody started, one more for each
+        flow that had to be called to reach it.
+      under: The flow that called it, or None for the one somebody started. What makes a run
+        a tree rather than a list: two flows gathered at once run at the same moment and
+        neither of them is under the other, so only the flow each was called from can say
+        where it belongs.
     """
 
     flow: str
     since: float
+    depth: int = 0
+    under: Running | None = None
 
 
-#: The flows running now, in the order they started: the one somebody ran, then whatever it
-#: called, then whatever that called, each beside the thread it is running on. Kept here
-#: rather than asked of the flows, which is the one thing a flow cannot be asked -- it is a
-#: Python file and may branch any way it likes -- and read by the interface to say what is
+class _Held(NamedTuple):
+    """One flow of a run, as whatever is watching the run needs it.
+
+    Attributes:
+      one: What it is, and what called it.
+      thread: The thread `entered` was called on, which is what says it is still there.
+      agents: What it is being driven with, for a report of a failure in it.
+    """
+
+    one: Running
+    thread: threading.Thread
+    agents: Sequence[Agent]
+
+
+#: Every flow running now, in the order they started: the one somebody ran, then whatever any
+#: of them called, each beside the thread it was entered on and the agents it drives. Kept
+#: here rather than asked of the flows, which is the one thing a flow cannot be asked -- it is
+#: a Python file and may branch any way it likes -- and read by the interface to say what is
 #: running under what.
 #:
-#: A list rather than a stack, because a flow written as a coroutine may have two of them
-#: going at once, and both are running. Under a lock, since a flow runs on whichever thread
-#: took it and the interface reads while they run.
-_RUNNING: list[tuple[Running, threading.Thread]] = []
+#: Flat, with the shape carried by the records themselves: each one says what called it. It
+#: cannot be a stack, because a flow written as a coroutine may have two calls going at once
+#: on one thread and neither of those is under the other. Keyed by the identity of the record
+#: `entered` made, so that what goes with a flow goes when that flow does: a crash in the
+#: interface an hour after a flow ended must not be filed as a crash in that flow, and a flow
+#: that called another must not have the called one's agents put under its name.
+#:
+#: Under a lock, since a flow runs on whichever thread took it and the interface reads while
+#: they run.
+_RUNNING: dict[int, _Held] = {}
 _TELLING = threading.Lock()
 
-#: The agents each of those is being driven with, for a report of something that went wrong
-#: while they were. Keyed by the record `entered` made, so that it goes when the run does: a
-#: crash in the interface an hour after a flow ended must not be filed as a crash in that flow,
-#: and a flow that called another must not have the called one's agents put under its name.
-_DRIVEN: dict[int, Sequence[Agent]] = {}
+#: The flow this task is inside, which is the branch a call made from here goes on. A context
+#: variable rather than one slot for the thread or for the process: `asyncio` copies the
+#: context into every task it starts, so two flows gathered at once each get one of their own
+#: and a third called from either lands under the one that called it rather than under
+#: whichever of them happened to start last. A thread that is not running a flow -- an
+#: interface drawing a status line, a turn taken on a thread of its own -- has none, and
+#: reads the whole of the above instead.
+_ON: contextvars.ContextVar[Running | None] = contextvars.ContextVar(
+    "hmz_flow_running", default=None
+)
 
 
 def running() -> tuple[Running, ...]:
-    """Every flow running now, the one that was started first and whatever it called after it.
+    """Every flow running now: the branch this is asked from, or all of them from outside.
+
+    Asked from inside a flow -- by the flow's own code, by a hook it hung, by a callback an
+    agent reached for -- it answers with the branch that flow is on: the one somebody
+    started, then each flow that was called to get here, innermost last. That is what a flow
+    can truthfully be told, and the only thing a flow gathering two calls at once can be:
+    the sibling running beside it is not running under it and is none of its business.
+
+    Asked from outside one -- the interface drawing a status line, a report being written --
+    it answers with every flow of the run, oldest first, each saying how deep it is and what
+    called it. A run is a tree, and from outside there is no branch to be on.
 
     A flow says it has ended as it ends, however it ends -- but only a flow that got the
     chance to. One whose thread has gone was abandoned where it stood rather than finished:
@@ -136,15 +188,34 @@ def running() -> tuple[Running, ...]:
     against the threads running it, and a flow with no thread left is not one of them.
 
     Returns:
-      One apiece, in the order they started. Empty where nothing is running.
+      One apiece. Empty where nothing is running.
     """
     with _TELLING:
-        _RUNNING[:] = [one for one in _RUNNING if one[1].is_alive()]
-        return tuple(flow for flow, _ in _RUNNING)
+        for key in [
+            key for key, held in _RUNNING.items() if not held.thread.is_alive()
+        ]:
+            del _RUNNING[key]
+        here = _ON.get()
+        if here is None:
+            return tuple(held.one for held in _RUNNING.values())
+        branch = list[Running]()
+        while here is not None:
+            branch.append(here)
+            here = here.under
+        # Only the ones still running: a branch is read off records that hold each other,
+        # and one whose thread has gone was pruned above rather than left to be reported.
+        # A branch with nothing left on it is nothing running here, and never everything
+        # running anywhere -- what a flow must not be handed is its siblings.
+        return tuple(one for one in reversed(branch) if id(one) in _RUNNING)
 
 
 def entered(flow: str, agents: Sequence[Agent] = ()) -> Running:
-    """Writes down that a flow has started, for whatever is watching the run.
+    """Writes down that a flow has started here, under whatever called it here.
+
+    Under whatever called it *in this task*, which is what makes a run a tree: a called flow
+    runs on the branch of the flow that called it, and two called at once run on two branches
+    of it. What this task is inside is written down as well as answered with, so that a flow
+    called from inside this one lands under it.
 
     Args:
       flow: What it was asked for as.
@@ -153,22 +224,31 @@ def entered(flow: str, agents: Sequence[Agent] = ()) -> Running:
     Returns:
       The record, to be handed back when it ends.
     """
-    one = Running(flow, time.monotonic())
+    under = _ON.get()
+    one = Running(
+        flow, time.monotonic(), 0 if under is None else under.depth + 1, under
+    )
     with _TELLING:
-        _RUNNING.append((one, threading.current_thread()))
-        _DRIVEN[id(one)] = agents
+        _RUNNING[id(one)] = _Held(one, threading.current_thread(), agents)
+    _ON.set(one)
     return one
 
 
 def left(one: Running) -> None:
     """Writes down that a flow has ended, however it ended.
 
+    What this task is inside goes back to whatever called that flow, rather than to a token
+    taken when it started: a flow written as a coroutine is entered where the call was
+    written and left inside the task that ran it, and those are two contexts -- while the
+    branch it was on is the same one read from either.
+
     Args:
       one: What :func:`entered` answered with.
     """
     with _TELLING:
-        _RUNNING[:] = [held for held in _RUNNING if held[0] is not one]
-        _DRIVEN.pop(id(one), None)
+        _RUNNING.pop(id(one), None)
+    if _ON.get() is one:
+        _ON.set(one.under)
 
 
 #: The container this run is in, or None for a run on this machine. One per process rather
@@ -302,21 +382,6 @@ def lands_in(agents: Sequence[Agent], where_: MachineConfig) -> None:
         if isinstance(one, HumanAgent) or isinstance(one.config.machine, DockerConfig):
             continue
         cast("Driven", one).runs_on(where_)
-
-
-class Writing(NamedTuple):
-    """Where one called flow is being written down, and what its agents wrote to before it.
-
-    Attributes:
-      record: The record opened for the call, or None for a call nobody is keeping one of --
-        one from a flow run from a test, or from a flow that was called from nothing.
-      before: What each of its agents was writing to when it was called, to be handed back
-        when it returns: the agents belong to the run, and a flow that called another goes
-        on writing its own record afterwards.
-    """
-
-    record: Sub | None
-    before: tuple[Journal | None, ...]
 
 
 class Place(NamedTuple):
@@ -699,6 +764,30 @@ def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
       flow: The flow, as it was named.
       agents: The agents it is being run with.
     """
+    if (loaded := _brought(flow)) is None:
+        return
+    for agent in agents:
+        _settles(agent).loads(loaded)
+
+
+def _brought(flow: str | os.PathLike[str]) -> tuple[Loaded, ...] | None:
+    """The skills one flow works by, read off the flow as it is on disk now.
+
+    Worked out rather than mounted, so that what a called flow is to carry can be settled
+    before the call takes the agents: a call that is refused between the two must not leave
+    the flow that made it driving agents carrying somebody else's skills.
+
+    Args:
+      flow: The flow, as it was named.
+
+    Returns:
+      One apiece, or None for a flow that says nothing about skills at all -- which is a
+      flow that leaves the agents carrying whatever they carry rather than one that empties
+      them.
+
+    Raises:
+      NotAFlow: If a repository the flow names cannot be reached.
+    """
     from . import at as directory
     from .skills import brought
 
@@ -712,13 +801,11 @@ def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
     # -- but it may still name skills that live somewhere else, and those are as much what it
     # works by as a directory flow's are.
     if not where and not declared:
-        return
+        return None
     try:
-        loaded = brought(where, declared)
+        return tuple(brought(where, declared))
     except OSError as unreachable:
         raise NotAFlow(f"{flow}: {unreachable}") from unreachable
-    for agent in agents:
-        _settles(agent).loads(loaded)
 
 
 def _brings(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -759,38 +846,272 @@ def _called(flow: str | os.PathLike[str]) -> str:
     return said.parent.name if said.name == ENTRY else said.stem
 
 
-class _CalledSkills:
-    """Template for handing agents into a called flow and restoring them afterwards."""
+def _carried(
+    flow: str, agents: Sequence[Agent], *, inherit: bool
+) -> list[tuple[Loaded, ...]]:
+    """What each agent is to carry inside a called flow, worked out before the call takes it.
 
-    def carry(self, flow: str, agents: Sequence[Agent]) -> list[tuple[Loaded, ...]]:
-        """Loads the called flow's skills under this policy, returning the prior state."""
-        before = [agent.loaded for agent in agents]
-        carries(flow, agents)
-        for agent, parent in zip(agents, before, strict=True):
-            _settles(agent).loads(self.combine(parent, agent.loaded))
-        return before
+    Args:
+      flow: The flow being called, as it was asked for.
+      agents: The agents it is being handed, carrying the calling flow's own.
+      inherit: Whether what they carry now stays reachable inside the call, after the called
+        flow's own and only where the names do not collide.
 
-    def combine(
-        self, parent: tuple[Loaded, ...], child: tuple[Loaded, ...]
-    ) -> tuple[Loaded, ...]:
-        """Chooses what the called flow carries; isolation is the default policy."""
-        del parent
-        return child
-
-
-class _InheritedCalledSkills(_CalledSkills):
-    """Carries a child's skills plus parent skills whose names the child did not replace."""
-
-    def combine(
-        self, parent: tuple[Loaded, ...], child: tuple[Loaded, ...]
-    ) -> tuple[Loaded, ...]:
-        """Merges child first so its version wins every same-name skill."""
-        child_names = {one.name for one in child}
-        return child + tuple(one for one in parent if one.name not in child_names)
+    Returns:
+      One tuple apiece, in the order the agents were given.
+    """
+    child = _brought(flow)
+    if child is None:
+        # A flow that says nothing about skills leaves them as they are, which is what a run
+        # of such a flow does too.
+        return [agent.loaded for agent in agents]
+    if not inherit:
+        return [child for _ in agents]
+    named = {one.name for one in child}
+    return [
+        child + tuple(one for one in agent.loaded if one.name not in named)
+        for agent in agents
+    ]
 
 
-_ISOLATED_SKILLS = _CalledSkills()
-_INHERITED_SKILLS = _InheritedCalledSkills()
+class _Claim(NamedTuple):
+    """One call's hold on one agent, for as long as that call runs.
+
+    Attributes:
+      on: The branch the call is on, which is what says whether two claims are one under the
+        other or two beside each other.
+      record: Where that call is written down, or None for a call nobody is keeping a record
+        of.
+      skills: What the called flow works by, which its agents carry while it runs.
+    """
+
+    on: Running
+    record: Sub | None
+    skills: tuple[Loaded, ...]
+
+
+class _Claimed(NamedTuple):
+    """One agent, as it was before any call took it and as the calls that have it want it.
+
+    Attributes:
+      was: Where it was writing before the first of them took it.
+      carried: What it was carrying then.
+      held: Every call that has it now, in the order they took it.
+    """
+
+    was: Journal | None
+    carried: tuple[Loaded, ...]
+    held: list[_Claim]
+
+
+#: Which calls have each agent now, by the agent's own identity. An agent belongs to the run
+#: rather than to any one flow of it, and a called flow points it at that call's own record
+#: and that flow's own skills for as long as the call lasts -- so what it was before has to
+#: be kept somewhere, and a swap remembered by whoever swapped it is a swap two calls going
+#: at once put back in the wrong order.
+#:
+#: Read and written under `_TELLING`, beside what is running, since the two answer one
+#: question: which flow this agent is working for now.
+_CLAIMED: dict[int, _Claimed] = {}
+
+#: Where each flow of a run is writing, by the identity of its record. What a call made from
+#: inside a flow is written under, which is the flow's own record and not the agents': an
+#: agent two calls have at once is writing where both of them were called from, and a third
+#: flow called from inside one of those belongs under that one.
+_WRITTEN: dict[int, Sub | None] = {}
+
+
+def _beneath(one: Running, of: Running) -> bool:
+    """Whether one flow is the other, or is running somewhere under it.
+
+    Args:
+      one: The flow being asked about.
+      of: The flow it may be running under.
+
+    Returns:
+      True where it is, which is what makes two claims on one agent a nesting rather than a
+      pair of siblings.
+    """
+    at: Running | None = one
+    while at is not None:
+        if at is of:
+            return True
+        at = at.under
+    return False
+
+
+def _points(agent: Agent, claimed: _Claimed) -> None:
+    """Points one agent at where the calls that have it agree it is working.
+
+    One call has it: that call's record and that flow's skills, which is a called flow being
+    driven as a run of it would be. Two calls that are one under the other: the inner one's,
+    which is the same thing said twice. Two calls beside each other -- a flow that gathered
+    two calls sharing the agents it was handed -- and neither of them may have it: what a
+    session opened by that agent is part of is the flow they were both called from, and
+    writing it into whichever of them started last would be filing it under a flow that
+    happened to be there. A flow that wants a branch of its own writes down the agents for
+    it, which is what `drives` and `Agent.clone` are for.
+
+    Which is the flow they were both called from and not the run: the fork may be five flows
+    down, and an agent dropped all the way back to the run's own record would be filed under
+    a flow that was not even in the room. So it is the deepest call holding this agent that
+    every one of them is running under -- and only where the fork is the run's own flow, which
+    holds nothing, does that come back to what the agent was before any of them took it.
+
+    Args:
+      agent: The agent.
+      claimed: What it was, and what has it now.
+    """
+    deep = sorted(claimed.held, key=lambda one: one.on.depth, reverse=True)
+    # The innermost, where the calls holding it are a chain -- a flow that called a flow.
+    if all(_beneath(deep[0].on, one.on) for one in claimed.held):
+        found = deep[0]
+    else:
+        # Otherwise the fork: the deepest of them that all of them are running under.
+        found = next(
+            (
+                each
+                for each in deep
+                if all(_beneath(one.on, each.on) for one in claimed.held)
+            ),
+            None,
+        )
+    if found is None:
+        agent.epic, skills = claimed.was, claimed.carried
+    else:
+        agent.epic, skills = found.record, found.skills
+    _settles(agent).loads(skills)
+
+
+def _takes(
+    driven: Sequence[Agent],
+    started: Running,
+    record: Sub | None,
+    skills: Sequence[tuple[Loaded, ...]],
+) -> None:
+    """Hands the agents to a call: its record to write into, its flow's skills to carry.
+
+    Args:
+      driven: The agents the called flow was handed.
+      started: What :func:`entered` answered with.
+      record: Where the call is written down, or None for one nobody is keeping a record of.
+      skills: What each of the agents is to carry, in the order they were given.
+    """
+    with _TELLING:
+        _WRITTEN[id(started)] = record
+        for agent, carrying in zip(driven, skills, strict=True):
+            held = _CLAIMED.setdefault(
+                id(agent), _Claimed(agent.epic, agent.loaded, [])
+            )
+            held.held.append(_Claim(started, record, carrying))
+            _points(agent, held)
+
+
+def _gives_back(driven: Sequence[Agent], started: Running) -> Sub | None:
+    """Hands the agents back as the call found them, and answers with the call's record.
+
+    However the call ended, and whichever order two calls going at once end in: what an agent
+    goes back to is what it was before any call took it rather than what the call that is
+    ending happened to see, which two ending out of order would put back as each other's.
+
+    Args:
+      driven: The agents the called flow was handed.
+      started: What :func:`entered` answered with.
+
+    Returns:
+      Where the call was written down, or None for one nobody kept a record of.
+    """
+    with _TELLING:
+        record = _WRITTEN.pop(id(started), None)
+        for agent in driven:
+            held = _CLAIMED.get(id(agent))
+            if held is None:
+                continue
+            held.held[:] = [one for one in held.held if one.on is not started]
+            if held.held:
+                _points(agent, held)
+                continue
+            del _CLAIMED[id(agent)]
+            agent.epic = held.was
+            _settles(agent).loads(held.carried)
+    return record
+
+
+def _writes(driven: Sequence[Agent]) -> Epic | None:
+    """The record the flow running here writes to, which is what a call of its own goes under.
+
+    Read off the branch this task is on rather than off the agents it is driving. An agent two
+    calls have at once is writing where both of them were called from, and a third flow called
+    from inside one of those belongs under that one rather than under what the two share.
+
+    The flow nobody called keeps no record of its own here -- it writes the run's, which
+    whatever opened the run handed to the agents *it* started with. Those, and not the ones
+    this call is being made with: a branch driving agents of its own, which is what `drives`
+    and `Agent.clone` hand it, would otherwise be a branch that could not find the run it is
+    part of and would be written down nowhere, along with everything under it.
+
+    Args:
+      driven: The agents the call is being made with, for a call from a thread with no branch
+        on it: one made from a tool a turn reached for, or from outside any flow at all.
+
+    Returns:
+      The record, or None for a call from a flow nothing is keeping a record of -- one run
+      from a test, one called from nothing.
+    """
+    from hmz.epic import Epic
+
+    at = _ON.get()
+    if at is None:
+        # No branch to read: a call made from a thread that is not running a flow -- a tool
+        # a turn reached for, which is the flow's own code on somebody else's thread. What
+        # the agents are writing to now is then the only thing that knows.
+        return next(
+            (one for one in (each.epic for each in driven) if isinstance(one, Epic)),
+            None,
+        )
+    over: Sequence[Agent] = driven
+    with _TELLING:
+        while at is not None:
+            if id(at) in _WRITTEN:
+                return _WRITTEN[id(at)]
+            if (held := _RUNNING.get(id(at))) is not None and held.agents:
+                over = held.agents
+            at = at.under
+        # What the agents of the outermost flow were handed as the run began -- and what they
+        # are still writing to unless a call has them, which is what was kept when it did.
+        was = [
+            _CLAIMED[id(one)].was if id(one) in _CLAIMED else one.epic for one in over
+        ]
+    return next((one for one in was if isinstance(one, Epic)), None)
+
+
+#: How deep one flow calling another goes before the next call is refused. A `load` chain has
+#: no natural bottom -- a flow may call itself, and one that decides how deep to go from its
+#: own config or from what a model said may decide wrong -- and what an unbounded one comes to
+#: is a `RecursionError` out of whatever the innermost call happened to be importing, which
+#: names no flow and blames the wrong line. High enough that no chain anybody writes on
+#: purpose reaches it, low enough to be reached long before the interpreter's own limit is.
+_DEEPEST = 64
+
+
+def _deep(flow: str) -> None:
+    """Refuses a call from a chain of flows that has gone deeper than one goes.
+
+    Args:
+      flow: The flow being called, as it was asked for.
+
+    Raises:
+      NotAFlow: If calling it would be deeper than :data:`_DEEPEST` flows down.
+    """
+    at = _ON.get()
+    if at is None or at.depth + 1 <= _DEEPEST:
+        return
+    walked = " > ".join(one.flow for one in running()[-3:])
+    raise NotAFlow(
+        f"{flow}: called {at.depth + 1} flows deep, and a chain of flows calling flows "
+        f"goes {_DEEPEST} -- a flow with no bottom to it is a flow to correct, and this "
+        f"one reached here through … > {walked}"
+    )
 
 
 def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry:
@@ -833,11 +1154,28 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
     its skill wins when parent and child use the same name, and the agents are restored to
     exactly what the caller carried when the call returns or raises.
 
-    Each call is written down as the run of a flow it is. The epic of the run that called it
-    gets a record of that call -- one file per call, named for the flow and for this call of
+    A call may also say what the flow it is calling runs at, which is `drives`: a mapping
+    from the name the called flow gives one of its places -- or the name of the agent filling
+    it -- to the config that branch is to be driven at::
+
+        await asyncio.gather(
+            load("official/rlar")(agents, task),
+            load("official/rlar")(agents, task, drives={"actor": careful}),
+        )
+
+    What each of those is handed is a clone at that config rather than the agent set up
+    again: an agent is what it was made as, so two efforts are two agents. They are the
+    call's own -- written into the call's own record, carrying the called flow's skills --
+    which is also what makes two calls gathered at once two branches with nothing shared
+    between them.
+
+    Each call is written down as the run of a flow it is. The record of the flow that called
+    it gets a line saying so -- one record per call, named for the flow and for this call of
     it -- and what the called flow opens, keeps and calls in turn goes there rather than into
-    the record of whatever started the run. The record that called it says `called` and
-    `returned` with the filename, so a run reads back as the shape it ran in.
+    the record of whatever started the run. So a flow calling a flow calling a flow reads
+    back as the tree it ran as, however deep it went and however many of it ran at once. The
+    record that called it says `called` and `returned` with the filename, at both ends,
+    because two calls going at once end in an order nothing can pair by.
 
     Args:
       flow: The flow to call, by the name `-f` takes.
@@ -857,17 +1195,18 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
     # wrong where it was written rather than an hour into a loop.
     readies(declares(flow)[0])
     named = str(flow)
-    skill_policy = _INHERITED_SKILLS if inherit_skills else _ISOLATED_SKILLS
 
     def calling(
         agents: Sequence[Agent],
         task: str,
         config: BaseModel | dict[str, Any] | None = None,
+        *,
+        drives: Mapping[str, AgentConfig] | None = None,
     ) -> Awaitable[None] | None:
         # Read afresh, which is what makes a flow rewritten since the last call the flow that
         # runs now: a flow is a directory, and reading one is running its entry point.
         run, places, make, setting, mark = declares(flow)
-        driven = _handed(named, places, make, agents)
+        driven = _handed(named, places, make, agents, drives)
         # Read back through the flow's own model, which is what refuses a config a flow does
         # not take and one it takes another of -- and what puts the settings through its own
         # validators at the moment it is about to run, exactly as a run of it does. Before the
@@ -876,110 +1215,212 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
         # left driving agents that are carrying the skills of a flow that never ran.
         given = None if config is None else set_up(named, setting, config)
         settings = () if setting is None else (given,)
-        # And what it left behind last time, for a flow that says it can be picked up: kept
-        # under its own name in the epic of the run that called it, since a flow that called
-        # another is two flows and neither writes the other's.
-        held = () if not mark.resumable else (_holding(driven, named),)
-        # And the skills it works by, which are the flow's rather than the agents': a called
-        # flow brings its own, mounted onto whatever sessions it opens, and hands the agents
-        # back as it found them so that the flow which called it goes on carrying its own.
-        before = skill_policy.carry(named, driven)
-        started = entered(named, driven)
-        # And a record of its own to write into, in the epic of the run that called it: a
-        # called flow opens sessions and calls flows of its own, and what it did is its own
-        # rather than a run's that happened to start it.
-        writing = _opened(driven, named, task, resumable=mark.resumable)
+        # And refused where a chain of them has no bottom, for the same reason and in the
+        # same breath: before anything has been taken, carried or written down.
+        _deep(named)
+        if _awaits(run):
+            # Nothing is taken until the flow itself starts. A coroutine has not run when it
+            # is made -- one gathered and then cancelled before its first step never runs at
+            # all -- so a call written down as started by the making of it would be a call
+            # nothing ever ends, holding agents nothing ever hands back. It is also where
+            # the branch has to be taken: `asyncio` copies the context into the task that
+            # runs it, and two gathered at once are two tasks with a context apiece.
+            return _running(
+                run,
+                driven,
+                named,
+                task,
+                settings,
+                resumable=mark.resumable,
+                inherit=inherit_skills,
+            )
+        started, held = _begins(
+            named, driven, task, resumable=mark.resumable, inherit=inherit_skills
+        )
         try:
             answered = run(driven, task, *settings, *held)
         except BaseException as why:
-            _ended(driven, started, before, writing, type(why))
+            _ended(driven, started, type(why))
             raise
         if inspect.isawaitable(answered):
-            # A flow written as a coroutine has not run yet: it is running while whoever
-            # called it awaits it, so what says it is running has to last that long too.
-            return _awaited(answered, driven, started, before, writing)
-        _ended(driven, started, before, writing)
+            # A flow that is not a coroutine function and answered with something to await
+            # all the same -- one wrapped in a decorator of its own, a compiled atlas. It
+            # runs while whoever called it awaits it, so what says it is running has to last
+            # that long too, and the branch goes back to the caller until it does: here is
+            # the caller, and two of these gathered at once share it.
+            _ON.set(started.under)
+            return _awaited(answered, driven, started)
+        _ended(driven, started)
         return None
 
     return calling
+
+
+def _awaits(run: Entry) -> bool:
+    """Whether a flow is one that has to be awaited, asked before it is called rather than after.
+
+    Asked beforehand because a coroutine flow must be written down as started where it starts
+    rather than where it was made, and what it was made by is the only thing there is to ask
+    at that point. A flow that is not one of these and answers with something to await anyway
+    -- one wrapped in a decorator of its own -- is left to be found out by the answer.
+
+    Args:
+      run: The flow's entry point.
+
+    Returns:
+      True where calling it gives back a coroutine.
+    """
+    if inspect.iscoroutinefunction(run):
+        return True
+    # A flow that is an object rather than a function, which is what a compiled atlas is.
+    called = getattr(run, "__call__", None)  # noqa: B004 -- asked of it, not called
+    return called is not None and inspect.iscoroutinefunction(called)
+
+
+def _begins(
+    named: str,
+    driven: tuple[Agent, ...],
+    task: str,
+    *,
+    resumable: bool,
+    inherit: bool,
+) -> tuple[Running, tuple[Any, ...]]:
+    """Puts a call on the branch it runs on, and takes the agents for it.
+
+    Args:
+      named: The flow being called, as it was asked for.
+      driven: The agents it is being handed.
+      task: What it was called with.
+      resumable: Whether it says it can be picked up again.
+      inherit: Whether the calling flow's skills stay reachable inside it.
+
+    Returns:
+      What :func:`entered` answered with, and what the flow is to be called with after the
+      task and its settings.
+    """
+    # Where it is written down, which is under the flow running here rather than under
+    # whatever the agents happen to be writing to: two calls sharing one agent leave it
+    # writing where they were both called from, and a third called from inside one of them
+    # belongs under that one.
+    under = _writes(driven)
+    # What it left behind last time, for a flow that says it can be picked up: kept under its
+    # own name in the epic of the run that called it, since a flow that called another is two
+    # flows and neither writes the other's.
+    held = () if not resumable else (_holding(under, named),)
+    # And the skills it works by, which are the flow's rather than the agents': a called flow
+    # brings its own, mounted onto whatever sessions it opens, and hands the agents back as
+    # it found them so that the flow which called it goes on carrying its own.
+    carrying = _carried(named, driven, inherit=inherit)
+    started = entered(named, driven)
+    try:
+        # A record of its own to write into, in the epic of the run that called it: a called
+        # flow opens sessions and calls flows of its own, and what it did is its own rather
+        # than a run's that happened to start it.
+        writing = _opened(under, driven, named, task, resumable=resumable)
+        _takes(driven, started, writing, carrying)
+    except BaseException:
+        # A record that could not be opened is a call that never started: leaving it on the
+        # branch would put every later call of this task under a flow that is not running.
+        left(started)
+        raise
+    return started, held
+
+
+async def _running(
+    run: Entry,
+    driven: tuple[Agent, ...],
+    named: str,
+    task: str,
+    settings: tuple[Any, ...],
+    *,
+    resumable: bool,
+    inherit: bool,
+) -> None:
+    """Runs a flow written as a coroutine, taking its agents where it actually starts.
+
+    Args:
+      run: The flow's entry point.
+      driven: The agents it was called with.
+      named: The flow, as it was asked for.
+      task: What it was called with.
+      settings: What it was set up with, or nothing for a flow that takes none.
+      resumable: Whether it says it can be picked up again.
+      inherit: Whether the calling flow's skills stay reachable inside it.
+    """
+    started, held = _begins(named, driven, task, resumable=resumable, inherit=inherit)
+    try:
+        # Asked of the answer all the same: what says it has to be awaited is what it was
+        # written as, and a flow is what it does when it is called.
+        if inspect.isawaitable(answered := run(driven, task, *settings, *held)):
+            await answered
+    except BaseException as why:
+        # Cancellation among them: a task taken down mid-await unwinds through here, which
+        # hands its agents back, closes its record and takes it off the branch -- and does so
+        # at every level, each level being a task or a frame of its own.
+        _ended(driven, started, type(why))
+        raise
+    _ended(driven, started)
 
 
 async def _awaited(
     answered: Awaitable[None],
     driven: tuple[Agent, ...],
     started: Running,
-    before: Sequence[tuple[Loaded, ...]],
-    writing: Writing,
 ) -> None:
-    """Waits for a called flow that is a coroutine, and writes down that it ended.
+    """Waits for a flow that answered with something to await, and writes down that it ended.
+
+    The branch is taken here rather than where the call was written, for the reason a
+    coroutine flow's is: it is here that the flow is actually running, and here is a task of
+    its own where a sibling was gathered beside it.
 
     Args:
       answered: What calling it gave back.
       driven: The agents it was called with.
       started: What :func:`entered` answered with.
-      before: What each of them was carrying before it was called.
-      writing: What :func:`_opened` answered with.
     """
+    _ON.set(started)
     try:
         await answered
     except BaseException as why:
-        _ended(driven, started, before, writing, type(why))
+        _ended(driven, started, type(why))
         raise
-    _ended(driven, started, before, writing)
+    _ended(driven, started)
 
 
 def _opened(
+    under: Epic | None,
     driven: tuple[Agent, ...],
     named: str,
     task: str,
     *,
     resumable: bool,
-) -> Writing:
-    """Opens the record a called flow is written to, and points its agents at it.
-
-    Found through the agents rather than through anything of ours: the epic belongs to the
-    run that was started, the agents were handed it as it began, and a flow called from a
-    `Runner` that opened none -- a flow run from a test, a flow called from a flow called
-    from nothing -- has nowhere to write and nothing to say.
-
-    The agents write into it for as long as the call lasts, which is what puts a session
-    opened inside a called flow in that flow's record rather than in the record of whatever
-    started the run. They are pointed back at what they were writing to when it returns, the
-    way they are handed back the skills they carried.
+) -> Sub | None:
+    """Opens the record a called flow is written to, inside the record that called it.
 
     Args:
+      under: The record of the flow making the call, or None for a call from a flow nobody is
+        keeping a record of -- one run from a test, one called from nothing.
       driven: The agents the called flow was handed.
       named: The flow, as it was asked for.
       task: What it was called with.
       resumable: Whether it says it can be picked up again.
 
     Returns:
-      The record and what to hand the agents back.
+      The record, or None where there is nowhere to write.
     """
-    # Asked what it is rather than taken as read: what an agent asks of a journal is that it
-    # can be told a session was opened, and this is asking it for something else.
-    from hmz.epic import Epic
-
-    under = next((one.epic for one in driven if isinstance(one.epic, Epic)), None)
     if under is None:
-        return Writing(None, ())
+        return None
     # Cast because a flow sees its agents through `Agent`, which says what a flow may ask
     # of one and nothing about what it was configured with -- and what a record says it
     # was driven by is exactly that. They are the run's own agents either way.
-    record = under.called(
+    return under.called(
         named, cast("Sequence[AgentBase]", driven), task, resumable=resumable
     )
-    was = tuple(agent.epic for agent in driven)
-    for agent in driven:
-        agent.epic = record
-    return Writing(record, was)
 
 
 def _ended(
     driven: tuple[Agent, ...],
     started: Running,
-    before: Sequence[tuple[Loaded, ...]],
-    writing: Writing,
     kind: type[BaseException] | None = None,
 ) -> None:
     """Writes down that a called flow has ended, and hands its agents back as they came.
@@ -987,17 +1428,11 @@ def _ended(
     Args:
       driven: The agents it was called with.
       started: What :func:`entered` answered with.
-      before: The skills each of them carried before the call, which are the calling flow's.
-      writing: What :func:`_opened` answered with.
       kind: What was raised out of the called flow, if anything.
     """
+    if (record := _gives_back(driven, started)) is not None:
+        record.ended(kind)
     left(started)
-    if writing.record is not None:
-        for agent, wrote in zip(driven, writing.before, strict=True):
-            agent.epic = wrote
-        writing.record.ended(kind)
-    for agent, held in zip(driven, before, strict=True):
-        _settles(agent).loads(held)
 
 
 def _handed(
@@ -1005,6 +1440,7 @@ def _handed(
     places: tuple[Place, ...],
     make: Callable[..., tuple[Agent, ...]],
     agents: Sequence[Agent],
+    drives: Mapping[str, AgentConfig] | None = None,
 ) -> tuple[Agent, ...]:
     """The agents a called flow is handed, as the tuple that flow declared.
 
@@ -1014,18 +1450,27 @@ def _handed(
     was started, and a name changed under it would change what the run has already been
     written down as.
 
+    A caller may say what a place of the called flow is to be driven at, and what fills that
+    place is then a clone at that config -- a second agent rather than this one set up again,
+    since what an agent is is settled where it is made. It is checked exactly as the agent it
+    replaces would have been: a config that puts a place somewhere the flow does not is
+    refused where the call was written.
+
     Args:
       flow: The flow being called, for what a refusal says.
       places: What it declared.
       make: What to build its agents as -- the named tuple it declared, or a plain one.
       agents: What the caller handed over.
+      drives: What to drive one or more of its places at, by the name the called flow gives
+        the place or the name of the agent filling it, or None to drive them all as they come.
 
     Returns:
       The agents, as the flow declared them.
 
     Raises:
       NotAFlow: If that is the wrong number of them, if one of them cannot run a moment the
-        flow says that place has to, or if one is somewhere the flow does not put it.
+        flow says that place has to, if one is somewhere the flow does not put it, or if
+        `drives` names something the flow does not drive.
     """
     from hmz.agents import HumanAgent
 
@@ -1041,6 +1486,8 @@ def _handed(
         raise NotAFlow(
             f"{flow}: the flow drives {len(asked)} agents, {len(given)} given"
         )
+    if drives:
+        driven = _differently(flow, places, driven, drives)
     for agent, place in zip(driven, places, strict=True):
         if short := place.moments - type(agent).moments:
             raise NotAFlow(
@@ -1065,7 +1512,69 @@ def _handed(
     return make(driven)
 
 
-def _holding(driven: tuple[Agent, ...], named: str) -> dict[str, Any]:
+def _differently(
+    flow: str,
+    places: tuple[Place, ...],
+    driven: Sequence[Agent],
+    drives: Mapping[str, AgentConfig],
+) -> list[Agent]:
+    """The agents of a call that said what one of its places is to be driven at.
+
+    A clone apiece rather than the agents set up again, because that is what an agent set up
+    differently is: an agent is what it was made as, and two efforts are two agents. Each
+    carries what the one it stands in for carries and is named nothing, which is what tells
+    a comparison of two efforts from one agent that changed its mind.
+
+    Args:
+      flow: The flow being called, for what a refusal says.
+      places: What it declared, which is what its places are called.
+      driven: The agents it would have been handed.
+      drives: What to drive one or more of those places at.
+
+    Returns:
+      The agents to hand over, the clones among them.
+
+    Raises:
+      NotAFlow: If it names something the flow does not drive, something two of its places
+        answer to, or the person at the prompt -- who runs nothing anybody chose and so has
+        nothing to be driven at.
+    """
+    from hmz.agents import HumanAgent
+
+    made = list(driven)
+    where: dict[str, int | None] = {}
+    for at, agent in enumerate(made):
+        # None for a name two places answer to -- one agent handed to a flow twice, two named
+        # the same -- since what a caller meant by it is then not a thing to guess at.
+        where[agent.id] = None if agent.id in where else at
+    # The called flow's own names over the agents' own: a caller says what the flow it is
+    # calling is to drive its reviewer at, and what the flow it was handed calls that agent
+    # is the caller's business rather than the callee's.
+    for at, place in enumerate(places):
+        if place.name:
+            where[place.name] = at
+    for name, config in drives.items():
+        if name in where and where[name] is None:
+            raise NotAFlow(
+                f"{flow}: two of the agents it is being handed are called {name!r}, so "
+                "which of them is to be driven at that is not a thing to work out"
+            )
+        at = where.get(name)
+        if at is None:
+            raise NotAFlow(
+                f"{flow}: nothing it drives is called {name!r} -- it drives "
+                f"{', '.join(place.name or 'an agent' for place in places)}"
+            )
+        if isinstance(made[at], HumanAgent):
+            raise NotAFlow(
+                f"{flow}: {name} is the person at the prompt, who takes no turn anywhere "
+                "and so runs nothing to be driven at"
+            )
+        made[at] = made[at].clone(config=config)
+    return made
+
+
+def _holding(under: Epic | None, named: str) -> dict[str, Any]:
     """The dict a called flow that can be picked up writes what it wants back into.
 
     Kept in the epic of the run that called it, under the called flow's own name: a flow
@@ -1074,20 +1583,23 @@ def _holding(driven: tuple[Agent, ...], named: str) -> dict[str, Any]:
     nothing -- is handed a dict that is nowhere, which is a flow that runs and leaves nothing
     rather than a call that fails.
 
+    Found through the flow making the call rather than through the agents it is handing over,
+    for the reason the record is: a branch driving agents of its own would otherwise leave
+    nothing behind and be picked up as a run that never happened.
+
     Args:
-      driven: The agents the called flow is being handed, which is what holds the epic.
+      under: The record the flow making the call is writing, which is what holds the epic.
       named: The called flow, as it was asked for.
 
     Returns:
       What it left behind last time, as something to write this time's into.
     """
-    from hmz.epic import Epic, resumed, state
+    from hmz.epic import resumed, state
 
-    for agent in driven:
-        if isinstance(agent.epic, Epic):
-            at = resumed(named, agent.epic.workspace)
-            return agent.epic.state(named, state(at, named) if at is not None else None)
-    return {}
+    if under is None:
+        return {}
+    at = resumed(named, under.workspace)
+    return under.state(named, state(at, named) if at is not None else None)
 
 
 def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
@@ -1435,20 +1947,22 @@ def _about() -> dict[str, Any]:
     Returns:
       The description, as plain values something can write out as YAML. The flow named at the
       top is the one somebody started, which is the one a report is about; whatever it called
-      is under `running` beneath it.
+      is under `running` beneath it, each saying how deep it is and what called it -- a run
+      is a tree, and a report of one that flattened it would say a flow ran under the wrong
+      one.
     """
     with _TELLING:
-        held = [
-            (one, _DRIVEN.get(id(one), ()))
-            for one, thread in _RUNNING
-            if thread.is_alive()
-        ]
+        held = [one for one in _RUNNING.values() if one.thread.is_alive()]
     return {
-        "flow": held[0][0].flow if held else "",
+        "flow": next((one.one.flow for one in held if one.one.under is None), ""),
         "running": [
             {
-                "flow": one.flow,
-                "for": round(time.monotonic() - one.since),
+                "flow": each_of.one.flow,
+                "deep": each_of.one.depth,
+                "under": (
+                    each_of.one.under.flow if each_of.one.under is not None else ""
+                ),
+                "for": round(time.monotonic() - each_of.one.since),
                 "agents": [
                     {
                         "called": each.id,
@@ -1464,10 +1978,10 @@ def _about() -> dict[str, Any]:
                         "works": "here" if each.config.machine is None else "elsewhere",
                         "skills": [loaded.name for loaded in each.loaded],
                     }
-                    for each in agents
+                    for each in each_of.agents
                 ],
             }
-            for one, agents in held
+            for each_of in held
         ],
     }
 

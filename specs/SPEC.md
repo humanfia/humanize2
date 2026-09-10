@@ -469,10 +469,18 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   back as the shape it ran in rather than as one flat list nothing can be attributed to. How
   it ended MUST be how the call ended: a call that raised inside a run that carried on is a
   call that failed and a run that did not.
-- What an epic opened MUST be read across every record it holds, and each session MUST say
-  which flow opened it. One run is one run however many flows it took to run it: a trace of it
-  is gathered from what the whole run opened, and which flow a session was opened inside is
-  what a record of its own is for.
+- A run of flows calling flows MUST be readable back as the tree it ran as, however deep it
+  went and however many of it ran at once: each record under the one that called it, and two
+  gathered calls under neither. Read as a list it would be so many things one run did, with
+  nothing saying which of them ran under which -- and a recursion five levels deep with
+  siblings at every level is exactly the run nobody can hold in their head unaided. Two calls
+  going at once MUST be told from one another by the record each was written to rather than by
+  the flow's name, which is the same name.
+- Each session MUST say which flow opened it and which record it was written into: a flow
+  called five times in one run is five calls of it, and the name alone would make one flow of
+  the five. What an epic opened MUST be read across every record it holds. One run is one run
+  however many flows it took to run it: a trace of it is gathered from what the whole run
+  opened, and which flow a session was opened inside is what a record of its own is for.
 - A session MUST be written down as whose it was, what took its turns, which account those
   turns ran as and what the backend called it. The backend's own log says only the last of
   those: two agents at one configuration are one agent to anything reading the logs alone,
