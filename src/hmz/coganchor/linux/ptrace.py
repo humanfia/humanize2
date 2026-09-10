@@ -29,6 +29,7 @@ __all__ = [
     "SYSCALL_STOP_SIG",
     "WALL",
     "Registers",
+    "blank",
     "cont",
     "get_event_message",
     "getregs",
@@ -87,7 +88,10 @@ class _Iovec(ctypes.Structure):
 
 def _ptrace(request: int, pid: int, addr: int, data: int) -> int:
     ctypes.set_errno(0)
-    result = _libc.ptrace(request, pid, ctypes.c_void_p(addr), ctypes.c_void_p(data))
+    # The addresses as the numbers they are: ctypes converts an integer to a `void *`
+    # argument itself, and a supervisor stopping tens of thousands of times a session would
+    # otherwise build two pointer objects at every one of them and drop both.
+    result = _libc.ptrace(request, pid, addr, data)
     if result == -1:
         code = ctypes.get_errno()
         if code:
@@ -100,11 +104,16 @@ def _ptrace(request: int, pid: int, addr: int, data: int) -> int:
 class Registers:
     """Mutable view over a tracee's ``user_regs_struct``."""
 
-    __slots__ = ("_buffer", "_dirty")
+    __slots__ = ("_buffer", "_dirty", "_vector")
 
     def __init__(self, buffer: ctypes.Array[ctypes.c_ulonglong]) -> None:
         self._buffer = buffer
         self._dirty = False
+        # The iovec the kernel is handed to fill this in and to read it back out, made once
+        # and held beside what it points at: it holds the address as a number rather than a
+        # reference, so a vector that outlived its buffer would name freed memory. Held here
+        # so a tracer reading a register set per stop is not building one per stop too.
+        self._vector = _Iovec(ctypes.addressof(buffer), ctypes.sizeof(buffer))
 
     @property
     def dirty(self) -> bool:
@@ -113,6 +122,20 @@ class Registers:
     @property
     def buffer(self) -> ctypes.Array[ctypes.c_ulonglong]:
         return self._buffer
+
+    @property
+    def vector(self) -> int:
+        """Where the iovec naming this register set is, for a ptrace call to be given."""
+        return ctypes.addressof(self._vector)
+
+    def settled(self) -> None:
+        """Says these are the tracee's own registers again, with nothing written over them.
+
+        Called by whatever has just read a stop's registers into a set that has been used
+        before: what `dirty` answers is whether this stop wrote anything, and a set carried
+        from the last stop would answer for that one.
+        """
+        self._dirty = False
 
     @property
     def syscall_number(self) -> int:
@@ -175,19 +198,35 @@ def setoptions(pid: int, options: int = OPTIONS) -> None:
     _ptrace(_SETOPTIONS, pid, 0, options)
 
 
-def getregs(pid: int) -> Registers:
-    """Read the registers of a tracee that is stopped."""
-    buffer = (ctypes.c_ulonglong * ARCH.register_count)()
-    iov = _Iovec(ctypes.addressof(buffer), ctypes.sizeof(buffer))
-    _ptrace(_GETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
-    return Registers(buffer)
+def blank() -> Registers:
+    """An empty register set of this architecture's shape, to be read into.
+
+    For a tracer that stops tens of thousands of times a session: one set, read over at each
+    stop, rather than one allocated and collected per stop. Between two stops the tracee
+    runs, so what an allocation there costs is not the allocation but the cache it displaces.
+    """
+    return Registers((ctypes.c_ulonglong * ARCH.register_count)())
+
+
+def getregs(pid: int, into: Registers | None = None) -> Registers:
+    """Read the registers of a tracee that is stopped.
+
+    Args:
+      pid: The stopped tracee.
+      into: A register set to read over, or None for one of its own.
+
+    Returns:
+      The registers, which are `into` itself where one was given.
+    """
+    registers = blank() if into is None else into
+    _ptrace(_GETREGSET, pid, _NT_PRSTATUS, registers.vector)
+    registers.settled()
+    return registers
 
 
 def setregs(pid: int, registers: Registers) -> None:
     """Write registers back, which is how a syscall is answered or redirected."""
-    buffer = registers.buffer
-    iov = _Iovec(ctypes.addressof(buffer), ctypes.sizeof(buffer))
-    _ptrace(_SETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
+    _ptrace(_SETREGSET, pid, _NT_PRSTATUS, registers.vector)
 
 
 def cont(pid: int, signal: int = 0) -> None:

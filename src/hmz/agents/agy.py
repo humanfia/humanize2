@@ -55,6 +55,11 @@ def _native(
             continue
         if not separator and index + 1 < len(args):
             value = args[index + 1]
+        if not value:
+            # A flag with nothing after it names nothing. Left as it was rather than taken
+            # as "": an empty data directory is `~/.gemini` itself, which is the whole of
+            # that home walked and read every turn instead of the one directory under it.
+            continue
         if name == "--app_data_dir":
             directory = value
         else:
