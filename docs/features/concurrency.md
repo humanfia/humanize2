@@ -31,6 +31,29 @@ together. And either way it is one agent: one set of settings, one id, one proce
 
 Ten thousand conversations opened up front are a list, not a bill.
 
+## How many of them go at once is the CLI's answer, not this library's
+
+Nothing here caps a fan-out. What does is the coding agent underneath it, and the shape it comes
+in: one held open for the life of a session pays for starting once, and one run again for every
+turn pays for starting on every turn. So the number of conversations that still go at speed on a
+given machine is a fact about the backend rather than about this library, and it is measured
+rather than guessed: [the concurrency
+benchmark](https://github.com/humanfia/humanize2/blob/main/bench/cli-concurrency/MOCK-RESULTS.md)
+reports, per backend, how many conversations still run at **half the speed each of them runs
+alone** — every turn still doing its own real work, with its own files changed, its own command
+executed and its own thread of the conversation recalled.
+
+Those are four CPUs against a **loopback model that answers instantly**, so what they measure is
+the CLI's own overhead rather than how many conversations a real provider will keep fed; the
+[real-provider record](https://github.com/humanfia/humanize2/blob/main/bench/cli-concurrency/RESULTS.md)
+is separate and establishes no global maximum.
+
+One of those ceilings is not about speed at all. **opencode keeps every conversation of every
+workspace in one database**, and several of its processes opening one at the same moment can
+collide on it and fail before the model is ever asked. humanize leaves that database where the
+CLI put it — a conversation belongs to the CLI you can open it in, not to humanize — so that
+ceiling is opencode's own, and the way past it is opencode's own `OPENCODE_DB`.
+
 ## Every call that runs a turn has an awaited twin
 
 Same arguments, same answers, same shapes, same suppression. The difference is only where the

@@ -1,0 +1,605 @@
+{
+ "best": {
+  "agy / default_mock_profile": {
+   "concurrency": 16,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage3-summary.json",
+   "worst": 1.9784307623610653
+  },
+  "claude / default_mock_profile": {
+   "concurrency": 4,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/explore-n4-summary.json",
+   "worst": 1.2270334433725496
+  },
+  "codex / default_mock_profile": {
+   "concurrency": 6,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage3-summary.json",
+   "worst": 1.5029383998752353
+  },
+  "cursor / default_mock_profile": {
+   "concurrency": 8,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage2-summary.json",
+   "worst": 1.5641333188362894
+  },
+  "dsh / default_mock_profile": {
+   "concurrency": 4,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/explore-n4-summary.json",
+   "worst": 0.8089053069208342
+  },
+  "grok / default_mock_profile": {
+   "concurrency": 8,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage2-summary.json",
+   "worst": 1.701796463613762
+  },
+  "grok / rejected_optional_native_worker_pool_size_2": {
+   "concurrency": 6,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/rejected-optional-grok-pool2-n6-summary.json",
+   "worst": 1.3397795787848956
+  },
+  "kimi / default_mock_profile": {
+   "concurrency": 4,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/explore-n4-summary.json",
+   "worst": 1.0296455149497927
+  },
+  "mimo / default_mock_profile": {
+   "concurrency": 2,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/default-n2-summary.json",
+   "worst": 1.1396140628637532
+  },
+  "mimo / rejected_optional_per_workspace_native_database": {
+   "concurrency": 2,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/rejected-optional-mimo-db-n2-summary.json",
+   "worst": 1.1522883214651758
+  },
+  "opencode / default_mock_profile": {
+   "concurrency": 1,
+   "repeats": 5,
+   "summary": "evidence-2026-09-10/opencode-default-serial-confirmation-summary.json",
+   "worst": 1.013562961934158
+  },
+  "opencode / optional_per_workspace_native_database": {
+   "concurrency": 4,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/explore-n4-summary.json",
+   "worst": 1.657470098541906
+  },
+  "pi / default_mock_profile": {
+   "concurrency": 8,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage2-summary.json",
+   "worst": 1.8654497329051163
+  },
+  "qwen / default_mock_profile": {
+   "concurrency": 8,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage2-summary.json",
+   "worst": 1.3018621505390486
+  },
+  "zcode / default_mock_profile": {
+   "concurrency": 6,
+   "repeats": 3,
+   "summary": "evidence-2026-09-10/selected-stage3-summary.json",
+   "worst": 1.9601057885505062
+  }
+ },
+ "derived_not_measured": true,
+ "floor": 2.0,
+ "metric": "result_seconds, cold and warm p50 and p95, candidate over its serial control",
+ "revision": "speed-floor-rederived-from-2026-09-10-v1",
+ "source": "results-2026-09-10.json",
+ "trials": [
+  {
+   "backend": "qwen",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.5534831045328891
+  },
+  {
+   "backend": "kimi",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9325172691029788
+  },
+  {
+   "backend": "grok",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9517331182260594
+  },
+  {
+   "backend": "pi",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.61969494143903
+  },
+  {
+   "backend": "claude",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.978729731169611
+  },
+  {
+   "backend": "codex",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9768754943169635
+  },
+  {
+   "backend": "dsh",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.6703954251031554
+  },
+  {
+   "backend": "agy",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.5421265286579748
+  },
+  {
+   "backend": "opencode",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "execution failure",
+   "worst_complete_turn_ratio": null
+  },
+  {
+   "backend": "mimo",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.1396140628637532
+  },
+  {
+   "backend": "zcode",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.970776629357001
+  },
+  {
+   "backend": "cursor",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0016087423817843
+  },
+  {
+   "backend": "qwen",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.5850077311272107
+  },
+  {
+   "backend": "kimi",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0296455149497927
+  },
+  {
+   "backend": "grok",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9455654101654015
+  },
+  {
+   "backend": "pi",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.8019794279672341
+  },
+  {
+   "backend": "claude",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.2270334433725496
+  },
+  {
+   "backend": "codex",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.088213243247609
+  },
+  {
+   "backend": "dsh",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.8089053069208342
+  },
+  {
+   "backend": "agy",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.513814341916623
+  },
+  {
+   "backend": "opencode",
+   "concurrency": 4,
+   "profile": "optional_per_workspace_native_database",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.657470098541906
+  },
+  {
+   "backend": "zcode",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.2629971607806858
+  },
+  {
+   "backend": "cursor",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0580805786163545
+  },
+  {
+   "backend": "qwen",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.3018621505390486
+  },
+  {
+   "backend": "kimi",
+   "concurrency": 3,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0039091826241802
+  },
+  {
+   "backend": "grok",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.701796463613762
+  },
+  {
+   "backend": "pi",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.8654497329051163
+  },
+  {
+   "backend": "claude",
+   "concurrency": 3,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.1383757393926812
+  },
+  {
+   "backend": "codex",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "miss",
+   "worst_complete_turn_ratio": 2.0199923766991996
+  },
+  {
+   "backend": "dsh",
+   "concurrency": 3,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.698876324234565
+  },
+  {
+   "backend": "agy",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.913473434262466
+  },
+  {
+   "backend": "opencode",
+   "concurrency": 3,
+   "profile": "optional_per_workspace_native_database",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.3240233391022214
+  },
+  {
+   "backend": "zcode",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "miss",
+   "worst_complete_turn_ratio": 2.5651426894458544
+  },
+  {
+   "backend": "cursor",
+   "concurrency": 8,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.5641333188362894
+  },
+  {
+   "backend": "qwen",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9012083411849671
+  },
+  {
+   "backend": "kimi",
+   "concurrency": 3,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9866243001894988
+  },
+  {
+   "backend": "grok",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.3484924041439192
+  },
+  {
+   "backend": "pi",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.2737241656312415
+  },
+  {
+   "backend": "claude",
+   "concurrency": 3,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0426943977728427
+  },
+  {
+   "backend": "codex",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.5029383998752353
+  },
+  {
+   "backend": "dsh",
+   "concurrency": 3,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.6639364534341724
+  },
+  {
+   "backend": "agy",
+   "concurrency": 16,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.9784307623610653
+  },
+  {
+   "backend": "opencode",
+   "concurrency": 2,
+   "profile": "optional_per_workspace_native_database",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0390525079613269
+  },
+  {
+   "backend": "zcode",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.9601057885505062
+  },
+  {
+   "backend": "cursor",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.2843674525283086
+  },
+  {
+   "backend": "qwen",
+   "concurrency": 7,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0756543359850763
+  },
+  {
+   "backend": "pi",
+   "concurrency": 7,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.263600821866263
+  },
+  {
+   "backend": "grok",
+   "concurrency": 5,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.080817186167441
+  },
+  {
+   "backend": "codex",
+   "concurrency": 5,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.2109580679118463
+  },
+  {
+   "backend": "zcode",
+   "concurrency": 5,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.769390766071271
+  },
+  {
+   "backend": "cursor",
+   "concurrency": 5,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.161527996979277
+  },
+  {
+   "backend": "kimi",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0053075092856936
+  },
+  {
+   "backend": "claude",
+   "concurrency": 2,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.8973817258576744
+  },
+  {
+   "backend": "agy",
+   "concurrency": 12,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.527858347511388
+  },
+  {
+   "backend": "qwen",
+   "concurrency": 6,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.9513527707664301
+  },
+  {
+   "backend": "agy",
+   "concurrency": 10,
+   "profile": "default_mock_profile",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.416652122948673
+  },
+  {
+   "backend": "zcode",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.2333673467389417
+  },
+  {
+   "backend": "cursor",
+   "concurrency": 4,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0517077127862107
+  },
+  {
+   "backend": "agy",
+   "concurrency": 9,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 0.8643006179794227
+  },
+  {
+   "backend": "mimo",
+   "concurrency": 1,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.0143727594493361
+  },
+  {
+   "backend": "opencode",
+   "concurrency": 1,
+   "profile": "default_mock_profile",
+   "repeats": 5,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.013562961934158
+  },
+  {
+   "backend": "grok",
+   "concurrency": 6,
+   "profile": "rejected_optional_native_worker_pool_size_2",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.3397795787848956
+  },
+  {
+   "backend": "mimo",
+   "concurrency": 2,
+   "profile": "rejected_optional_per_workspace_native_database",
+   "repeats": 3,
+   "verdict": "pass",
+   "worst_complete_turn_ratio": 1.1522883214651758
+  }
+ ]
+}

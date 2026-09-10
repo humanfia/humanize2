@@ -273,3 +273,146 @@ def test_subagent_completion_does_not_settle_the_main_turn() -> None:
             assert not updates.ended
         finally:
             updates.close()
+
+
+def test_notifications_say_which_authoritative_read_is_due() -> None:
+    def handler(socket: ServerConnection) -> None:
+        acknowledge(socket)
+        for kind in (
+            "tool.call.started",
+            "turn.step.completed",
+            "event.approval.requested",
+            "event.question.requested",
+            "error",
+        ):
+            socket.send(json.dumps({"type": kind, "session_id": "ours"}))
+        socket.recv()
+
+    with server(handler) as base:
+        updates = kimi._Updates(base, "test-token", "ours")
+        try:
+            # A listener that has been told nothing yet asks the daemon everything.
+            assert (updates.questioned, updates.stepped) == (True, True)
+            for expected in (
+                (False, False),  # a tool starting moves neither spending nor questions
+                (False, True),  # a step that landed is spending that moved
+                (True, False),  # an approval is a question by another name
+                (True, False),
+                (True, True),  # and one the daemon could not name is both
+            ):
+                updates.questioned = updates.stepped = False
+                updates.wait(settled=False)
+                assert (updates.questioned, updates.stepped) == expected
+        finally:
+            updates.close()
+
+
+def test_a_frame_under_an_unknown_name_still_wakes_the_reader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(socket: ServerConnection) -> None:
+        acknowledge(socket)
+        socket.send(json.dumps({"type": "event.consent.wanted", "session_id": "ours"}))
+        socket.recv()
+
+    # Without this the reader would wait out the whole recovery interval for a question
+    # the daemon had named something this table has never heard of.
+    monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 30)
+    monkeypatch.setattr(kimi, "_POLL_SECONDS", 0.05)
+    with server(handler) as base:
+        updates = kimi._Updates(base, "test-token", "ours")
+        try:
+            updates.questioned = updates.stepped = False
+            started = kimi.time.monotonic()
+            updates.wait(settled=False)
+            assert kimi.time.monotonic() - started < 5
+            assert (updates.questioned, updates.stepped) == (True, True)
+        finally:
+            updates.close()
+
+
+def test_streamed_chunks_are_coalesced_rather_than_woken_for_one_by_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent = threading.Event()
+
+    def handler(socket: ServerConnection) -> None:
+        acknowledge(socket)
+        for kind in ("shell.output", "tool.call.delta", "tool.progress"):
+            for _ in range(8):
+                socket.send(json.dumps({"type": kind, "session_id": "ours"}))
+        sent.set()
+        socket.recv()
+
+    # The daemon streams a running command's output a chunk at a time. One wake per chunk
+    # would be four calls per chunk on the daemon every session of the agent shares.
+    monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 30)
+    monkeypatch.setattr(kimi, "_POLL_SECONDS", 0.2)
+    with server(handler) as base:
+        updates = kimi._Updates(base, "test-token", "ours")
+        try:
+            assert sent.wait(timeout=2)
+            wakes = 0
+            deadline = kimi.time.monotonic() + 1.5
+            while kimi.time.monotonic() < deadline:
+                updates.wait(settled=False)
+                wakes += 1
+            assert wakes <= 12  # twenty-four chunks, at most one wake per poll interval
+            assert (updates.questioned, updates.stepped) == (True, True)
+        finally:
+            updates.close()
+
+
+def test_streaming_text_alone_does_not_re_arm_the_authoritative_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(socket: ServerConnection) -> None:
+        acknowledge(socket)
+        for _ in range(4):
+            socket.send(json.dumps({"type": "assistant.delta", "session_id": "ours"}))
+        socket.recv()
+
+    # A deadline reached with text still arriving is the coalescing above, not silence:
+    # nothing about it says a question is waiting or that spending has moved. Silence is
+    # covered separately, and does ask the daemon everything.
+    monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 30)
+    monkeypatch.setattr(kimi, "_POLL_SECONDS", 0.05)
+    with server(handler) as base:
+        updates = kimi._Updates(base, "test-token", "ours")
+        try:
+            updates.questioned = updates.stepped = False
+            updates.wait(settled=False)
+            assert (updates.questioned, updates.stepped) == (False, False)
+        finally:
+            updates.close()
+
+
+def test_a_listener_that_stops_carrying_events_asks_for_everything(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(socket: ServerConnection) -> None:
+        acknowledge(socket)
+        socket.send(json.dumps({"type": "turn.step.completed", "session_id": "ours"}))
+        socket.recv()
+
+    monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 0.01)
+    with server(handler) as base:
+        updates = kimi._Updates(base, "test-token", "ours")
+        try:
+            updates.wait(settled=False)
+            updates.questioned = updates.stepped = False
+            # Silence for a whole recovery interval is a listener that may have missed
+            # something, so the reader goes back to asking the daemon everything.
+            updates.wait(settled=False)
+            assert (updates.questioned, updates.stepped) == (True, True)
+            updates.questioned = updates.stepped = False
+            updates.close()
+            assert (updates.questioned, updates.stepped) == (True, True)
+            updates.questioned = updates.stepped = False
+            slept: list[float] = []
+            monkeypatch.setattr(kimi.time, "sleep", slept.append)
+            updates.wait(settled=False)
+            assert slept == [kimi._POLL_SECONDS]
+            assert (updates.questioned, updates.stepped) == (True, True)
+        finally:
+            updates.close()
