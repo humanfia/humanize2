@@ -112,8 +112,8 @@ async def _to_the_models(app: Humanize, driver: Pilot[None]) -> None:
     await until(lambda: isinstance(app.screen, Catalogue), driver)
 
 
-def test_a_line_uses_the_agent_place_goal_suggestion(flows: Path) -> None:
-    """Naming models on the command line does not silently switch goals back on."""
+def test_a_line_names_an_agent_and_the_flow_says_the_rest(flows: Path) -> None:
+    """Whether that agent has goals is the flow's, settled when the run is set up."""
     opened: list[Humanize] = []
 
     def opens(app: Humanize) -> None:
@@ -132,7 +132,7 @@ def test_a_line_uses_the_agent_place_goal_suggestion(flows: Path) -> None:
             == 0
         )
 
-    assert opened[0]._models == [Runs("codex/said:low", goals=False)]
+    assert opened[0]._models == [Runs("codex/said:low")]
 
 
 def _under(app: Humanize) -> str:

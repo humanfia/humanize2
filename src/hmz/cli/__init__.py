@@ -280,8 +280,8 @@ def _line() -> ArgumentParser:
         dest="agents",
         metavar="CLI/MODEL:EFFORT",
         help="what one of that flow's agents runs, repeated once for each it drives, in the "
-        "order it takes them; the written-out form may include service_tier=SERVICE_TIER, "
-        "permission=PERMISSION and web_search=on|off; needs -f",
+        "order it takes them; the written-out form may include service_tier=SERVICE_TIER; "
+        "needs -f",
     )
     parser.add_argument(
         "-c",
@@ -377,13 +377,12 @@ def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Ru
     if not flow:
         parser.error("-a says what runs the flow, so it needs -f")
     hmz = Hmz()
-    # What each line said about searching the web, kept beside the line itself: the rest of
-    # what an agent is travels in the spec and is read again where the agent is made, and
-    # this is a switch rather than a word of the spec by the time the interface holds it.
-    searching: list[bool] = []
+    # Read for nothing but the refusal: what an agent is travels in the spec and is read
+    # again where the agent is made, and a line that says what the flow says is a line to
+    # correct here rather than one the run finds out about.
     for spec in agents:
         try:
-            searching.append(hmz.agents.reads(spec)[6] is not False)
+            hmz.agents.reads(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
     try:
@@ -392,10 +391,9 @@ def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Ru
         parser.error(str(why))
     if len(places) != len(agents):
         parser.error(f"{flow} drives {len(places)} agents, {len(agents)} given")
-    return [
-        Runs(spec, goals=places[at].goals_default, web_search=searching[at])
-        for at, spec in enumerate(agents)
-    ]
+    # Nothing is said here about goals, the rung or the web: the flow says all three, and
+    # `Runner` settles them onto the agents before the first turn.
+    return [Runs(spec) for spec in agents]
 
 
 def opens(

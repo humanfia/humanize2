@@ -67,17 +67,22 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     )
 """
 
-#: A flow that writes down the permission rung each agent was configured to run at.
+#: A flow that declares a rung for the first of its two agents and nothing for the second,
+#: and writes down what each of them ended up running at. RUNG is filled in per test.
 ACCESS = """
 import json
 from pathlib import Path
+from typing import Annotated
 
-from hmz.agents import AgentBase
+from hmz.agents import AgentBase, AgentDefaults
 from hmz.flows import flow
 
 
 @flow
-def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+def run(
+    agents: tuple[Annotated[AgentBase, AgentDefaults(permission="RUNG")], AgentBase],
+    task: str,
+) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps([agent.config.permission for agent in agents])
     )
@@ -277,18 +282,18 @@ def test_an_agent_that_names_no_account_runs_as_this_machine_does(
 
 
 @pytest.mark.parametrize("permission", PERMISSIONS)
-def test_an_agent_may_be_given_a_permission_rung(
+def test_the_flow_says_what_each_of_its_agents_may_do(
     tmp_path: Path, permission: str
 ) -> None:
-    """Each `-a` carries its own rung, and omitting it keeps the existing default."""
-    flow = _flow(tmp_path, ACCESS)
+    """The place carries the rung, and a place that said nothing runs at the default one."""
+    flow = _flow(tmp_path, ACCESS.replace("RUNG", permission))
     main(
         [
             "exec",
             "-f",
             flow,
             "-a",
-            f"cli=codex,model=m,effort=high,permission={permission}",
+            "cli=codex,model=m,effort=high",
             "-a",
             "claude/m:high",
             "task",
@@ -611,14 +616,17 @@ def test_an_agent_that_is_not_cli_model_and_effort_is_a_usage_error(
     assert f"bad agent {spec!r}" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("permission", ["readonly", "read_only", ""])
-def test_an_unknown_permission_is_a_usage_error_before_any_agent_runs(
+@pytest.mark.parametrize(
+    "said", ["permission=read-only", "permission=bypass", "web_search=off"]
+)
+def test_a_line_that_says_what_the_flow_says_is_a_usage_error(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    permission: str,
+    said: str,
 ) -> None:
+    """And says where it is said instead, which is beside the agent the flow declares."""
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
-    spec = f"cli=codex,model=m,effort=high,permission={permission}"
+    spec = f"cli=codex,model=m,effort=high,{said}"
 
     with pytest.raises(SystemExit) as stopped:
         main(["exec", "-f", flow, "-a", spec, "task"])
@@ -626,7 +634,7 @@ def test_an_unknown_permission_is_a_usage_error_before_any_agent_runs(
     assert stopped.value.code == 2
     error = capsys.readouterr().err
     assert f"bad agent {spec!r}" in error
-    assert "permission must be one of read-only, workspace-write, auto, bypass" in error
+    assert "is the flow's to say, written beside the agent" in error
     assert not (tmp_path / "flow.json").exists()
 
 

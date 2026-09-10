@@ -28,6 +28,8 @@ SEVERITY = {
     "not-a-flow": "error",
     "unsized-agents": "error",
     "unread-annotation": "error",
+    "unknown-permission": "error",
+    "goals-both-ways": "error",
     "foreign-import": "error",
     "unknown-name": "error",
     "unknown-ask": "error",
@@ -293,6 +295,68 @@ def run(agents: tuple[Agent, Agent], task: str) -> None:
 """,
         CLEAN,
         id="unsized-agents-edge-a-fixed-length",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Annotated
+
+from hmz.flows import Agent, AgentDefaults, flow
+
+@flow
+def run(
+    agents: tuple[Annotated[Agent, AgentDefaults(permission="readonly")]], task: str
+) -> None:
+    agents[0](task)
+""",
+        {"unknown-permission"},
+        id="unknown-permission",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Annotated
+
+from hmz.flows import Agent, AgentDefaults, flow
+
+@flow
+def run(
+    agents: tuple[Annotated[Agent, AgentDefaults(permission="read-only")]], task: str
+) -> None:
+    agents[0](task)
+""",
+        CLEAN,
+        id="unknown-permission-edge-a-rung-there-is",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Annotated
+
+from hmz.flows import Agent, AgentDefaults, Goal, flow
+
+@flow
+def run(
+    agents: tuple[Annotated[Agent, Goal, AgentDefaults(goals=False)]], task: str
+) -> None:
+    agents[0].pursue(task)
+""",
+        {"goals-both-ways"},
+        id="goals-both-ways",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Annotated
+
+from hmz.flows import Agent, AgentDefaults, Goal, flow
+
+@flow
+def run(agents: tuple[Annotated[Agent, Goal]], task: str) -> None:
+    agents[0].pursue(task)
+""",
+        CLEAN,
+        id="goals-both-ways-edge-a-goal-alone",
     ),
     pytest.param(
         DOC

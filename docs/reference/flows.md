@@ -406,6 +406,49 @@ hmz exec: error: pursuing: worker is run under a goal, which pi has no feature f
 and the agents page of `/flow` offers only the CLIs that would work for that place, so it cannot
 be chosen wrong there at all.
 
+## What each agent may do
+
+What an agent is allowed to do, whether it keeps itself going and whether it may read the
+internet are declared beside the type as well, in one `AgentDefaults`:
+
+```python
+from typing import Annotated, NamedTuple
+
+from hmz.flows import Agent, AgentDefaults
+
+class Agents(NamedTuple):
+    """The two this drives, and what each is allowed."""
+
+    builder: Agent
+    reviewer: Annotated[
+        Agent, AgentDefaults(permission="read-only", web_search=False)
+    ]
+```
+
+| Written beside the type | What it says |
+| --- | --- |
+| *(nothing)* | `bypass`, goals on, the web readable — what every agent of every flow has always run at |
+| `AgentDefaults(permission=…)` | one rung of [the four](/user/permissions) |
+| `AgentDefaults(goals=…)` | whether the backend's own [goal feature](/weaver/goals) is available |
+| `AgentDefaults(web_search=…)` | whether it [may search the web](/reference/agents#whether-an-agent-may-search-the-web) |
+
+**This is a change.** These three used to be settings of the agent that a command line or the
+agent sheet could reach. They are still settings of the agent — that is what reaches the CLI —
+but which value an agent runs at is the flow's: a reviewer that may not write is a reviewer
+whichever CLI fills the place. A line that writes `permission=` or `web_search=` is a usage
+error naming the flow as the place to say it, and there are no rows for them on the sheet.
+
+What the flow declares reaches every agent handed to that place before its first turn, over
+whatever it was made with. A backend that cannot be told is refused there and then:
+
+```console
+$ hmz exec -f quiet -a pi/openai-codex/gpt-5.5:high "read this repository"
+hmz exec: error: quiet: the agent cannot be run as this flow declares -- PiAgent has no way of being told not to search the web; web_search must be on for it
+```
+
+A flow that calls another gets the called flow's declaration for the length of the call, and
+the agents are handed back as they came — exactly as they are with the skills it brought.
+
 ## Where each agent works
 
 Where an agent's turns land is declared the same way, and by the same file: the flow writes it
@@ -456,7 +499,8 @@ What the flow declared is readable without driving it:
 from hmz.flows import wanted
 
 wanted("official/rlar")   # one Place per agent somebody has to choose:
-                          # .name, .moments, .goal, .where
+                          # .name, .moments, .goal, .where,
+                          # .permission, .goals, .web_search
 ```
 
 `where` is `None`, the `Remote` class itself, or the `Isolated` the flow wrote — which is how
@@ -1156,6 +1200,8 @@ that cannot run, cannot be answered, or cannot end — something no run of it su
 | `not-a-flow` | error | No `__init__.py`, or nothing marked `@flow()`. |
 | `unsized-agents` | error | An `agents` annotation that does not state a fixed count. |
 | `unread-annotation` | error | The annotation's names live under `TYPE_CHECKING`, where a run cannot read them. |
+| `unknown-permission` | error | An `AgentDefaults` naming a rung there is not. |
+| `goals-both-ways` | error | A place run under a `Goal` and declared `AgentDefaults(goals=False)` at once. |
 | `foreign-import` | error | An import of humanize's own modules other than `hmz.flows`. |
 | `unknown-name` | error | `from hmz.flows import` a name it does not offer. |
 | `unknown-ask` | error | An attribute asked of an agent, session or person that is not on the interfaces. |

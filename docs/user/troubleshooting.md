@@ -100,19 +100,24 @@ An `-a` is missing a part. All three are required:
 The CLI is read from the front and the effort from after the **last** colon. A model with
 slashes in it, such as `kimi/kimi-code/k3:high`, is fine.
 
-### `bad agent '…': foo is not cli, model, effort, provider, permission or config.KEY`
+### `bad agent '…': foo is not cli, model, effort, service_tier, provider or config.KEY`
 
 The written-out form has a key that is not one of the five every backend takes — `cli`,
-`model`, `effort`, `provider` and `permission` — or a `config.KEY` Codex override.
+`model`, `effort`, `service_tier` and `provider` — or a `config.KEY` Codex override.
 
-### `bad agent '…': permission must be one of read-only, workspace-write, auto, bypass, not '…'`
+### `bad agent '…': permission is the flow's to say`
 
-The `permission=` value is misspelled or empty. humanize matches it exactly and refuses it
-rather than silently replacing it with the default:
+What an agent may do, and whether it may search the web, are not settings of `-a`: the flow
+declares them where it declares the place, so that they mean the same thing whichever CLI fills
+it. Take the key off the line and write it into the flow:
 
-```sh
--a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only
+```python
+class Agents(NamedTuple):
+    reviewer: Annotated[Agent, AgentDefaults(permission="read-only")]
 ```
+
+See [Permissions](/user/permissions) and
+[Writing a flow](/weaver/writing-a-flow#say-what-each-agent-is-allowed).
 
 ### The agent starts and immediately fails
 

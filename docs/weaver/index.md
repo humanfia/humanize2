@@ -57,7 +57,7 @@ weaver writes against.
 | [Concepts](/user/concepts) | The vocabulary the rest of this uses |
 | [Security](/user/security) | A flow is Python, and reading one means running it |
 | [Skills](/user/skills) | What an agent carries: its CLI's own, and the ones the flow brings |
-| [Permissions](/user/permissions) | Four rungs, from `read-only` to `bypass` |
+| [Permissions](/user/permissions) | Four rungs, from `read-only` to `bypass` — yours to declare |
 | [Efforts](/user/efforts) | How hard to think — and moving it while the flow runs |
 
 ---

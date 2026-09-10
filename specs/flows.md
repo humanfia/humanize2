@@ -245,6 +245,12 @@ What a flow drives, written as interfaces and nothing else.
 - A flow MUST declare the places it drives with these, and what it writes beside one -- a
   moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults` -- MUST go on meaning what it
   means. What is annotated is which interface, not which class.
+- What an agent may do, whether it has goals and whether it may search the web MUST be among
+  what a place declares, and MUST NOT be sayable anywhere else: they are things about the work
+  rather than about the agent, so the person who wrote the flow settles them and the person
+  who chose the agent is not asked. A flow MUST NOT be able to change them once it is running
+  either -- they are on `Driven` and not on `Agent`, like everything else somebody already
+  answered -- so a flow that wants an agent allowed less makes another with `Agent.clone`.
 - A flow MUST be able to put callbacks of its own in front of an agent as tools it may reach
   for, said on the conversation and taking effect from its next turn -- which is where a flow
   is when it has something to offer. The callback MUST run in the process the flow is in, so
@@ -291,7 +297,9 @@ class Place(NamedTuple):
     moments: frozenset[Moment]
     where: type[Remote] | Remote | Isolated | None = None
     goal: bool = False
-    goals_default: bool = True
+    permission: str = "bypass"
+    goals: bool = True
+    web_search: bool = True
 
 
 class Running(NamedTuple):
@@ -353,6 +361,11 @@ def set_up(
 def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None: ...
 
 
+def runs_at(
+    flow: str | os.PathLike[str], agent: Agent, place: Place
+) -> AgentConfig: ...
+
+
 def entered(flow: str, agents: Sequence[Agent] = ()) -> Running: ...
 
 
@@ -380,6 +393,18 @@ run another. `hmz.runner` asks this and then opens an epic around the answer.
 - Where an agent works MUST be the flow's to say rather than a setting anybody may reach for,
   and MUST be settled here: a place that says nothing runs on this machine and MUST refuse an
   agent pointed anywhere else.
+- What an agent may do, whether it has goals and whether it may search the web MUST be read
+  off the place the same way, out of the `AgentDefaults` a flow wrote beside it, and MUST be
+  settled onto the agent here -- `runs_at` -- before its first turn and over whatever it was
+  constructed with. A place that wrote none MUST come out at `bypass`, goals on and the web
+  readable, which is what every agent of every flow ran at before a flow could say; a place
+  run under a `Goal` MUST come out with goals whatever else it wrote.
+- A backend that cannot be told one of them MUST be refused as `NotAFlow`, naming the place
+  and saying what the backend said: a flow that declares its agent may not search the web
+  cannot be driven by a CLI that would go on searching, and a declaration nobody can carry out
+  is a run to refuse rather than a setting that lies.
+- `runs_at` MUST answer with what the agent was set up as before it, so that a flow which
+  called another can hand the agents back exactly as it found them.
 - A whole run MAY be put in one container from outside, which is a convenience and not a second
   way of saying where an agent works: it is said once, about all of them, by whoever started
   the run. One container MUST be started for the run rather than one per agent -- the agents are
@@ -417,6 +442,9 @@ run another. `hmz.runner` asks this and then opens an epic around the answer.
   carrying what they carried before it: the skills are the flow's, and a flow that called
   another goes on being driven by its own. A caller MAY say the ones it carries stay reachable,
   and the called flow MUST still win a name they both use.
+- What a called flow declares its agents run at MUST hold for the length of the call and MUST
+  be handed back the same way, however the call ends: the flow driving an agent is the one
+  entitled to say what it may do, and a call is over when it returns.
 - A called flow that says it can be picked up MUST be handed its own kept state, under its own
   name, in the epic of the run that called it: a flow that called another is two flows, each
   with its own to keep, and both of them part of one run.
@@ -497,6 +525,11 @@ own.
   is `surface`, and what a flow may import MUST be read off this package's own tables, which
   is `offered`: the checker states what the interface is, so a second copy of either would be
   the drift it checks for.
+- What a flow declares its agents run at MUST be read here too, the flow being the one that
+  says it: a rung no backend has a word for MUST be an error wherever it is written, and so
+  MUST a place declared under a goal and without goals at once -- one flow saying two things
+  about one agent, of which only one can be done. The rungs there are MUST be read off
+  `hmz.agents` rather than written down again.
 
 ## `proving.py`
 

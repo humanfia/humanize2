@@ -32,28 +32,19 @@ class Agents:
 
     def reads(
         self, spec: str
-    ) -> tuple[
-        Profile,
-        str,
-        str,
-        str,
-        str,
-        str | None,
-        bool | None,
-        tuple[tuple[str, str], ...],
-    ]:
+    ) -> tuple[Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
         """Reads one agent the way a command line names one.
 
         Args:
           spec: The short or written-out form `-a` takes.
 
         Returns:
-          The backend, model, effort, service tier, account, the permission rung where one
-          was named, whether it may search the web where anybody said, and the pairs said in
-          the backend's own vocabulary.
+          The backend, model, effort, service tier, account, and the pairs said in the
+          backend's own vocabulary. What the agent may do and whether it may search the web
+          are not among them: a flow says those where it declares the place.
 
         Raises:
-          ValueError: If it is not an agent, or names no permission rung there is.
+          ValueError: If it is not an agent, or says what the flow says.
         """
         from hmz.runner import read_agent
 
@@ -146,23 +137,13 @@ class Agents:
           ValueError: If the spec is not one an agent may be written down as.
           Taken: If the name is one already written down and `force` is False.
         """
-        from hmz.agents import PERMISSIONS
         from hmz.backends import read
         from hmz.kept import Runs
 
         if not name.strip():
             raise ValueError("an agent is written down under a name")
         try:
-            (
-                profile,
-                model,
-                effort,
-                service_tier,
-                provider,
-                permission,
-                searches,
-                overrides,
-            ) = read(spec)
+            profile, model, effort, service_tier, provider, overrides = read(spec)
         except ValueError as why:
             # Said against the spelling that was refused: a line with four agents on it is
             # one where the message has to say which of them was the one to correct.
@@ -177,19 +158,18 @@ class Agents:
                 "config.KEY is a setting of the agent on the line that runs it, "
                 "not of one written down under a name"
             )
-        if permission is not None and permission not in PERMISSIONS:
-            raise ValueError(
-                f"permission must be one of {', '.join(PERMISSIONS)}, not {permission!r}"
-            )
         return self.write(
             name,
             Runs(
                 f"{profile.name}/{model}:{effort}",
                 anchor.strip(),
-                permission or "",
+                # Nothing: what an agent may do is the flow's, said where the flow declares
+                # the place it fills, so an agent written down under a name says nothing
+                # about it and the flow it is imported into says it instead.
+                "",
                 provider,
                 goals,
-                web_search if web_search is not None else searches is not False,
+                web_search is not False,
             ),
             force=force,
         )
