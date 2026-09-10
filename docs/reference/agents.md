@@ -1186,10 +1186,28 @@ Kimi Code uses the official daemon's WebSocket notifications to wake its REST po
 It answers the daemon's heartbeat so long turns keep receiving notifications.
 Closing the notification socket uses a 100ms grace period, so unread notifications do not
 hold up a result that REST has already confirmed. The receive queue remains bounded.
-Session history, spending, questions and goals still come from the REST responses.
-Pending user questions are requested with the native `status=pending` filter. If the
-daemon does not support notifications, refuses the connection or loses it, the driver resumes
-its regular polling without submitting the turn again.
+Session history, spending, questions and goals still come from the REST responses, and a
+notification only says when one of them is worth making early. Only a pending question is:
+it is the one thing a turn stops on, so a question notification brings that read forward and
+everything else keeps the cadence it had before there were notifications — one second. What
+a turn has spent is read on that second and once more as the turn settles; the session's
+status and its history are read every round, which is what paces the round. Pending user
+questions are requested with the native `status=pending` filter, and a daemon that refuses
+that filter is asked without it, whichever answered being the one asked from then on. One
+refusal is carried on from and asked again on the next second; a daemon that has refused
+both spellings for a whole recovery interval fails the turn rather than leaving it waiting
+on a question nobody can read.
+
+The settings a session runs at are set on it once rather than before every turn, since a
+second turn at the same settings is a session that already has them. A goal is the
+exception: it is set going rather than held, so the same objective again asks for it again.
+
+A turn is over when the session that was running it has been seen to stop twice over, a
+wait apart, and not before it has been seen to start: the daemon takes a prompt before it
+runs it, so a session that is not busy in between is as likely the moment before the turn
+as the moment after it, and reading it back there would answer with what had not been said
+yet. If the daemon does not support notifications, refuses the connection or loses it, the
+driver resumes its regular polling without submitting the turn again.
 
 **`juice()` is the third reading, and it is not a clock at all.** It is what one turn of the
 *model* came out with — one request and the answer to it, of which a turn a flow asks for is
@@ -1356,8 +1374,10 @@ ordinary turn is a `session/prompt` written to a process that is already up rath
 started again. What that process cannot be told is what sends a turn back to `grok -p`: it has
 no `--tools`, no `--disallowed-tools` and no `--json-schema`, so a rung that takes tools away,
 an agent told not to search the web, and a turn held to a shape are each one run of the command
-line, resuming the same conversation. The session id is Grok Build's own either way, and each
-transport picks up what the other opened.
+line, resuming the same conversation. So is [a fork](#a-conversation-that-goes-two-ways): the
+protocol opens a session or loads one by id and has no third call, so the one turn that cuts
+the conversation is `--resume … --fork-session` and every turn after it is ordinary. The
+session id is Grok Build's own either way, and each transport picks up what the other opened.
 
 ## Answering in a shape
 
