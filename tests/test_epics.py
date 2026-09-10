@@ -204,6 +204,8 @@ def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
 
     (epic,) = epics()
     (one,) = sessions(epic)
+    # The last of those is the record it was opened in, which for the run's own flow is the
+    # run's own record.
     assert one == (
         "builder",
         "claude",
@@ -212,6 +214,7 @@ def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
         "builder-claude@local-the-session",
         one.at,
         str(tmp_path / "flow"),
+        JOURNAL,
     )
     assert one.name == called("builder", "claude", "", "the-session")
 

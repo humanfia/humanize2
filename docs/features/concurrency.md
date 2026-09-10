@@ -39,6 +39,24 @@ a flow written as a coroutine can hold as many turns as it likes without any one
 stopping the rest. The agents, the settings, the run it writes down and the way it is stopped
 are all as they are for a plain function.
 
+## Whole flows go at once too
+
+`load` gives you a flow to run, and a coroutine flow is awaited by whoever called it — so a
+flow gathers whole flows exactly as it gathers turns, as deep as it likes and as wide.
+
+- **Each gathered call is a branch of the run in its own right**: its own record in the epic,
+  its own skills, its own settings, its own unwinding when the run is stopped. Neither of two
+  siblings is under the other, and neither can see the other — what is running, asked from
+  inside a flow, is the branch that flow is on.
+- **A run of flows calling flows reads back as the tree it ran as.** A record per call, inside
+  the record of the call that made it, however deep it went.
+- **Give each branch an agent of its own.** A conversation belongs to one agent, so two
+  branches driving one agent are two flows sharing one — and what it opens then belongs to the
+  flow they were both called from rather than to either of them. `clone()` is how a branch gets
+  one to itself.
+- **A chain of calls has a bottom**, at 64, so that a recursion with no base case is named
+  where it went wrong rather than becoming a `RecursionError` somewhere else entirely.
+
 ## A batch is one agent over many prompts
 
 One session apiece, none of them kept, and the answers come back in the order they were asked

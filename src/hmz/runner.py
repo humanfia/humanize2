@@ -43,6 +43,7 @@ def _finished(running: Awaitable[None]) -> None:
       running: The flow, as the coroutine calling it made.
     """
     import asyncio
+    import contextvars
     from concurrent.futures import ThreadPoolExecutor
 
     async def flowing() -> None:
@@ -58,8 +59,12 @@ def _finished(running: Awaitable[None]) -> None:
     # Started from a thread that is already running a loop of its own -- an interface, a test.
     # A flow cannot be run on that one: it would be the flow waiting for turns that are
     # waiting for the loop the flow is holding, which is a run that never takes its first.
+    #
+    # The context goes with it, since a thread is otherwise handed an empty one: what the run
+    # was entered as is held there, and a flow that called another from a thread that had
+    # never heard of the run would be a flow with no branch to be on.
     with ThreadPoolExecutor(max_workers=1, thread_name_prefix="humanize-flow") as apart:
-        apart.submit(asyncio.run, flowing()).result()
+        apart.submit(contextvars.copy_context().run, asyncio.run, flowing()).result()
 
 
 class Runner:
