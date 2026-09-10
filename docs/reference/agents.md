@@ -1085,6 +1085,14 @@ its increment across turns, including resumed processes. On an externally resume
 that reports only terminal usage, the first summary has no known baseline and can include
 historical spending; legacy summaries do not identify their counter scope.
 
+**pi is one `pi --mode rpc` held open for the whole session**, so every turn after the first
+starts with nothing to start. The first one starts node on the CLI's own bundle, and about a
+quarter of that start is V8 compiling it — the same bundle, compiled again by every session on
+the machine. So a pi turn is given node's own `NODE_COMPILE_CACHE`, pointed at a directory under
+humanize's home: the first session to run compiles it, and the rest read that back. A
+`NODE_COMPILE_CACHE` already set is left alone, since theirs is the cache they meant, and a turn
+that lands on another machine is given none — the path would name a directory on this one.
+
 **`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a fleet
 of its own. It is more work than any single-agent effort, which is why it sits above `max`.
 
