@@ -25,7 +25,7 @@ interface Backend {
 
 const DRIVEN: Record<Driven, string> = {
   held: 'one process, held open across its turns and spoken to a line at a time',
-  server: 'the app server it serves its own client from, started once per agent',
+  server: 'the app server it serves its own client from, started when a turn first needs one',
   command: 'its command line, one run per turn',
   sdk: 'its Python SDK, which ships inside humanize',
   protocol: 'the Agent Client Protocol, and nothing else is assumed',

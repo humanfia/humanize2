@@ -1,0 +1,1374 @@
+{
+  "revision": "mock-codex-complete-task-floor-v1",
+  "synthetic_model": true,
+  "real_model_performance_verified": false,
+  "backend": "codex",
+  "native_cli": "codex-cli 0.153.4",
+  "floor": {
+    "metric": "result_seconds (complete task, from turn submission to the hmz result)",
+    "limit": 2.0,
+    "applies_to": [
+      "cold.p50",
+      "cold.p95",
+      "warm.p50",
+      "warm.p95"
+    ],
+    "note": "The separate startup and fixed-work gates recorded for the other rows are not measured here; this row is measured against the complete-task floor alone."
+  },
+  "measurement_groups": "cgroup v2 cpuset, four exclusive physical cores, 16 GiB, no swap, taken through hmzbench-run after its occupancy guard was corrected; every rung below was measured after that correction.",
+  "confirmations": [
+    {
+      "trial": "original-shared-n2",
+      "note": "original source, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.2823267709463835,
+            "p95": 1.353179074008949,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.6720665600150824,
+            "p95": 0.7284614080563188,
+            "count": 5
+          }
+        },
+        "journal_sha256": "f7c159dcb615fa94a976c1ec4383ed1b190394bf09ddbcd21c7fa9f354cecd48"
+      },
+      "candidate_journal_sha256": "f8eb33793aacb6da069ac6ef8caffc47c6445182fb6870817c04a8dd25592591",
+      "rungs": [
+        {
+          "sessions": 2,
+          "repeats": 5,
+          "items_ok": 10,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.4967332975722034,
+            "cold.result_seconds.p95": 1.7647744994834436,
+            "warm.result_seconds.p50": 2.04487067007929,
+            "warm.result_seconds.p95": 2.1708734635037046
+          },
+          "worst_complete_task_ratio": 2.1708734635037046,
+          "passes_half_speed_floor": false,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 1.919301176443696,
+              "p95": 2.388055923045613,
+              "count": 10
+            },
+            "warm": {
+              "p50": 1.3742891969159245,
+              "p95": 1.581397539936006,
+              "count": 10
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "original-separate-n7",
+      "note": "original source, published separate profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.2112118379445747,
+            "p95": 1.2700052740983665,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.6856213910505176,
+            "p95": 0.7194758660625666,
+            "count": 5
+          }
+        },
+        "journal_sha256": "701a66339d3bb63b0c407bc346d2ee41ab3e90deee494888a5f65214b49dee5b"
+      },
+      "candidate_journal_sha256": "38a20c3b6301bf4e728c500ea744cc6e566a5825565d8f4a1f885de2fea47311",
+      "rungs": [
+        {
+          "sessions": 7,
+          "repeats": 5,
+          "items_ok": 35,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.8929354273007255,
+            "cold.result_seconds.p95": 1.9915145996129302,
+            "warm.result_seconds.p50": 1.2532021128835789,
+            "warm.result_seconds.p95": 1.3219991968189808
+          },
+          "worst_complete_task_ratio": 1.9915145996129302,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.2927457980113104,
+              "p95": 2.529234044952318,
+              "count": 35
+            },
+            "warm": {
+              "p50": 0.859222175902687,
+              "p95": 0.9511465170653537,
+              "count": 35
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n7-a",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.4302058999892324,
+            "p95": 1.6932464219862595,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7617128210840747,
+            "p95": 0.8658092539990321,
+            "count": 5
+          }
+        },
+        "journal_sha256": "45cc19374bc18646a33b202a6893b904ca7af886d4996594aa6db90364edc884"
+      },
+      "candidate_journal_sha256": "76c7498b789f51d392694a2b616d43e8f6f228c961e556d65e70288dabfdc212",
+      "rungs": [
+        {
+          "sessions": 7,
+          "repeats": 5,
+          "items_ok": 35,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.684379255439348,
+            "cold.result_seconds.p95": 1.5178152764085717,
+            "warm.result_seconds.p50": 0.9978102533448037,
+            "warm.result_seconds.p95": 0.9551913220247005
+          },
+          "worst_complete_task_ratio": 1.684379255439348,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.409009148948826,
+              "p95": 2.5700352860148996,
+              "count": 35
+            },
+            "warm": {
+              "p50": 0.7600448629818857,
+              "p95": 0.8270134859485552,
+              "count": 35
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n7-b",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.440697496989742,
+            "p95": 1.5408796530682594,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7717269140994176,
+            "p95": 0.8531939280219376,
+            "count": 5
+          }
+        },
+        "journal_sha256": "9e0c815cbd561a7adf14f45c13688669a4301780fd84c7a4945607bb71de3e1f"
+      },
+      "candidate_journal_sha256": "967f887762eb301ace2766a3df002e77924d611866b37f2f5e3fa291d7845430",
+      "rungs": [
+        {
+          "sessions": 7,
+          "repeats": 5,
+          "items_ok": 35,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 2.033889291232946,
+            "cold.result_seconds.p95": 2.132297062575146,
+            "warm.result_seconds.p50": 1.134059964726211,
+            "warm.result_seconds.p95": 1.1984286694360622
+          },
+          "worst_complete_task_ratio": 2.132297062575146,
+          "passes_half_speed_floor": false,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.9302192110335454,
+              "p95": 3.2856131580192596,
+              "count": 35
+            },
+            "warm": {
+              "p50": 0.8751845969818532,
+              "p95": 1.0224920639302582,
+              "count": 35
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n7-c",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.3973263419466093,
+            "p95": 1.9400733270449564,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7758000649046153,
+            "p95": 0.8152512070955709,
+            "count": 5
+          }
+        },
+        "journal_sha256": "b9177274328d021397aa0cbbfa8b4408b87562cf17743ced320a2019bac234a7"
+      },
+      "candidate_journal_sha256": "aae0c2344173032fc475aadb3ea9318aa744fcaf4880c55bdab7560f292691af",
+      "rungs": [
+        {
+          "sessions": 7,
+          "repeats": 5,
+          "items_ok": 35,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 2.213079081891457,
+            "cold.result_seconds.p95": 1.7128497406297727,
+            "warm.result_seconds.p50": 1.16790101595985,
+            "warm.result_seconds.p95": 1.27264141409617
+          },
+          "worst_complete_task_ratio": 2.213079081891457,
+          "passes_half_speed_floor": false,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 3.0923936979379505,
+              "p95": 3.3230540950316936,
+              "count": 35
+            },
+            "warm": {
+              "p50": 0.9060576839838177,
+              "p95": 1.0375224490417168,
+              "count": 35
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n7-d",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.5001744199544191,
+            "p95": 1.517166453995742,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.8364808009937406,
+            "p95": 0.9438887489959598,
+            "count": 5
+          }
+        },
+        "journal_sha256": "903263649132357b1e10485e69b9c5f98530f388a3a87bb2e934ebb4331f85dc"
+      },
+      "candidate_journal_sha256": "5c10f4ef8df973c7dcad0445fd672935a11df72eed382b550b8acfc03ada4f70",
+      "rungs": [
+        {
+          "sessions": 7,
+          "repeats": 5,
+          "items_ok": 35,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.7136204216257962,
+            "cold.result_seconds.p95": 1.845648464313653,
+            "warm.result_seconds.p50": 0.9236658104886121,
+            "warm.result_seconds.p95": 0.9203615309602976
+          },
+          "worst_complete_task_ratio": 1.845648464313653,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.570729522034526,
+              "p95": 2.8001559359254315,
+              "count": 35
+            },
+            "warm": {
+              "p50": 0.7726287170080468,
+              "p95": 0.8687188940821216,
+              "count": 35
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n6-a",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.6815681760199368,
+            "p95": 1.8120634809602052,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.8301606239983812,
+            "p95": 0.8922882649349049,
+            "count": 5
+          }
+        },
+        "journal_sha256": "7a035bfe6ea83e3b6aa4c5e33e886b4bf5133e6cbf0f893890c2d7b1916f8217"
+      },
+      "candidate_journal_sha256": "f05f58ba51344a1960b84647fb8bef6560b5b5e51b75d3c2a94375922e31190d",
+      "rungs": [
+        {
+          "sessions": 6,
+          "repeats": 5,
+          "items_ok": 30,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.5073989961435341,
+            "cold.result_seconds.p95": 1.5537948556987227,
+            "warm.result_seconds.p50": 0.9792952875701421,
+            "warm.result_seconds.p95": 1.0086257091199802
+          },
+          "worst_complete_task_ratio": 1.5537948556987227,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.5347941804793663,
+              "p95": 2.815574914915487,
+              "count": 30
+            },
+            "warm": {
+              "p50": 0.8129723870079033,
+              "p95": 0.8999848839594051,
+              "count": 30
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n6-b",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.5663672600639984,
+            "p95": 1.8726649340242147,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7788763910066336,
+            "p95": 0.9254509080201387,
+            "count": 5
+          }
+        },
+        "journal_sha256": "d2c486c88deb8581f2d296e52be393b6f95eca7ea8d698bac7c04ede8d340bfe"
+      },
+      "candidate_journal_sha256": "65a99a2d51bf5a77e7909d5455d742146530aa25cbe0efd35361571b76e0b5cc",
+      "rungs": [
+        {
+          "sessions": 6,
+          "repeats": 5,
+          "items_ok": 30,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.3875353072656245,
+            "cold.result_seconds.p95": 1.4718180978424154,
+            "warm.result_seconds.p50": 1.009044114839719,
+            "warm.result_seconds.p95": 0.949006636989925
+          },
+          "worst_complete_task_ratio": 1.4718180978424154,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.1733898774837144,
+              "p95": 2.756222141091712,
+              "count": 30
+            },
+            "warm": {
+              "p50": 0.7859206385328434,
+              "p95": 0.8782590539194643,
+              "count": 30
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n6-c",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.351748054032214,
+            "p95": 1.9444931100588292,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7163145940285176,
+            "p95": 0.9153448370052502,
+            "count": 5
+          }
+        },
+        "journal_sha256": "868b6cd8268c2873e686703f72715c72b27507f9f85ee7312c12d3be952dd6ba"
+      },
+      "candidate_journal_sha256": "1f7f3f73af716051249de144a23a0f9e7666a5e0cd99d042daa4216391143244",
+      "rungs": [
+        {
+          "sessions": 6,
+          "repeats": 5,
+          "items_ok": 30,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.5892735015306971,
+            "cold.result_seconds.p95": 1.4143224122644342,
+            "warm.result_seconds.p50": 0.9257334920679624,
+            "warm.result_seconds.p95": 0.8336177440698435
+          },
+          "worst_complete_task_ratio": 1.5892735015306971,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.1482973630190827,
+              "p95": 2.7501401860499755,
+              "count": 30
+            },
+            "warm": {
+              "p50": 0.6631164105492644,
+              "p95": 0.7630476980702952,
+              "count": 30
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n6-d",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.5069974260404706,
+            "p95": 1.6387667109956965,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7489607490133494,
+            "p95": 0.8207848690217361,
+            "count": 5
+          }
+        },
+        "journal_sha256": "864c2e3e0e870ca2e66289acacb4ed9c2ccd31f84efd73082f4390f6f3d3433f"
+      },
+      "candidate_journal_sha256": "0c5b8193d0d17eb4bf710d165066489624a0e9e203936557d91cf81877bf4aaf",
+      "rungs": [
+        {
+          "sessions": 6,
+          "repeats": 5,
+          "items_ok": 30,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.4035428597512976,
+            "cold.result_seconds.p95": 1.3794849356742118,
+            "warm.result_seconds.p50": 0.8622642193125711,
+            "warm.result_seconds.p95": 0.8550218254605356
+          },
+          "worst_complete_task_ratio": 1.4035428597512976,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 2.1151354769826867,
+              "p95": 2.260653990902938,
+              "count": 30
+            },
+            "warm": {
+              "p50": 0.6458020555437542,
+              "p95": 0.7017889770213515,
+              "count": 30
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n5-a",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.5161120690172538,
+            "p95": 1.5474555359687656,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.7213972780155018,
+            "p95": 0.8025830109836534,
+            "count": 5
+          }
+        },
+        "journal_sha256": "dd87dcdb7e639a6908f6c1ece8d49902c27edf0d1f5a5d47bf22c512c6b6f18b"
+      },
+      "candidate_journal_sha256": "4f537bfe2e661724d7e9de47ce73ae2253f90be094605959fa15993fb2ceceb7",
+      "rungs": [
+        {
+          "sessions": 5,
+          "repeats": 5,
+          "items_ok": 25,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.1270220823089045,
+            "cold.result_seconds.p95": 1.162610897851063,
+            "warm.result_seconds.p50": 0.7860517170098876,
+            "warm.result_seconds.p95": 0.7519610342898959
+          },
+          "worst_complete_task_ratio": 1.162610897851063,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 1.708691781037487,
+              "p95": 1.7990886700572446,
+              "count": 25
+            },
+            "warm": {
+              "p50": 0.5670555690303445,
+              "p95": 0.6035111510427669,
+              "count": 25
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trial": "candidate-shared-n5-b",
+      "note": "candidate, shipped shared profile",
+      "original_serial_control": {
+        "repeats": 5,
+        "items_ok": 5,
+        "items_failed": 0,
+        "result_seconds": {
+          "cold": {
+            "p50": 1.4289596339222044,
+            "p95": 1.4581009589601308,
+            "count": 5
+          },
+          "warm": {
+            "p50": 0.6682009920477867,
+            "p95": 0.6921911800745875,
+            "count": 5
+          }
+        },
+        "journal_sha256": "e7e649e3419d76259a7e26e36ba8a859dac03acb6d866ac73dcfbfac2f6bce4d"
+      },
+      "candidate_journal_sha256": "d5be864ec98e6270f5eb56368ff4ef9c5c661ef664e2b6458dc5f90dd1cff1bc",
+      "rungs": [
+        {
+          "sessions": 5,
+          "repeats": 5,
+          "items_ok": 25,
+          "items_failed": 0,
+          "cleanup_survivors": [],
+          "complete_task_ratios": {
+            "cold.result_seconds.p50": 1.2284263021302833,
+            "cold.result_seconds.p95": 1.2703739769438664,
+            "warm.result_seconds.p50": 0.8392172590968672,
+            "warm.result_seconds.p95": 0.872640620577981
+          },
+          "worst_complete_task_ratio": 1.2703739769438664,
+          "passes_half_speed_floor": true,
+          "candidate_result_seconds": {
+            "cold": {
+              "p50": 1.7553715989924967,
+              "p95": 1.852333514019847,
+              "count": 25
+            },
+            "warm": {
+              "p50": 0.5607658050721511,
+              "p95": 0.604034140938893,
+              "count": 25
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "exploratory_ladders": [
+    {
+      "ladder": "candidate-shared",
+      "journal_sha256": "1695c1c3acef7073540b76a805f06f489a468c15c36c0efb91ecf115ea8cddc1",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.4969988879747689,
+              "p95": 1.5758523269323632,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.6516181020997465,
+              "p95": 0.6556814489886165,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 4,
+          "repeats": 3,
+          "items_ok": 12,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 0.9976818382882798,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.4935286024701782,
+              "p95": 1.5510751160327345,
+              "count": 12
+            },
+            "warm": {
+              "p50": 0.514089064032305,
+              "p95": 0.5534976510098204,
+              "count": 12
+            }
+          }
+        },
+        {
+          "sessions": 5,
+          "repeats": 3,
+          "items_ok": 15,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.2136194244575422,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.7678469310048968,
+              "p95": 1.9124849940417334,
+              "count": 15
+            },
+            "warm": {
+              "p50": 0.5633876590291038,
+              "p95": 0.6141171649796888,
+              "count": 15
+            }
+          }
+        },
+        {
+          "sessions": 6,
+          "repeats": 3,
+          "items_ok": 18,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.428767017442193,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.081179424014408,
+              "p95": 2.2515258290804923,
+              "count": 18
+            },
+            "warm": {
+              "p50": 0.6474293924984522,
+              "p95": 0.6981517580570653,
+              "count": 18
+            }
+          }
+        },
+        {
+          "sessions": 7,
+          "repeats": 3,
+          "items_ok": 21,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.504364593311098,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.2457453780807555,
+              "p95": 2.370656444923952,
+              "count": 21
+            },
+            "warm": {
+              "p50": 0.6718159759184346,
+              "p95": 0.7236143950140104,
+              "count": 21
+            }
+          }
+        },
+        {
+          "sessions": 8,
+          "repeats": 3,
+          "items_ok": 24,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.8063202765578943,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.658686071576085,
+              "p95": 2.8464940109988675,
+              "count": 24
+            },
+            "warm": {
+              "p50": 0.830845621007029,
+              "p95": 0.8758548879995942,
+              "count": 24
+            }
+          }
+        },
+        {
+          "sessions": 9,
+          "repeats": 3,
+          "items_ok": 27,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.98553330824582,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.9345955969765782,
+              "p95": 3.1289072840008885,
+              "count": 27
+            },
+            "warm": {
+              "p50": 0.878872265922837,
+              "p95": 0.9642440869938582,
+              "count": 27
+            }
+          }
+        },
+        {
+          "sessions": 10,
+          "repeats": 3,
+          "items_ok": 30,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.255366052579084,
+          "result_seconds": {
+            "cold": {
+              "p50": 3.362962788029108,
+              "p95": 3.554123842041008,
+              "count": 30
+            },
+            "warm": {
+              "p50": 1.0069890129962005,
+              "p95": 1.1357804170111194,
+              "count": 30
+            }
+          }
+        }
+      ]
+    },
+    {
+      "ladder": "original-separate-a",
+      "journal_sha256": "aa6fbf0067851da1df1f8900ee8793d3aaf7bf3a6a69ac69c547d933f1317d88",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.0639956330414861,
+              "p95": 1.097588996984996,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.600832381984219,
+              "p95": 0.6467365049757063,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 4,
+          "repeats": 3,
+          "items_ok": 12,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.2571909055303567,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.291960995469708,
+              "p95": 1.3798789050197229,
+              "count": 12
+            },
+            "warm": {
+              "p50": 0.5343690334702842,
+              "p95": 0.624430590076372,
+              "count": 12
+            }
+          }
+        },
+        {
+          "sessions": 8,
+          "repeats": 3,
+          "items_ok": 24,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.249109602734753,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.3113992144935764,
+              "p95": 2.46859795297496,
+              "count": 24
+            },
+            "warm": {
+              "p50": 0.8437200110056438,
+              "p95": 0.9242691090330482,
+              "count": 24
+            }
+          }
+        },
+        {
+          "sessions": 9,
+          "repeats": 3,
+          "items_ok": 27,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.521406094245134,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.624686075025238,
+              "p95": 2.767467585974373,
+              "count": 27
+            },
+            "warm": {
+              "p50": 0.9409356859978288,
+              "p95": 1.0463305100565776,
+              "count": 27
+            }
+          }
+        },
+        {
+          "sessions": 10,
+          "repeats": 3,
+          "items_ok": 30,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.7025845376818243,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.732587728998624,
+              "p95": 2.9663270519813523,
+              "count": 30
+            },
+            "warm": {
+              "p50": 0.99795453005936,
+              "p95": 1.1283586360514164,
+              "count": 30
+            }
+          }
+        }
+      ]
+    },
+    {
+      "ladder": "original-separate-b",
+      "journal_sha256": "ee16e32fec52d7a457a2b08594bf3b0dbe54f3bf4ff8b5eb358e9b50152e4f6f",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.0778519980376586,
+              "p95": 1.084847865975462,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.56347843806725,
+              "p95": 0.5943791320314631,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 5,
+          "repeats": 3,
+          "items_ok": 15,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.4910707360781092,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.4251775390002877,
+              "p95": 1.617584906052798,
+              "count": 15
+            },
+            "warm": {
+              "p50": 0.5641789560904726,
+              "p95": 0.6228101289598271,
+              "count": 15
+            }
+          }
+        },
+        {
+          "sessions": 6,
+          "repeats": 3,
+          "items_ok": 18,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.6028956995394894,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.6678516310057603,
+              "p95": 1.7388979790266603,
+              "count": 18
+            },
+            "warm": {
+              "p50": 0.6131482450291514,
+              "p95": 0.6611391589976847,
+              "count": 18
+            }
+          }
+        },
+        {
+          "sessions": 7,
+          "repeats": 3,
+          "items_ok": 21,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.8151232424196015,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.90261238894891,
+              "p95": 1.9691325760213658,
+              "count": 21
+            },
+            "warm": {
+              "p50": 0.7005121749825776,
+              "p95": 0.7616150400135666,
+              "count": 21
+            }
+          }
+        }
+      ]
+    },
+    {
+      "ladder": "original-shared",
+      "journal_sha256": "abf904458371002167033802e722eee56eaa89f2cec29c62d6dff18f9af86816",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.254295477992855,
+              "p95": 1.2967475090408698,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.6788340660277754,
+              "p95": 0.7037270369473845,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 2,
+          "repeats": 3,
+          "items_ok": 6,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.131632509828274,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.901215975987725,
+              "p95": 2.2249555230373517,
+              "count": 6
+            },
+            "warm": {
+              "p50": 1.4176141234929673,
+              "p95": 1.5000874300021678,
+              "count": 6
+            }
+          }
+        },
+        {
+          "sessions": 3,
+          "repeats": 3,
+          "items_ok": 9,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 4.1005784949557045,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.539762745029293,
+              "p95": 3.3334570339648053,
+              "count": 9
+            },
+            "warm": {
+              "p50": 2.2909039580263197,
+              "p95": 2.885687954025343,
+              "count": 9
+            }
+          }
+        },
+        {
+          "sessions": 5,
+          "repeats": 3,
+          "items_ok": 15,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 8.595725240630994,
+          "result_seconds": {
+            "cold": {
+              "p50": 3.790837879991159,
+              "p95": 5.226295750006102,
+              "count": 15
+            },
+            "warm": {
+              "p50": 3.653070979984477,
+              "p95": 6.049044254003093,
+              "count": 15
+            }
+          }
+        },
+        {
+          "sessions": 7,
+          "repeats": 3,
+          "items_ok": 21,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 10.658191388494181,
+          "result_seconds": {
+            "cold": {
+              "p50": 5.269726880942471,
+              "p95": 7.524769164971076,
+              "count": 21
+            },
+            "warm": {
+              "p50": 4.7941905609332025,
+              "p95": 7.500457445043139,
+              "count": 21
+            }
+          }
+        }
+      ]
+    },
+    {
+      "ladder": "prototype-shared-one-server-per-agent",
+      "journal_sha256": "e9dccb671747f066dc02362eef95b404dd5033b73f5c56ffaff00cef7bb26f46",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.0896789119578898,
+              "p95": 1.1275402159662917,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.6537754869787022,
+              "p95": 0.687915347982198,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 2,
+          "repeats": 3,
+          "items_ok": 6,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.3839769192334608,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.50809046352515,
+              "p95": 1.520624459022656,
+              "count": 6
+            },
+            "warm": {
+              "p50": 0.5660745454952121,
+              "p95": 0.6080335139995441,
+              "count": 6
+            }
+          }
+        },
+        {
+          "sessions": 3,
+          "repeats": 3,
+          "items_ok": 9,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.0343627167647673,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.2066740430891514,
+              "p95": 2.2938257770147175,
+              "count": 9
+            },
+            "warm": {
+              "p50": 0.7097825630335137,
+              "p95": 0.7471818570047617,
+              "count": 9
+            }
+          }
+        },
+        {
+          "sessions": 4,
+          "repeats": 3,
+          "items_ok": 12,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.7155600737979912,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.946255985472817,
+              "p95": 3.061903192079626,
+              "count": 12
+            },
+            "warm": {
+              "p50": 0.9484715349390171,
+              "p95": 1.0250488190213218,
+              "count": 12
+            }
+          }
+        },
+        {
+          "sessions": 6,
+          "repeats": 3,
+          "items_ok": 18,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 4.064485350625082,
+          "result_seconds": {
+            "cold": {
+              "p50": 4.399813894473482,
+              "p95": 4.582870690035634,
+              "count": 18
+            },
+            "warm": {
+              "p50": 1.4772610010113567,
+              "p95": 1.5907415450783446,
+              "count": 18
+            }
+          }
+        },
+        {
+          "sessions": 8,
+          "repeats": 3,
+          "items_ok": 24,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 4.871583229915561,
+          "result_seconds": {
+            "cold": {
+              "p50": 5.308461513486691,
+              "p95": 5.370739922043867,
+              "count": 24
+            },
+            "warm": {
+              "p50": 1.7775552970124409,
+              "p95": 1.9727712499443442,
+              "count": 24
+            }
+          }
+        }
+      ]
+    },
+    {
+      "ladder": "prototype-shared-without-the-delta-tee",
+      "journal_sha256": "51a41772c313da45e3de6af4bd291d1ac05340f8f70e5c0a9e48e83f71296cc1",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.1001440410036594,
+              "p95": 1.116238984046504,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.505233749980107,
+              "p95": 0.5309295050101355,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 8,
+          "repeats": 3,
+          "items_ok": 24,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.4561943626744367,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.5121407859842293,
+              "p95": 2.7416999000124633,
+              "count": 24
+            },
+            "warm": {
+              "p50": 0.8206785850343294,
+              "p95": 0.9049609380308539,
+              "count": 24
+            }
+          }
+        }
+      ]
+    },
+    {
+      "ladder": "prototype-shared-with-the-delta-tee",
+      "journal_sha256": "0f30c1714ca7ee6dd7446db2a9837c0aa6d52a4cbd93384f757aad02595df49a",
+      "rungs": [
+        {
+          "sessions": 1,
+          "repeats": 3,
+          "items_ok": 3,
+          "items_failed": 0,
+          "worst_complete_task_ratio": null,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.1657247139373794,
+              "p95": 1.188512739026919,
+              "count": 3
+            },
+            "warm": {
+              "p50": 0.6232465830398723,
+              "p95": 0.6600356790004298,
+              "count": 3
+            }
+          }
+        },
+        {
+          "sessions": 4,
+          "repeats": 3,
+          "items_ok": 12,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 1.1628069204780866,
+          "result_seconds": {
+            "cold": {
+              "p50": 1.2945032420102507,
+              "p95": 1.3820108380168676,
+              "count": 12
+            },
+            "warm": {
+              "p50": 0.5042478400282562,
+              "p95": 0.545166376978159,
+              "count": 12
+            }
+          }
+        },
+        {
+          "sessions": 8,
+          "repeats": 3,
+          "items_ok": 24,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.208462321621107,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.458765249524731,
+              "p95": 2.62478560290765,
+              "count": 24
+            },
+            "warm": {
+              "p50": 0.8140095754642971,
+              "p95": 0.916598784038797,
+              "count": 24
+            }
+          }
+        },
+        {
+          "sessions": 9,
+          "repeats": 3,
+          "items_ok": 27,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.3234689703633755,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.5418102690018713,
+              "p95": 2.761472470010631,
+              "count": 27
+            },
+            "warm": {
+              "p50": 0.8698309500468895,
+              "p95": 0.977853549993597,
+              "count": 27
+            }
+          }
+        },
+        {
+          "sessions": 10,
+          "repeats": 3,
+          "items_ok": 30,
+          "items_failed": 0,
+          "worst_complete_task_ratio": 2.444856706758645,
+          "result_seconds": {
+            "cold": {
+              "p50": 2.6970544289797544,
+              "p95": 2.9057433410780504,
+              "count": 30
+            },
+            "warm": {
+              "p50": 0.9492036620504223,
+              "p95": 1.0704370510065928,
+              "count": 30
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "diagnostics": {
+    "app_server_boot_seconds": {
+      "one_at_a_time": {
+        "supervised": 0.271,
+        "without_the_credential_supervisor": 0.222
+      },
+      "eight_at_once": {
+        "supervised": 0.535,
+        "without_the_credential_supervisor": 0.544
+      },
+      "credential_supervisor_interpreter_seconds": 0.027,
+      "note": "Time from spawn to the answer to `initialize`, measured in a measurement group. Eight at once cost roughly twice one, not eight times one."
+    },
+    "one_shared_app_server_serializes_opening_threads": {
+      "note": "Four conversations opened at once on one server: thread/start took 1.32 to 1.54 s each and finished staggered, while the four turns that followed overlapped and ended within 32 ms of each other. Identical with and without the credential supervisor, so the serialization is inside the app server."
+    },
+    "prototype_ladders_are_not_the_published_code": "The three `prototype-*` ladders were taken before code review; the reviewed driver changed how a message naming no thread is routed and where a server's account is recorded. They are retained as the diagnostics they were."
+  },
+  "original_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+  "instances": "shared (run.py default): several sessions on one agent"
+}

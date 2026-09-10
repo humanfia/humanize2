@@ -111,12 +111,16 @@
   {
    "backend": "codex",
    "profile": "default_mock_profile",
-   "concurrency": 5,
-   "trial_index": 48,
-   "max_startup_ratio": 1.6369787675579954,
-   "max_fixed_work_ratio": 0.9403916132833537,
-   "legacy_strict_pass": false,
-   "summary": "evidence-2026-09-10/selected-stage4-summary.json"
+   "concurrency": 6,
+   "instances": "shared",
+   "gate": "complete_task_half_speed_floor",
+   "gate_limit": 2.0,
+   "max_complete_task_ratio": 1.5892735015306971,
+   "max_startup_ratio": null,
+   "max_fixed_work_ratio": null,
+   "legacy_strict_pass": null,
+   "note": "Remeasured against the complete-task floor alone, with several sessions on one agent rather than one agent per session, and after the measurement-group occupancy guard was corrected. The startup, fixed-work and legacy verdicts were not taken. The codex entries under `trials` predate all three and are retained unchanged.",
+   "summary": "evidence-2026-09-10/codex-complete-task-floor-summary.json"
   },
   {
    "backend": "cursor",
