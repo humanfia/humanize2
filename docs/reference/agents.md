@@ -763,8 +763,13 @@ agent.stopped     # whether that has happened
 ```
 
 The turn under way is closed out and every later call raises `Stopped`. What the turn was doing
-is left where it got to; what ends is the agent's part in it. A stop that waited for a turn
+is left where it got to; what ends is the agent's part in it, which includes the CLI process
+the turn was running in and whatever that process had started. A stop that waited for a turn
 would not read as a stop — a model can think for minutes.
+
+To end one turn rather than the agent, there is
+[`session.interrupt`](#interrupting-by-hand) and the per-turn
+[budget](#cutting-a-turn-off-and-what-one-turn-may-spend) built on it.
 
 `Stopped` is not a `CalledProcessError`, so the loops that carry on past a turn that failed do
 not carry on past this.
@@ -1042,6 +1047,103 @@ would be halved by the accounting.
 The `result` event a turn ends on carries the same reckoning as `spent`, beside the per-model
 `tokens` it already carried: the two are the same spending counted two ways, and
 `result.spent.total` is what `result.tokens` comes to.
+
+## Cutting a turn off, and what one turn may spend
+
+A turn can be given a **budget** — what it may write, how long it may run — and when the budget
+is spent the turn stops. Not the next turn: the one running now.
+
+```python
+from hmz.agents import Budget
+
+session.budget = Budget(output=4_000, seconds=300, when="immediately", then="end")
+```
+
+**It is per turn.** Every turn starts with the whole of it, and what is measured is the rise
+across that turn — a cap over the whole conversation would cut a tenth round off for what the
+first round wrote. `Budget()` with nothing named in it caps nothing, which is how one
+conversation opts out of a budget its agent carries.
+
+| Field | |
+| --- | --- |
+| `output` | Output tokens one turn may come out with, or `0` for as many as it takes. Output rather than every kind: what a turn spends its time and most of its money on is what it writes. |
+| `seconds` | How long one turn may run on the clock, or `0` for as long as it takes. Seconds on the clock rather than seconds the model was talking — a turn waiting on a tool is a turn taking that long. |
+| `when` | `"next-response"` lets the answer the model is in the middle of land and stops on it, waiting a minute at most for one to arrive; `"immediately"` ends the turn where it stands. |
+| `then` | `"end"` answers with what has been said; `"fail"` raises `Unrecoverable`. |
+
+**It is held to off the live meter**, which is the same reading `spent()`, `rate()` and
+`juice()` are off: the meter moves as each request to the model comes back, so a turn that has
+written what it was given is cut off in the middle of the turn rather than after it. A cap on
+the clock bites whether or not anything is arriving, which is what catches a turn that has gone
+quiet. `"next-response"` is paid out by a response landing rather than by the turn ending — a
+budget that waited for the turn would never bite, the turn being the thing it is there to
+shorten.
+
+**A turn ended by its budget landed; it did not fail.** Its edits are on disk and its
+conversation is open, so the round after a short round carries the same session on rather than
+starting another — which is the whole difference between a cap and a kill. Read as a failure
+it would be taken again on a budget refilled for the retry, and a cap a loop refills every
+time it is reached is not a cap.
+
+`then="fail"` is a flow saying it cannot use a short round. It raises `Unrecoverable` rather
+than an ordinary failure, and so is not caught by `suppress`: the same budget is spent again
+on the next try, so a loop that took the turn over on a schedule would be cut off at the same
+word every round. Either way a turn cut off is never retried and never carried to the next
+account of a [fallback chain](/user/fallback).
+
+The budget is humanize's own rather than a native flag. Claude Code has a cap of its own —
+dollars, counted over the process rather than the turn — and a cap only some backends have,
+counted over something other than a turn, is not one a flow could be written against.
+
+A budget is a setting of the agent, and a setting of one conversation of it:
+
+```python
+agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model=…, effort="high",
+                                              budget=Budget(seconds=600)))
+session = agent.new()
+session.budget                       # Budget(seconds=600) — the agent's
+session.budget = Budget(output=800)  # this conversation's own, from its next turn
+```
+
+The turn already under way keeps the budget it opened with: what has been spent is measured
+against the cap the turn started on.
+
+### Interrupting by hand
+
+The primitive underneath is there on its own, and is what a watchdog over a wedged CLI reaches
+for:
+
+```python
+session.interrupt(why="it has been reading the same file for four minutes")
+```
+
+It ends the turn now running and leaves the session usable. A session with no turn running is
+left alone — a reason left standing would end the next turn before it had said anything, and a
+turn that has not started is prevented with `agent.stop()` instead.
+
+A [goal](#goals) is not a turn: it is the backend's own loop, started by the backend and
+followed rather than held, so a budget does not apply to one and `interrupt` does not reach
+one. `agent.stop()` is what ends a goal.
+
+**A turn cut off still ends on exactly one `result`**, carrying what the agent got as far as
+saying: there is no answer to read it off once the thing saying it has been taken away, so what
+the turn said as it went is what it answers with. That is what the backend said *to humanize* —
+a CLI that streams a message only when the message is complete has said nothing yet, so a turn
+cut off in its first paragraph answers with `""` rather than with half a sentence nobody was
+shown. A budget's cut-off also wins over a `Stop` hook that would have sent the agent on — a
+spent budget is not a question.
+
+What is actually ended is whichever process is holding the turn, and everything that process
+started:
+
+| How the backend is driven | What a cut-off reaches |
+| --- | --- |
+| One command per turn — `cursor`, `grok`, `opencode`, `mimo`, and the shaped turns of `agy` and `qwen` | The command the turn is running in, and its children. |
+| One process held open across its turns — `claude`, `pi`, `agy`, `qwen` | The process the session is spoken to. The next turn starts another and resumes the conversation. |
+| An app server serving every session of an agent at once — `codex`, `kimi`, `zcode`, `dsh` | Nothing is taken down; the turn stops at the next answer. Ending the server would end every other conversation on it. |
+
+`agent.stop()` reaches the same place, which is what makes it mean what it always said: on a
+command-per-turn backend it ends the turn under way rather than only preventing the next one.
 
 ## What each backend can do
 
@@ -1370,7 +1472,7 @@ class AgentBase:
 
     id: str                 # what this agent is called
     backend: str            # "claude", "codex", "kimi", "pi", …
-    config: AgentConfig     # model, effort, machine, permission, provider
+    config: AgentConfig     # model, effort, machine, permission, provider, budget
     opened: list[str]       # the backend's id for every session it ever opened
     sessions: list[SessionBase]
     stopped: bool
@@ -1415,7 +1517,20 @@ class SessionBase:
     async def apursue(objective: str, *, suppress: bool = False) -> str
 
     def interject(text: str) -> None
+    def interrupt(*, why: str) -> None  # end the turn now running, wherever it has got to
     def close() -> None
+
+    budget: Budget | None   # what each of its turns may spend, or None for no cap
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Budget:
+    output: float = 0.0            # output tokens one turn may write, 0 for no cap
+    seconds: float = 0.0           # how long one turn may run, 0 for no cap
+    when: str = "next-response"    # next-response | immediately
+    then: str = "end"              # end | fail
+
+    bounded: bool                  # whether it caps anything at all
+    def over(*, output: float = 0.0, seconds: float = 0.0) -> str
 
 @dataclass(frozen=True)
 class Event:

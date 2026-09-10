@@ -245,6 +245,17 @@ What a flow drives, written as interfaces and nothing else.
 - A flow MUST declare the places it drives with these, and what it writes beside one -- a
   moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults` -- MUST go on meaning what it
   means. What is annotated is which interface, not which class.
+- What one turn of a conversation may spend before it is cut off MUST be sayable here, as a
+  value rather than as arguments: a flow that wants a shorter round says what it may cost and
+  when a cap takes hold, and a dimension added to the answer MUST NOT be a change to every
+  place a turn can be asked for. It MUST be the session's to say as well as the agent's, and
+  MUST be sayable again while the conversation runs, for the reason the skills it carries are:
+  a loop watching what a round is costing decides between two rounds, not before the first.
+- A flow MUST be able to cut off the turn now running, which is not the same as stopping the
+  agent: stopping prevents its *next* turn, and a turn already gone wrong is minutes of a run
+  nobody can get back. What a turn cut off answers with MUST still be one answer, holding what
+  the agent got as far as saying -- a flow reading a stream that stopped mid-sentence would be
+  waiting for an answer nobody is going to give.
 - A flow MUST be able to put callbacks of its own in front of an agent as tools it may reach
   for, said on the conversation and taking effect from its next turn -- which is where a flow
   is when it has something to offer. The callback MUST run in the process the flow is in, so

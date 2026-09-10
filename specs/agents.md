@@ -53,6 +53,23 @@ while it runs, what it asks, what it cost, and how it failed -- with no behaviou
 ## `config.py`
 
 ```python
+CUTOFFS = ("next-response", "immediately")
+OUTCOMES = ("end", "fail")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Budget:
+    output: float = 0.0
+    seconds: float = 0.0
+    when: str = "next-response"
+    then: str = "end"
+
+    @property
+    def bounded(self) -> bool: ...
+
+    def over(self, *, output: float = 0.0, seconds: float = 0.0) -> str: ...
+
+
 class Goal: ...
 
 
@@ -78,8 +95,61 @@ class AgentConfig:
     provider: str = ""
     goals: bool = True
     web_search: bool = True
+    budget: Budget | None = None
 ```
 
+- `Budget` MUST be what one turn may spend before it is cut off, and MUST be over a turn
+  rather than over a session: a conversation is many turns, and a cap across all of them
+  would cut a tenth round off for what the first round wrote. Every turn MUST start with the
+  whole of it, and what is measured MUST be the rise across that turn.
+- It MUST be a value rather than a handful of arguments. A budget is already four answers --
+  how many tokens, how long, when it takes hold and what it leaves behind -- and the ones
+  after it are more of the same question, so a dimension added MUST be a field on this and a
+  line in `over` and MUST NOT be a signature change wherever a turn can be asked for. `over`
+  MUST therefore be the one place a reading is compared with a cap, and MUST answer with why
+  the turn is over budget in words a person reads, or "" while it is inside every cap.
+- Nothing MUST be capped unless it is named, so a `Budget()` is a turn under no budget at
+  all -- which is how one conversation says it is not to run under the budget its agent
+  carries. `bounded` MUST say which of the two a budget is, so that a turn under none starts
+  no clock and measures nothing.
+- `when` MUST be one of `CUTOFFS` and MUST say when a spent budget takes hold.
+  `next-response` MUST let the answer the model is in the middle of land and stop on it: what
+  the flow gets is a whole thought, and the tokens already paid for are worth reading. Which
+  means it MUST be paid out by a response landing rather than by the turn ending -- a budget
+  that waited for the turn would never bite, the turn being the thing it is there to shorten.
+  It MUST NOT wait for one indefinitely either: a backend that states a turn's whole cost only
+  once the turn is over lands nothing mid-turn to stop on, and a turn that has gone quiet is
+  the very one a clock was set for -- so the wait MUST have an end, and the end of it MUST be
+  the cut-off. `immediately` MUST end the turn where it stands: an agent six minutes into an
+  answer nobody wants goes on spending for as long as it is left alone.
+- `then` MUST be one of `OUTCOMES` and MUST say what the turn comes to. `end` MUST answer
+  with what has been said, so that a loop reads a short turn rather than an exception, and
+  MUST be what a budget nobody has said otherwise about does: a turn cut off has still done
+  what it did -- its edits are on disk and its conversation is open to the next turn -- so it
+  is a round that ended early and not a round that failed. Read as a failure it would be
+  taken again, on a budget refilled for the retry, and a cap a loop refills every time it is
+  reached is not a cap. `fail` MUST raise, and MUST raise `Unrecoverable`: the same budget is
+  spent again on the next try, so a turn taken over on a schedule would be cut off at the
+  same word every round and never get anywhere.
+- A turn ended by `end` MUST open the session wherever the backend has already said what to
+  call the conversation, because that turn landed. The round after a short round MUST carry
+  the same conversation on rather than start another, or a cap would cost the work it was
+  meant to bound. The cut-off MUST NOT open one for a turn `fail` raised on, that being a
+  turn that failed.
+- What a budget is MUST be humanize's own and MUST NOT be a per-backend native setting. Two
+  of these CLIs can be handed a cap of their own -- Claude Code takes dollars per process --
+  and neither is a cap a flow could rely on: one that only some backends have is one a flow
+  would have to ask about before it could be written, and one counted per process is not
+  counted per turn. So it is held to here, off the meter every backend feeds, and MUST be
+  said the same way whichever CLI is behind it.
+- A word neither answers to MUST be refused where the budget is written rather than where it
+  would have taken hold: a cut-off nothing recognises is a budget that quietly never bites,
+  which is the one failure a budget must not have.
+- `budget` MUST be what every turn of every session of this agent runs under, and MUST be
+  `None` for an agent nobody has been asked about: a cap nobody chose is a cap that would
+  truncate the one turn that needed the room. A conversation MUST be able to be given one of
+  its own, which is where a loop watching what a round costs is when it decides the next one
+  is to be shorter.
 - `goals` MUST be the explicit on/off availability of backend goals for this agent. It has
   no inherited or automatic state. `AgentDefaults` MAY be written beside a flow's agent type
   to suggest its initial picker value, but MUST be resolved into `AgentConfig.goals` before
@@ -344,6 +414,20 @@ class SessionBase(ABC):
         """
         raise NotImplementedError
 
+    @property
+    def budget(self) -> Budget | None:
+        """What each turn of this conversation may spend before it is cut off."""
+
+    @budget.setter
+    def budget(self, budget: Budget | None) -> None: ...
+
+    def interrupt(self, *, why: str) -> None:
+        """Cuts the turn now running off, wherever it has got to.
+
+        Args:
+            why: What it was cut off for.
+        """
+
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
         """Runs the session under a goal the agent keeps itself going toward.
 
@@ -388,6 +472,46 @@ class SessionBase(ABC):
   one the last turn was never asked for. It MUST NOT be in what the hooks and the watchers are
   shown, which is the flow's own words -- a schema in the transcript is the plumbing showing
   through.
+- `interrupt` MUST end the turn now running, and MUST be the primitive everything that cuts
+  one off is written on -- a spent budget, a watchdog over a wedged CLI, a person who has seen
+  enough. Stopping an agent is a different thing and MUST stay a different thing: that
+  prevents its *next* turn, and until there was this, a turn gone wrong ran to the end
+  whatever anybody did.
+- What it ends MUST be whatever is actually holding the turn, whichever lifetime the backend
+  is driven in: the process a command turn runs in, the process a session held open across
+  its turns is spoken to. It MUST end what that process started as well as the process, or a
+  turn cut off in the middle of a tool leaves the tool running and the turn is still
+  spending. A backend whose turn is held somewhere shared -- an app server serving every
+  session of an agent at once -- MUST NOT be taken down for one of them and MUST stop at the
+  next answer instead: cutting one turn off must not end every other conversation on it.
+- A turn cut off MUST still end the way every turn ends, on exactly one `result` or one
+  failure. A stream that stopped mid-sentence would leave whatever is reading it waiting for
+  an answer nobody is going to give. What that one `result` carries MUST be what the agent
+  got as far as saying, since there is no answer to read it off once the thing saying it has
+  been taken away.
+- A turn cut off MUST NOT be taken again -- not on the retry that a failed turn gets, and not
+  under the next account of the chain. The budget would be spent again on the same words, and
+  a watchdog that ended a wedged turn did not ask for another one.
+- A session with no turn running MUST be left alone by it: a reason left standing would end
+  the next turn before it had said anything, and a turn that has not started is prevented by
+  stopping the agent rather than by this.
+- A budget MUST be held to off the live meter rather than checked when a turn ends, which is
+  the whole of why it is worth having: the meter moves as each request to the model comes
+  back, so a turn that has written what it was given is cut off in the middle of the turn
+  rather than after it. A cap on the clock MUST bite whether or not anything is being spent,
+  since a turn that has gone quiet is the one a clock is for -- so a backend that reports what
+  it spent only at the end of a turn MUST still be held to one.
+- A session MUST run its turns under the budget its agent was configured with unless it has
+  been told otherwise, and MUST take being told while it is running -- which is where a loop
+  watching what a round costs is. The turn already under way MUST keep the budget it opened
+  with: what has been spent is measured against the cap the turn started on, and one swapped
+  halfway through would cut a turn off for tokens it was allowed when it wrote them.
+- A budget's cut-off MUST win over a hook that would have sent the agent on. A spent budget
+  is not a question, and `Stop` refusing is what a turn goes round again on.
+- A budget MUST be over a turn and not over a goal, and `interrupt` MUST NOT claim to reach
+  one. A goal is the backend's own loop, started by the backend and followed rather than
+  held, so there is no turn here to cut off and nothing that could honestly be measured
+  against a cap: what ends a goal is stopping the agent.
 - `interject` MUST reach the turn already under way rather than starting another, and MUST
   raise `NotImplementedError` on a backend that takes a turn's whole prompt up front. A
   backend that can be talked to MUST raise `RuntimeError` when nothing is running to hear it.
@@ -505,6 +629,16 @@ class CommandSessionBase(SessionBase):
 - A turn MUST be one run of the command, with both of the agent's streams teed to ours as they
   arrive, so that a long turn stays watchable. A sink that has gone away MUST NOT take the turn
   down with it, and MUST NOT stop the reading either: a pipe nobody drains blocks the agent.
+- The process a turn is running in MUST be reachable while it runs, and letting go of what
+  holds the conversation open MUST end it. There is nothing to hold *between* turns, which is
+  no reason to hold nothing during one: a session that held nothing at all would leave a stop
+  and a cut-off with nowhere to reach, and `stop` says it ends the turn under way. What the
+  turn's own reader finds out MUST be what it would find out about any process that has gone:
+  the streams end and the status is nonzero, which is a failed turn, and whoever asked for it
+  to be cut off is the one who answers for it.
+- Its exit status MUST be taken through the handle that started it and MUST NOT be reaped any
+  other way. A status taken by something that is not its parent is a status the turn's own
+  reader never sees, and a turn killed mid-word would then read as one that exited cleanly.
 - Every session that is not one command per turn MUST derive from `SessionBase` instead, so
   that a backend driven another way inherits none of this.
 

@@ -96,6 +96,9 @@ capabilities, identities, conversations, and ways of collaborating with a person
 
 - Per-turn controls, lifecycle hooks, and typed failures give flows explicit decision points.
 - Steering delivers an acknowledged instruction into a supported turn that is already running.
+- A per-turn budget of output tokens or wall-clock seconds is held to off the live meter, and
+  cuts the running turn off where its cut-off setting says.
+- The same interrupt primitive ends a turn by hand, reaching whichever process is holding it.
 - Goals continue across controlled turns, while cloning creates a separate conversation branch.
 - Side questions through /btw read a frozen conversation snapshot without changing the main
   session.
@@ -104,6 +107,7 @@ capabilities, identities, conversations, and ways of collaborating with a person
 - The board carries durable lines between a person and a flow without blocking either.
 
 **Learn:** [A line typed mid-turn](/features/steering),
+[A turn can be cut off](/features/budgets),
 [It decides when it is done](/features/goals), [The moments of a turn](/features/hooks),
 [You, as one of the agents](/features/human) · **Use:** [Questions](/user/questions),
 [Side questions (/btw)](/user/btw), [Board](/user/board),
