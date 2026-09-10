@@ -520,12 +520,15 @@ PROFILES = (
         # so there is no log to read a run's cost out of as it is spent, and none to gather.
         logs=(),
         efforts=_AGY,
-        # One place: the `skills/` of its own home, which is the global customization root it
-        # loads whatever else it is doing. Its other root is `.agents` under the workspace,
-        # and that one is not listed -- a turn is run as `--print`, which opens no project,
-        # and a skill left there is a skill such a turn never sees. So nothing is mounted for
-        # it either: what reads as a skill this agent has is a skill this agent has.
+        # Two places: the `skills/` of its own home, which is the global customization root it
+        # loads whatever else it is doing, and `.agents/skills` under the workspace, which it
+        # opens by name once it has been given that workspace -- traced, on a turn of its own
+        # stream transport, opening `<workspace>/.agents/skills/<name>/SKILL.md`. Not under
+        # the user's own home: it never looks there. So the shared one is where a flow's
+        # skills are mounted, which is where its sibling backends put theirs.
         skills=("skills/*/SKILL.md",),
+        works=(".agents/skills/*/SKILL.md",),
+        mounts=".agents/skills",
         # What a sign-in leaves behind where there is no keyring to put it in -- a session on
         # a machine with no desktop, which is where a flow runs. The keyring is the first
         # choice and is not a path.
@@ -536,6 +539,10 @@ PROFILES = (
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
             "GOOGLE_APPLICATION_CREDENTIALS",
+            # Where the key way's requests actually go. Exported once in a shell profile it
+            # sends every turn under an account of ours somewhere that account never named,
+            # with its key -- and the answers come back looking exactly as they should.
+            "GOOGLE_GEMINI_BASE_URL",
         ),
         ways=(
             Way(
