@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
 from hmz.agents import (
     AntigravityCLIAgent,
@@ -30,6 +31,7 @@ from hmz.agents import (
     PiAgentConfig,
     QwenCodeAgent,
     QwenCodeAgentConfig,
+    Unrecoverable,
 )
 from hmz.machines import AnchoredConfig
 from tests.stubs import HereAnchor
@@ -43,6 +45,15 @@ MIMO = MimoCodeAgentConfig(model="xiaomi/mimo-v2.5", effort="low")
 QWEN = QwenCodeAgentConfig(model="qwen3-coder-plus", effort="xhigh")
 GROK = GrokBuildAgentConfig(model="grok-4.6", effort="xhigh")
 AGY = AntigravityCLIAgentConfig(model="gemini-3.5-flash-medium", effort="high")
+
+
+class _Shape(BaseModel):
+    """What a turn held to a shape is asked to answer in."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    value: str
+
 
 #: A `pi --mode rpc`: it names the session it was given, then answers each command written to
 #: it with the events one agent run is made of. A prompt of `boom` is refused outright and one
@@ -232,27 +243,96 @@ else:
     turn(sys.stdin.read())
 """
 
-#: A `grok -p`: the prompt is inside the command line, and it answers in the lines of one
-#: turn, tagged by `type` and ending on the `end` that names the session. A prompt of `boom`
-#: comes back as an error line with the exit status still zero; one of `quiet` says nothing.
+#: Both of Grok Build's transports. `grok agent … stdio` holds the conversation open and
+#: speaks the protocol: `session/new` opens one, `session/prompt` takes a turn on it, and the
+#: turn arrives as `session/update` notifications. `grok -p` is one run of the same turn, with
+#: the prompt inside the command line and the same updates flattened onto `type`, ending on
+#: the `end` that names the session. A prompt of `boom` is refused on either -- an error line
+#: with the exit status still zero, or the protocol's own error -- and one of `quiet` leaves
+#: without answering at all.
 _GROK = """
 import json, os, pathlib, sys
 
 log = pathlib.Path(LOG)
 argv = sys.argv[1:]
-said = next((one.partition("=")[2] for one in argv if one.startswith("--single=")), "")
 flags = dict(zip(sys.argv, sys.argv[1:]))
-with log.open("a") as stream:
-    json.dump({"argv": argv, "stdin": said,
-               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
-    stream.write("\\n")
-
-session = flags.get("--resume", "ses-grok-stub")
+session = os.environ.get("A_SESSION_THE_TEST_NAMED") or flags.get(
+    "--resume", "ses-grok-stub")
+spent = {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}
 
 
 def out(line):
     print(json.dumps(line), flush=True)
 
+
+def noted(said):
+    with log.open("a") as stream:
+        json.dump({"argv": argv, "stdin": said, "pid": os.getpid(),
+                   "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
+        stream.write("\\n")
+
+
+def told(kind, **rest):
+    out({"jsonrpc": "2.0", "method": "session/update",
+         "params": {"sessionId": session, "update": {"sessionUpdate": kind, **rest}}})
+
+
+if argv[:1] == ["agent"] and "stdio" in argv:
+    while line := sys.stdin.readline():
+        asked = json.loads(line)
+        at, method = asked.get("id"), asked.get("method")
+        if method == "initialize":
+            out({"jsonrpc": "2.0", "id": at, "result": {"protocolVersion": 1}})
+            continue
+        if method == "session/new":
+            out({"jsonrpc": "2.0", "id": at, "result": {"sessionId": session}})
+            continue
+        if method == "session/load":
+            session = asked["params"]["sessionId"]
+            noted("load " + session)
+            if session == "gone":
+                out({"jsonrpc": "2.0", "id": at,
+                     "error": {"code": -32001, "message": "no such session"}})
+                continue
+            out({"jsonrpc": "2.0", "id": at, "result": {}})
+            continue
+        said = asked["params"]["prompt"][0]["text"]
+        noted(said)
+        if said == "quiet":
+            sys.exit(0)
+        if said == "boom":
+            out({"jsonrpc": "2.0", "id": at,
+                 "error": {"code": -32000, "message": "grok would not take it"}})
+            continue
+        if said == "ask":
+            # A tool call put in front of the client anyway, which it answers by the kind
+            # of the option rather than by taking whichever came first.
+            out({"jsonrpc": "2.0", "id": 9001,
+                 "method": "session/request_permission",
+                 "params": {"sessionId": session, "options": [
+                     {"optionId": "no", "kind": "reject_once"},
+                     {"optionId": "yes", "kind": "allow_always"}]}})
+            chosen = json.loads(sys.stdin.readline())
+            told("agent_message_chunk", content={
+                "type": "text",
+                "text": chosen["result"]["outcome"]["optionId"]})
+            out({"jsonrpc": "2.0", "id": at, "result": {"stopReason": "end_turn"}})
+            continue
+        told("agent_thought_chunk",
+             content={"type": "text", "text": "thinking about " + said})
+        told("tool_call", toolCallId="call_1", title="run_terminal_cmd",
+             rawInput={"command": "echo " + said})
+        told("tool_call_update", toolCallId="call_1", status="completed")
+        told("agent_message_chunk", content={"type": "text", "text": said})
+        out({"jsonrpc": "2.0", "method": "_x.ai/session_notification",
+             "params": {"sessionId": session,
+                        "update": {"sessionUpdate": "response_completed",
+                                   "usage": spent}}})
+        out({"jsonrpc": "2.0", "id": at, "result": {"stopReason": "end_turn"}})
+    sys.exit(0)
+
+said = next((one.partition("=")[2] for one in argv if one.startswith("--single=")), "")
+noted(said)
 
 if said == "quiet":
     sys.exit(0)
@@ -264,11 +344,13 @@ out({"type": "tool_call", "toolCallId": "call_1", "toolName": "run_terminal_cmd"
      "kind": "execute", "status": "in_progress", "title": "echo " + said,
      "rawInput": {"command": "echo " + said}})
 out({"type": "tool_call_update", "toolCallId": "call_1", "status": "completed"})
-# A letter a line, as the real one streams: what comes back must be the word.
-for letter in said:
-    out({"type": "text", "data": letter})
-out({"type": "usage", "messageId": "resp_1", "stopReason": "end_turn",
-     "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}})
+if "--json-schema" in argv:
+    out({"type": "text", "data": json.dumps({"value": said})})
+else:
+    # A letter a line, as the real one streams: what comes back must be the word.
+    for letter in said:
+        out({"type": "text", "data": letter})
+out({"type": "usage", "messageId": "resp_1", "stopReason": "end_turn", "usage": spent})
 out({"type": "end", "stopReason": "end_turn", "sessionId": session, "num_turns": 1})
 """
 
@@ -735,20 +817,89 @@ def test_qwen_that_said_nothing_at_all_is_a_failed_turn(stubs: _Stubs) -> None:
         QwenCodeAgent(QWEN).new()("quiet")
 
 
-def test_grok_is_one_run_per_turn_resuming_the_session_it_opened(
-    stubs: _Stubs,
-) -> None:
-    """Its prompt is inside the command line: Grok Build does not read one off stdin."""
+def test_grok_holds_one_process_for_the_conversation_it_opened(stubs: _Stubs) -> None:
+    """Two turns are two lines written to one `grok agent stdio`, not two runs of it."""
     session = GrokBuildAgent(GROK).new()
     assert session("hi") == "hi"
     assert session("again") == "again"
 
     opened, again = stubs.calls()
-    # Written onto the flag, so that a prompt opening with a dash is still a prompt.
-    assert "--single=hi" in opened.argv
+    assert opened.argv[:2] == ["agent", "--model"]
+    assert opened.argv[-1] == "stdio"
     assert opened.argv[opened.argv.index("--effort") + 1] == "xhigh"
     assert "--yolo" in opened.argv
-    assert again.argv[again.argv.index("--resume") + 1] == session.id
+    assert session.id == "ses-grok-stub"
+    assert [opened.stdin, again.stdin] == ["hi", "again"]
+    assert opened.pid == again.pid
+
+
+def test_grok_runs_a_shaped_turn_as_the_command_that_carries_the_shape(
+    stubs: _Stubs,
+) -> None:
+    """`grok agent` has no `--json-schema`, so a shape is a run resuming the session."""
+    session = GrokBuildAgent(GROK).new()
+    assert session("hi") == "hi"
+    assert session("again", schema=_Shape) == _Shape(value="again")
+
+    opened, shaped = stubs.calls()
+    assert opened.argv[-1] == "stdio"
+    # Written onto the flag, so that a prompt opening with a dash is still a prompt.
+    assert "--single=again" in shaped.argv
+    assert shaped.argv[shaped.argv.index("--resume") + 1] == session.id
+    assert json.loads(shaped.argv[shaped.argv.index("--json-schema") + 1])["title"] == (
+        "_Shape"
+    )
+
+
+def test_grok_loads_the_conversation_back_onto_the_process_after_a_shaped_turn(
+    stubs: _Stubs,
+) -> None:
+    """The two transports pick up what the other opened, by the id Grok Build minted."""
+    session = GrokBuildAgent(GROK).new()
+    assert session("hi") == "hi"
+    assert session("again", schema=_Shape) == _Shape(value="again")
+    assert session("third") == "third"
+
+    opened, shaped, loaded, third = stubs.calls()
+    assert opened.argv[-1] == "stdio"
+    assert shaped.argv[shaped.argv.index("--resume") + 1] == session.id
+    # A process is a transport: the one this turn started is handed the conversation the
+    # command line was resuming a moment ago rather than opening a second one.
+    assert loaded.stdin == f"load {session.id}"
+    assert third.argv[-1] == "stdio"
+    assert opened.pid != third.pid
+
+
+def test_grok_says_once_that_a_conversation_it_cannot_load_is_gone(
+    stubs: _Stubs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another try is refused the same way: the conversation is not there under that id."""
+    monkeypatch.setenv("A_SESSION_THE_TEST_NAMED", "gone")
+    session = GrokBuildAgent(GROK).new()
+    assert session("hi") == "hi"
+    assert session("again", schema=_Shape) == _Shape(value="again")
+
+    with pytest.raises(Unrecoverable):
+        session("third")
+
+
+def test_grok_grants_a_tool_call_it_is_asked_to_permit(stubs: _Stubs) -> None:
+    """By the kind of the option: an id is the agent's own word for what it offers."""
+    assert GrokBuildAgent(GROK).new()("ask") == "yes"
+
+
+def test_grok_takes_a_withheld_rung_on_the_command_line_that_can_say_it(
+    stubs: _Stubs,
+) -> None:
+    """A rung that takes tools away has no flag on the protocol's own process."""
+    session = GrokBuildAgent(
+        GrokBuildAgentConfig(model="m", effort="high", web_search=False)
+    ).new()
+    assert session("hi") == "hi"
+
+    (call,) = stubs.calls()
+    assert "stdio" not in call.argv
+    assert "--single=hi" in call.argv
 
 
 def test_grok_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
@@ -780,10 +931,16 @@ def test_grok_is_given_only_what_it_may_read_when_it_may_change_nothing(
     assert call.argv[call.argv.index("--tools") + 1] == "read_file,grep,list_dir"
 
 
-def test_grok_reports_an_error_line_as_a_failed_turn(stubs: _Stubs) -> None:
-    with pytest.raises(subprocess.CalledProcessError) as raised:
+def test_grok_reports_a_refused_turn_as_a_failed_turn(stubs: _Stubs) -> None:
+    """On either transport: the protocol refuses one, and a run says so on a line."""
+    with pytest.raises(subprocess.CalledProcessError) as refused:
         GrokBuildAgent(GROK).new()("boom")
-    assert "would not take it" in str(raised.value.stderr)
+    assert "would not take it" in str(refused.value)
+    with pytest.raises(subprocess.CalledProcessError) as errored:
+        GrokBuildAgent(
+            GrokBuildAgentConfig(model="m", effort="high", web_search=False)
+        ).new()("boom")
+    assert "would not take it" in str(errored.value.stderr)
 
 
 def test_grok_that_said_nothing_at_all_is_a_failed_turn(stubs: _Stubs) -> None:
