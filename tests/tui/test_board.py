@@ -1,4 +1,4 @@
-"""`/status`: the agents that have worked, the fleets under them, and the board.
+"""`/monitor`: the agents that have worked, the fleets under them, and the board.
 
 Three things that all belong on the one sheet, because all three are what the run *is doing*.
 An agent the flow declared and never reached is not; a subagent one of them started is; and so
@@ -8,6 +8,7 @@ write on and neither waits at.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -16,7 +17,7 @@ from textual.widgets import Label, OptionList
 from hmz.agents import AgentConfig, Board, Event, HumanAgent, Refused
 from hmz.kept import Runs
 from hmz.tui import Humanize
-from hmz.tui.pick import EVERY, Entry, Status
+from hmz.tui.pick import EVERY, Entry, Monitoring
 
 from .test_app import until
 from .test_attach import SteerableAgent
@@ -44,9 +45,9 @@ def _ids(app: Humanize) -> list[str]:
 
 
 async def _opens(app: Humanize, driver: Pilot[None]) -> None:
-    """Opens `/status` and waits for it to be up."""
-    app.action_status()
-    await until(lambda: isinstance(app.screen, Status), driver)
+    """Opens `/monitor` and waits for it to be up."""
+    app.action_monitor()
+    await until(lambda: isinstance(app.screen, Monitoring), driver)
 
 
 def _two(app: Humanize) -> tuple[AgentBase, AgentBase]:
@@ -141,7 +142,7 @@ async def test_a_run_with_no_person_in_its_flow_has_no_board() -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_the_board_is_on_the_status_sheet_and_says_what_is_on_it() -> None:
+async def test_the_board_is_under_the_diagram_and_says_what_is_on_it() -> None:
     """Beside how far through the run is: a board somebody has to go and open is unread."""
     app = Humanize()
     async with app.run_test() as driver:
@@ -183,7 +184,7 @@ async def test_a_line_the_flow_keeps_to_itself_is_not_one_to_change_here() -> No
         assert "the flow's to change" in str(
             app.screen.query_one("#tuning", Label).content
         )
-        assert isinstance(app.screen, Status)
+        assert isinstance(app.screen, Monitoring)
 
 
 @pytest.mark.timeout(60)
@@ -203,7 +204,7 @@ async def test_a_line_is_typed_onto_the_board_and_the_flow_reads_it_at_once() ->
         await driver.pause()
         await driver.press(*"fix the build")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Status), driver)
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
 
         assert person.board.get("todo") == "fix the build"
         assert person.board.items()[0].by == "user"
@@ -297,3 +298,120 @@ def test_a_watcher_that_raises_has_said_nothing() -> None:
     board.put("todo", "one")  # which does not raise
 
     assert board.get("todo") == "one"
+
+
+@pytest.mark.timeout(60)
+async def test_a_box_says_how_long_its_agent_has_been_at_what_it_is_doing() -> None:
+    """The half of a box that moves, and the half nothing else on the screen carries."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, two = _two(app)
+        first, second = one.new(), two.new()
+        app._heard(one, first, Event(kind="begins", text=""))
+        app._heard(two, second, Event(kind="begins", text=""))
+        app._heard(two, second, Event(kind="ends", text=""))
+        await driver.pause()
+        # Wound back, so that the clocks say something worth reading in a test.
+        app._monitor.opened[one.id] = time.monotonic() - 65.0
+        app._monitor.rested[two.id] = time.monotonic() - 130.0
+
+        await _opens(app, driver)
+
+        drawn = _drawn(app)
+        assert "1m0" in drawn  # the one working, since its turn began
+        assert (
+            "idle 2m1" in drawn
+        )  # the one that has stopped, since its last turn ended
+
+
+@pytest.mark.timeout(60)
+async def test_a_box_says_when_its_agent_has_something_unread_on_it() -> None:
+    """Which box is worth pressing enter on is the question this sheet is answering."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, _other = _two(app)
+        first = one.new()
+        app._heard(one, first, Event(kind="begins", text=""))
+        app._keeping(one.id).unread = True
+        await driver.pause()
+
+        await _opens(app, driver)
+
+        assert "unread" in _drawn(app)
+
+
+@pytest.mark.timeout(60)
+async def test_the_box_under_the_cursor_says_so_on_the_box() -> None:
+    """A picture cannot be highlighted: the markup inside it paints over the highlight."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, two = _two(app)
+        first, second = one.new(), two.new()
+        app._heard(one, first, Event(kind="begins", text=""))
+        app._heard(two, second, Event(kind="begins", text=""))
+        await driver.pause()
+        await _opens(app, driver)
+
+        await driver.press("down")  # off the row they all appear on, onto the first box
+        await driver.pause()
+
+        boxes = app.screen.query_one("#choices", OptionList)
+        assert boxes.highlighted == 1
+        assert "❯" in str(boxes.get_option_at_index(1).prompt)
+        assert "❯" not in str(boxes.get_option_at_index(2).prompt)
+
+
+@pytest.mark.timeout(60)
+async def test_a_clock_ticking_puts_the_row_back_rather_than_the_whole_list() -> None:
+    """A list rebuilt twice a second loses the click somebody is making on it."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, _other = _two(app)
+        first = one.new()
+        app._heard(one, first, Event(kind="begins", text=""))
+        await driver.pause()
+        await _opens(app, driver)
+        sheet = app.screen
+        assert isinstance(sheet, Monitoring)
+        boxes = sheet.query_one("#choices", OptionList)
+        held = boxes.get_option_at_index(1)
+
+        app._monitor.opened[one.id] = time.monotonic() - 91.0
+        sheet._fill()
+        await driver.pause()
+
+        assert "1m3" in str(boxes.get_option_at_index(1).prompt)  # it says the new time
+        assert boxes.get_option_at_index(1) is held  # in the row that was already there
+
+
+@pytest.mark.timeout(60)
+async def test_what_the_boxes_say_is_not_said_again_under_them() -> None:
+    """The diagram is the sheet, so what is written under it is what a picture cannot say."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, _other = _two(app)
+        first = one.new()
+        app._heard(one, first, Event(kind="begins", text=""))
+        await driver.pause()
+
+        await _opens(app, driver)
+
+        under = str(app.screen.query_one("#tuning", Label).content)
+        assert "Flow:" in under  # which flows are running, which no box says
+        assert "Tokens:" in under
+        assert "Working:" not in under  # the boxes are marked, and once is enough
+        assert "Agents:" not in under  # what each runs is on its own box
+
+
+@pytest.mark.timeout(60)
+async def test_a_run_that_has_not_started_says_so_where_the_boxes_would_be() -> None:
+    """A sheet about a run that has not begun is a blank page otherwise."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        _two(app)
+
+        await _opens(app, driver)
+
+        assert "no agent has taken a turn yet" in _drawn(app)
+        # And the agents that are set up are said under it, there being no boxes to say them.
+        assert "Agents:" in str(app.screen.query_one("#tuning", Label).content)

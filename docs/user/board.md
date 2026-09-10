@@ -6,7 +6,7 @@ needs from you — what there is to do next, how far through it is, the thing yo
 while it was running.
 
 The board is the other shape. A handful of named lines, kept beside the run and shown on
-[`/status`](/user/status). The flow reads and writes it whenever it likes, you change it
+[`/monitor`](/user/monitor). The flow reads and writes it whenever it likes, you change it
 whenever you like, and **neither waits on the other** — an issue list without being one.
 
 ## Try it
@@ -43,7 +43,7 @@ def run(agents: Agents, task: str) -> None:
 hmz -f board_loop -a claude/claude-opus-5:max
 ```
 
-Press **esc** for `/status`. Under the diagram is the board. Add a second line to `todo` while
+Press **esc** for `/monitor`. Under the diagram is the board. Add a second line to `todo` while
 the loop is working through the first, and it is picked up on the next round — nothing was
 interrupted and nothing waited.
 
@@ -74,7 +74,7 @@ line says whose it is:
 | --- | --- |
 | `"both"` | either side writes it. The ordinary one — how the two hand something back and forth, and what a queue both of you add to and take from wants to be |
 | `"user"` | yours. The flow reads it and is refused if it writes |
-| `"flow"` | the flow's. You read it, and `/status` says so rather than opening an editor |
+| `"flow"` | the flow's. You read it, and `/monitor` says so rather than opening an editor |
 
 The other side is **refused where it writes**, with a `Refused` — a write that quietly did
 nothing would be a flow that quietly does not do what it says.
@@ -85,7 +85,7 @@ nothing would be a flow that quietly does not do what it says.
 | --- | --- | --- |
 | The turn | stops until it is answered | goes on |
 | Who starts it | the agent | either of you |
-| Where it is | in the transcript, once | on `/status`, until it changes |
+| Where it is | in the transcript, once | on `/monitor`, until it changes |
 | What it is for | one thing the agent cannot decide | what there is to do, and how far through it is |
 
 A flow that has to have an answer asks. A flow that wants to *know whether* there is more to do
@@ -126,7 +126,7 @@ queue.
 
 ## See also
 
-- [The shape of a run](/user/status) — where the board is drawn
+- [Watching a run](/user/monitor) — where the board is drawn
 - [Questions](/user/questions) — the half that does stop the turn
 - [The person as an agent](/weaver/human-agent)
 - [Callbacks as tools](/weaver/tools) — the other thing that does not stop a turn

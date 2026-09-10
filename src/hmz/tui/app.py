@@ -2,7 +2,7 @@
 
 Laid out the way Claude Code is, and no wider: a transcript the width of the terminal, an
 editor under it between two rules, and a status line under that. Nothing sits beside them --
-how the run is going is on `/status`, and `/flow` both chooses the loop and, a page along,
+how the run is going is on `/monitor`, and `/flow` both chooses the loop and, a page along,
 sets what each of its agents runs.
 
 The transcript is a tab per agent, and one more where all of them appear together. A flow
@@ -80,11 +80,11 @@ from .pick import (
     Flowverses,
     Held,
     Leaves,
+    Monitoring,
     Providers,
     Reports,
     Runs,
     Saved,
-    Status,
     carries_on,
     config_of,
     opens_on,
@@ -120,7 +120,7 @@ _OWN = (
     "fallback",
     "epics",
     "settings",
-    "status",
+    "monitor",
     "clear",
     "details",
     "afk",
@@ -604,7 +604,7 @@ class Humanize(App[None]):
         # key pressed to dismiss whatever is on the screen must not be the key that ends a
         # day's work, and esc is pressed to dismiss things everywhere else in this
         # interface. The editor takes it first while it is offering something.
-        Binding("escape", "status", "status", show=False),
+        Binding("escape", "monitor", "monitor", show=False),
         # Round the transcripts: the one every agent is on, then whichever are working.
         # Priority, since tab and shift+tab are the screen's own way of moving the focus
         # about, and there is nowhere here for the focus to go.
@@ -1009,7 +1009,7 @@ class Humanize(App[None]):
     def compose(self) -> ComposeResult:
         """The transcript, the offers, the editor, the status. The width is the transcript's.
 
-        Nothing sits beside it. What the flow is doing is on `/status`, which is opened when
+        Nothing sits beside it. What the flow is doing is on `/monitor`, which is opened when
         it is wanted: a column saying so the whole time costs a fifth of every line of every
         transcript, to say something that has usually not changed since it was last looked at.
         """
@@ -1460,7 +1460,7 @@ class Humanize(App[None]):
 
         The ones working rather than every agent the flow drives: with ten agents going,
         what somebody is stepping between is the ones thinking. Every agent there is can
-        still be read, from the diagram on `/status`, which is where an agent that has
+        still be read, from the diagram on `/monitor`, which is where an agent that has
         stopped is picked out by name rather than stepped past.
 
         Returns:
@@ -1756,7 +1756,7 @@ class Humanize(App[None]):
             keys.append("tab agent")
         keys.append("/ commands")
         keys.append("shift+enter newline")
-        keys.append("esc status")
+        keys.append("esc monitor")
         if self.query_one(Editor).text:
             keys.append("ctrl+c clear")
         elif self._counting():
@@ -1810,8 +1810,8 @@ class Humanize(App[None]):
         return True
 
     @work
-    async def action_status(self) -> None:
-        """Opens the sheet saying how the run is going, which is what esc is.
+    async def action_monitor(self) -> None:
+        """Opens the run, drawn, which is what esc is.
 
         Readable while a flow runs, unlike the two that choose something: it changes nothing
         about the run, so there is nothing for it to conflict with. The one thing it answers
@@ -1819,7 +1819,7 @@ class Humanize(App[None]):
         name -- working or not, which is what tab is held to.
         """
         reading = await self.push_screen_wait(
-            Status(
+            Monitoring(
                 self._flow_named,
                 self._named_by,
                 self._models,
@@ -1876,6 +1876,7 @@ class Humanize(App[None]):
                 runs=self._models[at].spec if at < len(self._models) else "",
                 working=working,
                 reading=agent.id == self._attached,
+                unread=self._unread(agent.id),
             )
             for at, agent in enumerate(self._driven())
             if (working := any(one in self._working for one in agent.sessions))
@@ -1923,8 +1924,8 @@ class Humanize(App[None]):
             self.action_flowverses()
         elif name == "settings":
             self.action_settings()
-        elif name == "status":
-            self.action_status()
+        elif name == "monitor":
+            self.action_monitor()
         elif name == "details":
             if (switched := self._switched(argv, now=self._details)) is None:
                 return
@@ -2999,7 +3000,7 @@ class Humanize(App[None]):
     ) -> None:
         """Shows what a turn said, on the transcript of the agent that said it.
 
-        And takes what it cost into what `/status` shows, which is per agent: an agent is
+        And takes what it cost into what `/monitor` shows, which is per agent: an agent is
         what is read, and the bill is the agent's too.
 
         What is shown of a turn is what the turn was for unless `/details` says otherwise:
@@ -3066,7 +3067,7 @@ class Humanize(App[None]):
             )
         elif event.kind in ("subagent", "subagent-ends"):
             # An agent this one started of its own. Counted whether or not the details are
-            # being shown, since `/status` draws the fleet under the agent that started it
+            # being shown, since `/monitor` draws the fleet under the agent that started it
             # and a fleet nobody counted would be an agent working with nothing under it.
             named, _, about = event.text.partition(" ")
             if event.kind == "subagent":

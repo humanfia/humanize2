@@ -45,7 +45,7 @@ person gets one unless it has been said that none is there.
 A question stops the turn until it is answered. For everything a run wants from you that is not
 one thing it cannot decide — what there is to do next, how far through it is, the thing you
 thought of while it was running — there is [the mission board](/user/board) instead: named
-lines on `/status` that either of you changes whenever you like, and neither waits at.
+lines on `/monitor` that either of you changes whenever you like, and neither waits at.
 
 ## From Python
 
@@ -168,7 +168,7 @@ same way: nobody is there.
 The person is not:
 
 - a coding agent — it runs no model and spends nothing;
-- in [`/status`](/user/status)'s handover graph or the cost readout — its turns are not
+- in [`/monitor`](/user/monitor)'s handover graph or the cost readout — its turns are not
   bracketed by the events that say whose turn it is;
 - one of the conversations **tab** steps between;
 - able to run [moments](/weaver/hooks) — a moment is a point in a turn of a model.

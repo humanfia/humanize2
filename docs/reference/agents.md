@@ -687,7 +687,7 @@ agent.hooks.on(Moment.SUBAGENT_START, counted)
 They are told rather than answered: no backend here waits to be told whether it may start one,
 so a refusal would be a verdict that goes nowhere. The same events reach a watcher as
 `subagent` and `subagent-ends`, and the interface draws them
-[under the agent that started them](/user/status).
+[under the agent that started them](/user/monitor).
 
 A hook that raises has said nothing. A flow must not fail because something hung off it did —
 with one exception: a hook that drove an agent which has been [stopped](#stopping) lets
