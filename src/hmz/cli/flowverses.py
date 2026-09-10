@@ -36,6 +36,8 @@ def flowverses(argv: list[str]) -> int:
     """
     import argparse
 
+    from .output import asked_as_json, reads_json
+
     parser = argparse.ArgumentParser(
         prog="hmz flowverses",
         description="Where flows come from: a git repository with a `flows/` directory apiece, "
@@ -51,21 +53,11 @@ def flowverses(argv: list[str]) -> int:
         action="store_true",
         help="just the names, one a line, for a script to read",
     )
-    listing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="one JSON object per place, one a line, for a program to read",
-    )
+    reads_json(listing, "one JSON object per place, one a line, for a program to read")
 
     showing = doing.add_parser("show", help="what one holds")
     showing.add_argument("name", metavar="NAME")
-    showing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="the whole of it as one JSON object, for a program to read",
-    )
+    reads_json(showing, "the whole of it as one JSON object, for a program to read")
 
     making = doing.add_parser("add", help="fetch one, and offer its flows")
     making.add_argument(
@@ -86,7 +78,7 @@ def flowverses(argv: list[str]) -> int:
     dropping.add_argument("name", metavar="NAME")
 
     args = parser.parse_args(argv)
-    machine = getattr(args, "as_json", False)
+    machine = asked_as_json(args)
     if args.doing in (None, "list"):
         return _list(quiet=getattr(args, "quiet", False), as_json=machine)
     if args.doing == "show":
