@@ -64,6 +64,54 @@ def _fetches_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def priced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Puts one model's unit prices where the interface will read them.
+
+    Written and fetched from a file rather than from the network: what a token costs is
+    somebody else's list, and a suite must not go and ask them for it.
+
+    Returns:
+      The model that is now listed, at a dollar a million in and five a million out.
+    """
+    import json
+
+    from hmz import prices
+
+    source = tmp_path / "prices-source.json"
+    source.write_text(
+        json.dumps(
+            {
+                "currency": "USD",
+                "unit": "per 1M tokens",
+                "versions": [
+                    {
+                        "date": "2026-09-10",
+                        "models": [
+                            {
+                                "provider": "Anthropic",
+                                "id": "claude-haiku-4.5",
+                                "name": "Claude Haiku 4.5",
+                                "pricingItems": [
+                                    {"category": "input_tokens", "price": 1},
+                                    {"category": "output_tokens", "price": 5},
+                                    {"category": "cache_read_tokens", "price": 0.1},
+                                    {"category": "cache_write_tokens", "price": 1.25},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(prices.WHENCE, str(source))
+    prices._tried = 0.0
+    assert prices.refresh(wait=True)
+    return "claude-haiku-4.5"
+
+
+@pytest.fixture
 def catching_up(_fetches_nothing: None, monkeypatch: pytest.MonkeyPatch) -> None:
     """Gives it back, for a test that is about what the menu fetches as it opens.
 

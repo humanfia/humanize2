@@ -1043,6 +1043,21 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 `tokens` it already carried: the two are the same spending counted two ways, and
 `result.spent.total` is what `result.tokens` comes to.
 
+**What any of that came to in money** is `hmz.prices`, which prices a `Usage` kind by kind
+against a list fetched from [OpenLLMPrices](https://openllmprices.com/) and kept under
+`~/.humanize/prices.json`:
+
+```python
+from hmz import prices
+
+prices.cost(agent.spent(), agent.config.model)   # dollars, or None for an unlisted model
+prices.price("claude-haiku-4-5-20251001")        # Price(model="claude-haiku-4.5", …)
+```
+
+Neither call touches the network — they read what was already kept — and both answer `None`,
+never `0.0`, for a model nobody lists, so a flow steering by money can tell *not priced* from
+*free*. See [Cost and rate](/user/tally).
+
 ## What each backend can do
 
 | | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from hmz.prices import money
+
 __all__ = [
     "AgentProgress",
     "FlowSnapshot",
@@ -59,7 +61,7 @@ class FlowSnapshot:
     handovers: tuple[tuple[str, str, int], ...] = ()
     observations: tuple[Observation, ...] = ()
     waiting: int = 0
-    spent: tuple[tuple[str, int, float], ...] = ()
+    spent: tuple[tuple[str, int, float, float | None], ...] = ()
     waiting_for_input: bool = False
 
 
@@ -132,7 +134,10 @@ def format_snapshot(snapshot: FlowSnapshot, question: str) -> str:
         lines.extend(
             f"- {compact(model, 240)}: {max(tokens, 0)} token(s), "
             f"{max(rate, 0.0):.1f}/s"
-            for model, tokens, rate in spent
+            # Left off entirely for a model nobody prices, rather than said as nothing: an
+            # agent answering a side question must not read a missing price as a free run.
+            + (f", {money(max(dollars, 0.0))}" if dollars is not None else "")
+            for model, tokens, rate, dollars in spent
         )
         if len(snapshot.spent) > len(spent):
             lines.append(

@@ -324,8 +324,14 @@ this directory. Find its trajectories with `--session` rather than by workspace.
 A trace is for after. While a run is going, [`/status`](/user/status) shows the same shape
 live. It is read off the turns going past, never by asking the flow.
 
+A trace holds what the agents did, not what it cost: it is one process per agent, one track per
+row of its sessions, one slice per thing the agent did, and the summary line says sessions,
+slices and programs. What a run cost — tokens and money alike — is the live reading, on
+[`/status`](/user/status) and on the lines above the editor. See [Cost and rate](/user/tally).
+
 ## See also
 
+- [Cost and rate](/user/tally) — what a run cost, in tokens and in money
 - [Picking a run up](/user/resuming) — carrying one of these runs on where it stopped
 - [Tracing reference](/reference/tracing)
 - [CLI › `hmz trace`](/reference/cli#hmz-trace)

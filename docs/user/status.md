@@ -1,9 +1,10 @@
 # The shape of a run — `/status`
 
 `/status` answers three questions about the run in front of you: who is working right now,
-every handover between agents and how often each happened, and what each model has cost. Reach
-for it to see the **shape** of a run, because a two-agent loop that was supposed to alternate
-and is in fact one agent doing everything looks different here from the first glance.
+every handover between agents and how often each happened, and what each model has cost — in
+tokens and in money. Reach for it to see the **shape** of a run, because a two-agent loop that
+was supposed to alternate and is in fact one agent doing everything looks different here from
+the first glance.
 
 It is also where [the board](/user/board) is, for a flow that talks to you.
 
@@ -73,18 +74,23 @@ the flow and how long the run has been going. A flow that [called
 another](/reference/flows#a-flow-that-calls-another-flow) names both, innermost last — `chat ▸
 official/rlar`.
 
-**Under the agent lines**: what the run has cost and the rate it is costing it at, per model,
-over a recent window — so a flow that has stopped reads as stopped. See [Cost and
-rate](/user/tally).
+**Under the agent lines**: what the run has cost — tokens, money, and the rate it is costing it
+at — per model, over a recent window, so a flow that has stopped reads as stopped. A model
+[OpenLLMPrices](https://openllmprices.com/) does not list shows its tokens with nothing beside
+them rather than a bill of `$0.00`. See [Cost and rate](/user/tally).
 
 ## From Python
 
 The cost half is on the agents themselves:
 
 ```python
+from hmz import prices
+
 agent.spent()            # Usage(input=…, output=…, cache_read=…)
 agent.rate(over=60)      # tokens a second over the last minute
 agent.juice()            # output tokens an average turn of the model came out with
+
+prices.cost(agent.spent(), agent.config.model)   # dollars, or None for an unlisted model
 ```
 
 The graph half is yours to keep, from a watcher:
