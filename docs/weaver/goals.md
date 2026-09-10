@@ -40,7 +40,7 @@ set. A missing feature is a flow to correct, not a turn to retry.
 
 ## Disabling goals
 
-If your flow owns every continuation, suggest `off` for each agent it declares:
+If your flow owns every continuation, declare `off` for each agent it drives:
 
 ```python
 from typing import Annotated, NamedTuple
@@ -52,16 +52,20 @@ class Agents(NamedTuple):
     reviewer: Annotated[Agent, AgentDefaults(goals=False)]
 ```
 
-The marker only supplies the model picker's initial value. The `goals` row switches the
-selected agent between `on` and `off`, and the resolved value is saved on that agent's
-`AgentConfig`. There is no third state, and the flow does not change an agent after it is made.
-Python callers set the same policy directly:
+What the flow declares is what the agents run with. It reaches every agent handed to that
+place before its first turn, over whatever it was made with — there is no row for it on the
+sheet an agent is set up on and no `-a` setting for it, because whether an agent keeps itself
+going is a thing about the work rather than about the agent. There is no third state, and the
+flow does not change an agent after the run has started.
 
-```python
-agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", goals=False))
+A place run under a `Goal` has goals, whatever else it wrote; writing both against one place is
+a flow saying two things about one agent, and [`hmz check`](/reference/cli#hmz-check) says so:
+
+```console
+loop.py:11: error: goals-both-ways: this place is run under a goal and declared without
+goals -- a required goal is a goal, so drop one of the two rather than leaving the flow to
+say which it meant
 ```
-
-`agent.disable_goals()` does the same thing imperatively before the first turn.
 
 Ordinary turns still work. Later calls to `pursue` raise `RuntimeError`, even with
 `suppress=True`, and each backend is held to that its own way:

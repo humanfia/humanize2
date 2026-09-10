@@ -149,10 +149,11 @@ def test_a_line_of_flags_and_no_command_opens_the_interface_set_up() -> None:
     assert opened.called
 
 
-def test_a_bad_permission_does_not_open_the_interface(
+def test_a_line_that_says_what_the_flow_says_does_not_open_the_interface(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    spec = "cli=codex,model=m,effort=high,permission=readonly"
+    """A rung is the flow's, so a line that carries one is a line to correct before anything."""
+    spec = "cli=codex,model=m,effort=high,permission=read-only"
     with (
         unittest.mock.patch("hmz.tui.Humanize.run") as opened,
         pytest.raises(SystemExit) as stopped,
@@ -163,7 +164,7 @@ def test_a_bad_permission_does_not_open_the_interface(
     assert not opened.called
     error = capsys.readouterr().err
     assert f"bad agent {spec!r}" in error
-    assert "permission must be one of read-only, workspace-write, auto, bypass" in error
+    assert "is the flow's to say, written beside the agent" in error
 
 
 @pytest.mark.parametrize("argv", [["--help"], ["-h"]])

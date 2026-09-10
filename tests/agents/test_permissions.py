@@ -4,6 +4,10 @@ One ladder of four rungs, and six backends with a setting of their own apiece. W
 here is that each rung reaches the CLI as that CLI's own way of saying it, and that the one
 moment a backend actually waits on -- a permission it is asking for -- is answered the way the
 rung says it should be.
+
+Which rung an agent is on is the flow's: it is a thing about the work rather than about the
+agent -- a reviewer that may not write is a reviewer whichever CLI fills the place -- so the
+flow declares it where it declares the place, and it reaches the agent from there.
 """
 
 from __future__ import annotations
@@ -343,6 +347,37 @@ def test_every_backend_has_something_to_say_at_every_rung() -> None:
         assert rung in opencode._PERMITTED
         assert rung in codex_module._PERMITTED
         assert rung in zcode._PERMITTED
+
+
+#: A flow that says its one agent may look at anything and change nothing.
+_READING = '''"""A flow whose agent reviews and does not write."""
+
+from typing import Annotated
+
+from hmz.agents import AgentBase, AgentDefaults
+from hmz.flows import flow
+
+
+@flow
+def run(
+    agents: tuple[Annotated[AgentBase, AgentDefaults(permission="read-only")]], task: str
+) -> None:
+    agents[0](task)
+'''
+
+
+def test_the_flow_says_which_rung_its_agent_is_on(tmp_path: Path) -> None:
+    """Settled onto the agent before its first turn, over whatever it was made with."""
+    from hmz.runner import Runner
+
+    where = tmp_path / "reading.py"
+    where.write_text(_READING)
+    agent = CodexAgent(CodexAgentConfig(model="m", effort="high", permission="auto"))
+
+    Runner(str(where), [agent])
+
+    assert agent.config.permission == "read-only"
+    assert unattended(agent.config.permission)["sandbox"] == "read-only"
 
 
 def test_an_agent_allowed_less_is_another_agent_at_the_same_model() -> None:

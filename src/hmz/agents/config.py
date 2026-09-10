@@ -195,16 +195,43 @@ class Goal:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AgentDefaults:
-    """The initial goal availability offered for one place in a flow.
+    """What a flow writes beside an agent to say what it runs that one at.
 
-    This is only an input to agent selection. Once an agent is chosen, the effective value
-    lives in :attr:`AgentConfig.goals` and can be changed independently in the picker.
+    What an agent may do, whether it keeps itself going, and whether it reads the internet
+    are three things about the work rather than three things about the agent: a reviewer that
+    may not write is a reviewer whichever CLI fills the place, and a run whose answers have to
+    be reproducible tomorrow is one nobody may quietly switch searching back on for. So the
+    flow says them, where it declares the place::
+
+        class Agents(NamedTuple):
+            builder: AgentBase
+            reviewer: Annotated[
+                AgentBase, AgentDefaults(permission="read-only", web_search=False)
+            ]
+
+    and a place that writes nothing runs at what is written here, which is what every agent
+    of every flow has always run at.
 
     Attributes:
-      goals: Whether a newly selected agent starts with backend goals available.
+      permission: What the agent may do without being asked, as one of :data:`PERMISSIONS`.
+      goals: Whether the backend's own goal feature is available to it.
+      web_search: Whether it may search the web.
+
+    Raises:
+      ValueError: If the rung is not one there is, said as the flow is read rather than
+        reached down in a driver as a key that is not there.
     """
 
+    permission: str = "bypass"
     goals: bool = True
+    web_search: bool = True
+
+    def __post_init__(self) -> None:
+        if self.permission not in PERMISSIONS:
+            raise ValueError(
+                f"permission must be one of {', '.join(PERMISSIONS)}, "
+                f"not {self.permission!r}"
+            )
 
 
 class Remote:
@@ -262,10 +289,11 @@ class AgentConfig:
         credentials and its trajectory stay where a flow can reach them; what moves is the
         project it reads and the commands it runs.
       permission: What this agent may do without being asked, as one of :data:`PERMISSIONS`.
-        `unchecked` because that is what a flow driving an agent unattended has always run it
+        `bypass` because that is what a flow driving an agent unattended has always run it
         at: a flow watches its agent rather than gating it, and a turn waiting on an approval
-        nobody is there to give is a flow that has stopped. Anything tighter is a choice, and
-        is made where the agents are chosen.
+        nobody is there to give is a flow that has stopped. Anything tighter is the flow's
+        choice, written as an :class:`AgentDefaults` beside the place it declares, and
+        settled onto the agent before its first turn.
       provider: Which account this agent's turns run as, by the name a provider of its CLI was
         made under, or "" for the CLI as whoever is at this machine already runs it. It is a
         setting of the agent rather than of the flow because it is the agent that signs in:
@@ -273,18 +301,19 @@ class AgentConfig:
         accounts running at once, each refreshing its own token and neither able to read the
         other's -- which is what a provider is for.
       goals: Whether backend goals are available to this agent. This is always an explicit
-        on/off setting; a flow may suggest the initial picker value with `AgentDefaults`, but
-        that suggestion is resolved before the agent is constructed.
+        on/off setting with no inherited state, and it is the flow's to say: an
+        `AgentDefaults` beside the place says it, and a place run under a `Goal` has them on
+        and cannot be talked out of it.
       web_search: Whether this agent may search the web. On, because that is what a coding
-        agent has always been able to do and what most work wants; off is a choice, and is
-        made where the agents are chosen -- a run that must read only this repository, one
-        under a rate limit somebody is paying per query on, one whose answers have to be
-        reproducible tomorrow. It is said the same way on every backend that can be told, in
-        both directions rather than only one: a CLI whose own web search is off until it is
-        asked for is asked for it here, so that on means the same thing wherever it is read.
-        A backend with no way of being told refuses it off, the way one with no service tier
-        to send refuses `fast` -- an agent that quietly went on searching would be a setting
-        that lies.
+        agent has always been able to do and what most work wants; off is the flow's choice
+        -- a run that must read only this repository, one under a rate limit somebody is
+        paying per query on, one whose answers have to be reproducible tomorrow -- and is
+        written as an `AgentDefaults` beside the place. It is said the same way on every
+        backend that can be told, in both directions rather than only one: a CLI whose own
+        web search is off until it is asked for is asked for it here, so that on means the
+        same thing wherever it is read. A backend with no way of being told refuses it off,
+        the way one with no service tier to send refuses `fast` -- an agent that quietly
+        went on searching would be a setting that lies.
       budget: What each turn of each session of this agent may spend before it is cut off, or
         None for a turn that runs until it is done -- which is what an agent nobody has been
         asked about runs at, because a cap nobody chose is a cap that would truncate the one

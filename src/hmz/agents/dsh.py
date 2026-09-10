@@ -124,6 +124,29 @@ class DshAgent(AgentBase):
     def __init__(self, config: DshAgentConfig, *, name: str | None = None) -> None:
         super().__init__(config, name=name)
 
+    def _serves(self, config: AgentConfig) -> None:
+        """Refuses a rung this SDK cannot enforce, wherever the config arrives.
+
+        Where the config arrives rather than where the first turn runs, because what an agent
+        may do is the flow's: a flow that declares a reviewer which may not write is refused
+        this backend before the run starts, rather than an hour into one by a turn that could
+        never have run at that rung.
+
+        Args:
+          config: What its turns are to run at.
+
+        Raises:
+          ValueError: If it was allowed anything other than everything. The preview SDK
+            exposes no per-session sandbox or approval control, so a tighter rung is a
+            setting it would have to ignore.
+        """
+        super()._serves(config)
+        if config.permission != "bypass":
+            raise ValueError(
+                "dsh exposes no per-session sandbox or approval controls; "
+                "permission must be 'bypass'"
+            )
+
     def new(self, cwd: str | os.PathLike[str] | None = None) -> DshSession:
         """Opens an SDK session, which stays unopened until its first turn."""
         return DshSession(self, cwd)
@@ -318,16 +341,16 @@ class DshSession(SessionBase):
         return self(_GOAL.format(objective))
 
     def _validate(self) -> None:
-        """Refuses settings the SDK cannot faithfully apply."""
+        """Refuses settings the SDK cannot faithfully apply.
+
+        The effort alone: a turn may be told to think harder while it is running, so this is
+        the moment that one is read. What the agent may do is settled where the config is,
+        which is `DshAgent._serves` -- and cannot have changed since.
+        """
         if self.effort not in _EFFORTS:
             expected = ", ".join(_EFFORTS)
             raise ValueError(
                 f"unsupported dsh effort {self.effort!r}; expected {expected}"
-            )
-        if self._agent.config.permission != "bypass":
-            raise ValueError(
-                "dsh exposes no per-session sandbox or approval controls; "
-                "permission must be 'bypass'"
             )
 
     def _require_key(self, session_id: str) -> None:

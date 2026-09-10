@@ -207,21 +207,22 @@ The id is the end of the name, and a leading part of it is enough to name that s
 ## Isolation here is about environment, not permission
 
 A container does **not** stop the agent editing the workspace mounted into it. Narrowing what
-the agent may do at all is [permissions](/user/permissions) — a different setting, and they
-compose:
+the agent may do at all is [permissions](/user/permissions) — a different thing the flow says,
+and they compose:
 
 ```sh
 hmz exec -f tested \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=workspace-write \
+    -a codex/gpt-5.6-sol:high \
     "get the suite green on 3.12"
 ```
 
-With `permission=read-only`, the tester is in a container *and* cannot write anything:
+With `AgentDefaults(permission="read-only")` beside that place, the tester is in a container
+*and* cannot write anything:
 
 ```sh
 hmz exec -f tested \
     -a claude/claude-opus-5:max \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
+    -a codex/gpt-5.6-sol:high \
     "get the suite green"
 ```
 

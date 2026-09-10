@@ -75,6 +75,46 @@ defined) -- import what the annotation names at runtime, so the count it states 
 ```
 :::
 
+## Say what each agent is allowed
+
+Whoever runs your flow names a CLI, an account, a model and an effort. What the agent may *do*
+is yours: write an `AgentDefaults` beside the place, and every agent handed to it runs that way
+from its first turn, whichever CLI fills it.
+
+```python
+from typing import Annotated, NamedTuple
+
+from hmz.flows import Agent, AgentDefaults, flow
+
+
+class Agents(NamedTuple):
+    """One that writes the change, and one that only reads it."""
+
+    builder: Agent
+    reviewer: Annotated[
+        Agent, AgentDefaults(permission="read-only", web_search=False)
+    ]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    agents.builder(task)
+    agents.reviewer(f"review what was just done: {task}")
+```
+
+| Written beside the type | What it says | Where |
+| --- | --- | --- |
+| `permission=` | one rung of the four | [Permissions](/user/permissions) |
+| `goals=` | whether the backend's own goal feature is available | [Goals](/weaver/goals) |
+| `web_search=` | whether it may read the internet | [Agents](/reference/agents#whether-an-agent-may-search-the-web) |
+
+What a place declares only ever tightens. `bypass`, goals on and the web readable are the
+loosest of each and what a place that writes none of them declares, so a flow that says nothing
+runs its agents at exactly what they came with -- and a flow you call cannot hand itself more
+than you were running at. None of the three can be said on the line that runs the flow, and
+none of them has a row on the sheet an agent is set up on: they are things about the work, and
+the work is what the flow is.
+
 ## Choose what the next turn remembers
 
 ```python

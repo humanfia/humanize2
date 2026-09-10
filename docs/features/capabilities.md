@@ -60,7 +60,10 @@ scheduled, and recovered without hiding which execution model is in use.
 
 ### A4. Scheduling, state, and resumption
 
-- Flows declare agent roles, capabilities, and working locations, not backend implementations.
+- Flows declare agent roles, capabilities, working locations, and what each agent is allowed
+  -- its permission rung, whether goals are available to it, and whether it may search the web
+  -- rather than backend implementations. Whoever runs the flow names a CLI, an account, a
+  model and an effort, and nothing else.
 - Independent sessions may run concurrently; turns sharing one session remain sequential.
 - Resumable regular flows keep an explicit state mapping and resume by running current flow
   code again; atlases resume the first unfinished node visit under the same prophecy identity.
@@ -117,8 +120,10 @@ capabilities, identities, conversations, and ways of collaborating with a person
 ### B3. Tools and skills
 
 - Each session receives the flow-owned skills its role and scope select, mounted for that
-  session and removed when the scope ends.
-- Backends expose the native skills already installed where their own CLI reads them.
+  session and removed when the scope ends. Which skills exist at all is the flow author's;
+  nobody running the flow adjusts one.
+- Backends expose the native skills already installed where their own CLI reads them, as a
+  reading: humanize never rewrites, overrides or disables one.
 - On a capable backend, a flow callback becomes a native tool from the next turn until it is
   withdrawn or the session ends.
 

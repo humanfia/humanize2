@@ -1,7 +1,9 @@
 # Skills
 
-Skills come in two kinds, and the difference between them is who they belong to. Use this page
-to see which skills an agent loads, and to change what a flow brings.
+Skills come in two kinds, and the difference between them is who they belong to. Neither kind
+is a setting of an agent: what a person installed is that CLI's own, and what a flow brings is
+the flow's. Use this page to see which skills an agent loads, and — if the flow is yours — to
+change what it brings.
 
 | | |
 | --- | --- |
@@ -21,8 +23,9 @@ is a reading:
    These are claude's own: add one, or switch one off, where claude keeps them
 ```
 
-To change what a **flow** brings instead, change the flow: press `f` on it in `/flow` to copy
-it into `.humanize/flows/`, skills and all. From then on that name means your copy.
+There is nothing to switch here, either kind. To change what a **flow** brings, change the
+flow: press `f` on it in `/flow` to copy it into `.humanize/flows/`, skills and all. From then
+on that name means your copy, and what it brings is yours to edit as its author.
 
 ## The CLI's own skills
 
@@ -137,12 +140,13 @@ one thing about what it works by that moves with it: a session that has finished
 codebase and started writing the tests wants the skill about writing them and no longer wants
 the eight about reading it. Two conversations of one agent may carry different sets at once.
 
-This is about the skills the flow brings. The ones the CLI installed are still that CLI's own,
-and nothing here switches one of those on or off.
+This is the flow's own code saying which of the flow's own skills one of its conversations
+carries, which is why it is allowed: the flow brought them. The ones the CLI installed are
+still that CLI's own, and nothing anywhere switches one of those on or off.
 
 ## See also
 
 - [Flows › The skills a flow brings](/reference/flows#the-skills-a-flow-brings)
-- [Permissions](/user/permissions) — a per-agent narrowing that *is* one
+- [Permissions](/user/permissions) — what an agent may do, declared the same way: by the flow
 - [Agents › The skills an agent carries](/reference/agents#the-skills-an-agent-carries)
 - [TUI › What each agent carries](/reference/tui#what-each-agent-carries)

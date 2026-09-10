@@ -1917,11 +1917,17 @@ def _runnable(path: Path) -> bool:
     return path.is_file() and os.access(path, os.X_OK)
 
 
+#: What an agent line used to be able to say and no longer may: what the agent is allowed to
+#: do, and whether it may read the internet. Both are things about the work rather than about
+#: the agent -- a reviewer that may not write is a reviewer whichever CLI fills the place --
+#: so the flow says them where it declares the place, and a line that says one is a line to
+#: correct rather than a setting quietly ignored. Goals were never sayable here at all.
+_DECLARED = ("permission", "web_search")
+
+
 def read(
     spec: str,
-) -> tuple[
-    Profile, str, str, str, str, str | None, bool | None, tuple[tuple[str, str], ...]
-]:
+) -> tuple[Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
     """Reads one `-a` into the backend to drive, what to drive it at, and as whom.
 
     Args:
@@ -1930,40 +1936,43 @@ def read(
         The CLI may name a provider after an `@`, as `claude@deepseek/MODEL:EFFORT`, which is
         the account that agent's turns run as; `provider=` says the same thing written out.
         The written-out form may also name the common provider latency tier as
-        `service_tier=`, the agent's permission rung as `permission=`, and backend-native
-        settings as `config.KEY=VALUE`. Codex accepts app-server overrides and Claude one
-        exact `allowed_tools` rule. `web_search=` says whether the agent may search the web,
-        as `on` or `off`.
+        `service_tier=`, and backend-native settings as `config.KEY=VALUE`. Codex accepts
+        app-server overrides and Claude one exact `allowed_tools` rule.
 
     Returns:
       The backend, model, effort, common service tier, provider -- which is "" for an agent
-      that runs as whoever is at this machine already runs its CLI -- permission, which is
-      None at the default rung, whether it may search the web, which is None where nobody
-      said, and the `config.KEY` pairs, which is () where none were named.
+      that runs as whoever is at this machine already runs its CLI -- and the `config.KEY`
+      pairs, which is () where none were named.
 
     Raises:
-      ValueError: If it is neither spelling, or names no backend there is. What it says is
-        what a command line reports after the agent it could not read.
+      ValueError: If it is neither spelling, names no backend there is, or says one of the
+        things the flow says. What it says is what a command line reports after the agent it
+        could not read.
     """
     provider = ""
     service_tier = "default"
-    permission: str | None = None
-    searching: str | None = None
     overrides: list[tuple[str, str]] = []
     if "=" in spec:
         given = {
             key.strip(): value.strip()
             for key, _, value in (part.partition("=") for part in spec.split(","))
         }
-        backend, model, effort, service_tier, provider, permission, searching = (
+        backend, model, effort, service_tier, provider = (
             given.pop("cli", ""),
             given.pop("model", ""),
             given.pop("effort", ""),
             given.pop("service_tier", "default"),
             given.pop("provider", ""),
-            given.pop("permission", None),
-            given.pop("web_search", None),
         )
+        # Said before the leftovers are, because these two are not misspellings: a line that
+        # wrote one meant it, and what it meant is a thing about the work rather than about
+        # the agent -- so it is refused by name, pointing at the flow that does say it.
+        for said in _DECLARED:
+            if said in given:
+                raise ValueError(
+                    f"{said} is the flow's to say, written beside the agent where the flow "
+                    "declares it -- not on the line that runs the flow"
+                )
         for key, value in list(given.items()):
             if key.startswith("config."):
                 name = key.removeprefix("config.")
@@ -1974,7 +1983,7 @@ def read(
         if given:
             raise ValueError(
                 f"{', '.join(sorted(given))} is not cli, model, effort, service_tier, "
-                "provider, permission, web_search or config.KEY"
+                "provider or config.KEY"
             )
     else:
         # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
@@ -1996,8 +2005,7 @@ def read(
         raise ValueError(
             "expected CLI[@PROVIDER]/MODEL:EFFORT or "
             "cli=CLI,model=MODEL,effort=EFFORT[,service_tier=SERVICE_TIER]"
-            "[,provider=PROVIDER]"
-            "[,permission=PERMISSION][,web_search=on|off][,config.KEY=VALUE]"
+            "[,provider=PROVIDER][,config.KEY=VALUE]"
         )
     if not service_tier.strip():
         raise ValueError("service_tier cannot be empty")
@@ -2013,38 +2021,5 @@ def read(
         effort.strip(),
         service_tier.strip(),
         provider.strip(),
-        permission,
-        _switched(searching),
         tuple(overrides),
     )
-
-
-def _switched(said: str | None) -> bool | None:
-    """One on-or-off setting as it was written out, or nothing where nobody wrote it.
-
-    The words are the ones every switch here is written with, and nothing else is taken: a
-    line that meant off and was spelled some other way is a line to correct rather than a
-    setting quietly left on.
-
-    Args:
-      said: What was written, or None where the setting was not named at all.
-
-    Returns:
-      True, False, or None for a setting nobody said anything about.
-
-    Raises:
-      ValueError: If it was said and is neither word.
-    """
-    if said is None:
-        return None
-    held = {
-        "on": True,
-        "true": True,
-        "yes": True,
-        "off": False,
-        "false": False,
-        "no": False,
-    }.get(said.strip().lower())
-    if held is None:
-        raise ValueError(f"web_search must be on or off, not {said!r}")
-    return held

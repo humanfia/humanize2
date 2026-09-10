@@ -325,10 +325,18 @@ something else. A flow declares `hmz.flows.Agent` and reaches none of them.
 
 ### Whether an agent may search the web
 
-`web_search` is `True` unless asked for otherwise, because reaching the web is what a coding
-agent has always been able to do. Off is a choice, and one worth having: a run that must read
-only this repository, one under a per-query rate limit somebody is paying for, one whose
-answers have to be reproducible tomorrow.
+`web_search` is `True` unless the flow says otherwise, because reaching the web is what a
+coding agent has always been able to do. Off is the flow's choice, and one worth having: a run
+that must read only this repository, one under a per-query rate limit somebody is paying for,
+one whose answers have to be reproducible tomorrow.
+
+```python
+class Agents(NamedTuple):
+    reader: Annotated[Agent, AgentDefaults(web_search=False)]
+```
+
+The setting itself is on the agent's config, and the flow's declaration is what puts it there
+before the first turn:
 
 ```python
 config = ClaudeCodeAgentConfig(model="claude-opus-5", effort="high", web_search=False)
@@ -351,8 +359,9 @@ different things.
 | `agy`, `cursor`, `dsh`, `kimi`, `pi` | no way of being told — off is refused |
 
 A backend with no way of being told **refuses it off**, wherever the config arrives — where the
-agent is made, and where one already running is set up as something else. An agent that quietly
-went on searching would be a setting that lies. It composes with
+agent is made, where one already running is set up as something else, and where a flow that
+declared it off is handed one of those to drive. An agent that quietly went on searching would
+be a setting that lies. It composes with
 [what an agent may do](#what-an-agent-may-do) rather than overriding it: a rung that already
 withholds the reaching-out tools goes on withholding them whatever this says.
 
@@ -399,7 +408,7 @@ Claude's exact native allow rule is configured the same way and is handed to
 
 ```sh
 hmz exec -f flow.py:run \
-    -a 'cli=claude,model=claude-opus-5,effort=max,permission=workspace-write,config.allowed_tools=Bash(git diff *)' \
+    -a 'cli=claude,model=claude-opus-5,effort=max,config.allowed_tools=Bash(git diff *)' \
     task
 ```
 
@@ -1279,7 +1288,8 @@ command-per-turn backend it ends the turn under way rather than only preventing 
 | A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt |
 | Sub-agents in a trace | no | yes | yes | no | no | no | yes | no | no | no | no |
 
-DeepSeek Harness currently accepts only `permission="bypass"`. Its preview
+DeepSeek Harness currently accepts only the `bypass` rung, so a flow that declares another
+cannot be driven by it. Its preview
 SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
 another value is rejected before the runtime starts rather than silently ignored.
 
@@ -1349,32 +1359,39 @@ CLIs name them rather than in a vocabulary of humanize's own:
 ClaudeCodeAgentConfig(model="claude-opus-5", effort="high", permission="read-only")
 ```
 
-The command line names the same setting in an agent's written-out form:
+Which rung an agent runs at is the flow's, declared where it declares the place and settled
+onto whatever agent fills it before the first turn:
 
-```sh
-hmz exec -f ralph_loop \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
-    "review the current change"
+```python
+class Agents(NamedTuple):
+    reviewer: Annotated[Agent, AgentDefaults(permission="read-only")]
 ```
 
-`bypass` is the default, because that is what a flow driving an agent unattended has always
-run it at: a flow watches its agent rather than gating it, and a turn waiting on an approval
-nobody is there to give is a flow that has stopped. Anything tighter is a choice, and in the
-interface it is the `permission` row of the sheet an agent is set up on, stepped on the arrows.
+There is no `-a` setting for it and no row for it on the sheet an agent is set up on: a line
+that writes `permission=` is refused, naming the flow as the place to say it.
+
+`bypass` is the loosest rung and what a place that says nothing declares, because that is what
+a flow driving an agent unattended has always run it at: a flow watches its agent rather than
+gating it, and a turn waiting on an approval nobody is there to give is a flow that has
+stopped. Anything tighter is the flow author's choice. A declaration only ever tightens: what
+an agent already carries is never loosened to reach one, so a flow that says nothing runs its
+agents at what they came with, and a called flow runs at its caller's rung or tighter.
 
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:
 
 | Rung | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `read-only` | refused | `plan` mode | `read-only` sandbox | `--mode plan` | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied | `plan` mode |
-| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | `--sandbox enabled` | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied | `edit` mode |
-| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | `--auto-review`, its own classifier | — | — | — | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
+| `read-only` | refused | `plan` mode | `read-only` sandbox | `--mode plan` | refused | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied | `plan` mode |
+| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | `--sandbox enabled` | refused | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied | `edit` mode |
+| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | `--auto-review`, its own classifier | refused | — | — | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
 | `bypass` | `--dangerously-skip-permissions` | `manual` mode, every request answered here | `danger-full-access` | `--force --sandbox disabled` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — | `yolo` mode |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
-here rather than pretending: a dash is the rung above it, run again.
+here rather than pretending: a dash is the rung above it, run again. **Refused** is neither: a
+backend with no way of being run at that rung says no where the config arrives, so a flow that
+declares one is refused that backend before its first turn rather than quietly run looser.
 
 **A Codex whose rules are somebody else's runs a rung down rather than not at all.** An
 installation can be given requirements — an enterprise policy that arrives with the account, a

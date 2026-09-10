@@ -542,7 +542,7 @@ class Runner:
 
 def read_agent(
     spec: str,
-) -> tuple[Profile, str, str, str, str | None, tuple[tuple[str, str], ...]]:
+) -> tuple[Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
     """Reads and validates one command-line agent specification."""
 
 
@@ -566,6 +566,11 @@ never have reason to name this module.
   The same MUST go for an agent that cannot run a moment the flow hangs a hook on, one run
   under a goal whose backend has no such feature, one pointed at a machine the flow does not
   send it to, and a config that is not what the flow asked for.
+- What each agent may do, whether it has goals and whether it may search the web MUST be
+  settled here from what the flow declared, before the first turn and over whatever the agent
+  was made with: those three are the flow's and nobody else's, so the line that named a CLI, a
+  model, an effort and an account says nothing about them. A backend that cannot be told what
+  the flow said MUST be refused as `NotAFlow`, the way one that cannot run a moment is.
 - An agent that was not named where it was made MUST take the name the flow gives it, before
   anything is written down about the run: a name is what a trace groups an agent's sessions
   under, and `builder` says what a codename does not. One named already MUST keep that name.
@@ -663,6 +668,12 @@ Args:
   CLI is never spelled with an `@` in it, so the two are told apart wherever an agent is
   written. `provider=` MUST say the same thing written out, and an `@` naming nothing MUST be
   a line to correct rather than a line saying nothing.
+- What an agent may do and whether it may search the web MUST NOT be sayable here. They are
+  things about the work rather than about the agent, so the flow declares them where it
+  declares the place, and a line that writes `permission=` or `web_search=` MUST be a usage
+  error saying where it is said instead -- refused outright rather than parsed and applied,
+  the way a config a flow does not take is refused. An agent is what a line names: a CLI, an
+  account, a model at an effort and how quickly it is served.
 - Two agents of one spelling MUST be two agents, so that a flow of an actor and a reviewer at
   one configuration is what it says it is.
 - A flow that is not there, has no entry point, does not say how many agents it drives, or

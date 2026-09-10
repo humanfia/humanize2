@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import subprocess
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 
 import pytest
@@ -468,11 +468,15 @@ def test_an_unsupported_effort_is_refused_before_startup(effort: str) -> None:
 
 
 def test_permissions_the_sdk_cannot_enforce_are_refused() -> None:
-    agent = DshAgent(configured(permission="read-only"))
-
+    """Where the config arrives, so a flow that declares one is refused before it runs."""
     with pytest.raises(ValueError, match="permission must be 'bypass'"):
-        agent("work")
+        DshAgent(configured(permission="read-only"))
 
+    agent = DshAgent(configured())
+    with pytest.raises(ValueError, match="permission must be 'bypass'"):
+        agent.reconfigure(replace(agent.config, permission="read-only"))
+
+    assert agent.config.permission == "bypass"  # and it is left as it was
     assert Harness.made == []
 
 

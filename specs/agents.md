@@ -149,7 +149,9 @@ class Goal: ...
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AgentDefaults:
+    permission: str = "bypass"
     goals: bool = True
+    web_search: bool = True
 
 
 class Remote: ...
@@ -224,10 +226,33 @@ class AgentConfig:
   truncate the one turn that needed the room. A conversation MUST be able to be given one of
   its own, which is where a loop watching what a round costs is when it decides the next one
   is to be shorter.
+- What an agent may do, whether it has goals and whether it may search the web MUST be the
+  flow's to say and nobody else's. They are three things about the work rather than three
+  things about the agent -- a reviewer that may not write is a reviewer whichever CLI fills
+  the place, and a run whose answers have to be reproducible tomorrow is one nobody may
+  quietly switch searching back on for -- so whoever chooses an agent chooses a CLI, a model,
+  an effort and an account, and MUST NOT be asked or able to say any of these three.
+- `AgentDefaults` MUST be what a flow writes beside a place to say them, the way `Goal`,
+  `Remote` and `Isolated` are written. What it declares by default -- `bypass`, goals on, the
+  web readable -- MUST be the loosest of each, so that a place writing none of them settles
+  nothing: what an agent already carries is never loosened to reach a declaration, which is
+  what makes a flow that declares nothing run its agents at exactly what they came with. It
+  MUST refuse a rung no backend has a word for where it is written, so that a flow declaring
+  one is refused as the flow is read rather than reached down in a driver as a key that is
+  not there.
+- What it says MUST reach the agent before that agent's first turn, over whatever the agent
+  was constructed with: a flow is handed agents somebody else made, and one that declared a
+  reviewer which may not write cannot be given a reviewer that may. A flow that calls another
+  MUST have the called flow's declaration hold for the length of the call and MUST hand the
+  agents back as it found them, exactly as it does with the skills it brought.
+- A backend with no way of being run at a rung MUST refuse it wherever the config arrives --
+  where the agent is made, and where a flow settles what it declared onto one it was handed --
+  rather than on the first turn: a rung it would have to ignore is a run to refuse before it
+  starts, the way web search it cannot switch off is.
 - `goals` MUST be the explicit on/off availability of backend goals for this agent. It has
-  no inherited or automatic state. `AgentDefaults` MAY be written beside a flow's agent type
-  to suggest its initial picker value, but MUST be resolved into `AgentConfig.goals` before
-  the agent is constructed and MUST NOT let the flow change it afterwards.
+  no inherited or automatic state, and a place run under a `Goal` MUST have them: the two
+  written against each other on one place is a flow saying two things about one agent, and
+  `hmz.flows.checking` MUST report it.
 
 - `machine` MUST be the `hmz.machines.MachineConfig` the agent's turns land on, or `None`
   to run them on this machine. It is one setting because it is one question: a machine that is
@@ -246,23 +271,27 @@ class AgentConfig:
   `AgentBase.provider` MUST answer `None` for it, so that a turn under it is the turn an agent
   with no account has always taken. It is a setting of the agent because it is the agent that
   signs in: two agents of one CLI on two accounts are two accounts running at once.
-- `web_search` MUST be whether this agent may search the web, and MUST be on for an agent
-  nobody has been asked about: that is what a coding agent has always been able to do. It
+- `web_search` MUST be whether this agent may search the web, and MUST be on where the flow
+  said nothing: that is what a coding agent has always been able to do. It
   MUST mean the same thing on every backend that can express it, which means saying it in
   both directions rather than only one -- a CLI whose own web search is off until it is asked
   for MUST be asked for it, or on would mean two things. A backend that cannot be told MUST
   refuse it off wherever the config arrives, the way one with no service tier to send refuses
   `fast`: an agent that went on searching would be a setting that lies. Which backends those
   are MUST be read off `hmz.backends`, so that the one place that says what a CLI is is the
-  one place this is said too, and whatever is choosing an agent MUST put the question only
-  where there is an answer.
-- What skills an agent carries MUST NOT be a setting of it. A skill installed on this machine
-  is its CLI's own -- installed the way that CLI installs one, switched off the way that CLI
-  switches one off -- and humanize MUST NOT rewrite, override or disable any of them. What a
-  flow brings MUST be mounted onto the sessions it opens instead, which is `hmz.flows.skills`.
-  Which of *those* one session carries MUST be that session's own answer, and is one of the two
-  things about what an agent works by that MAY be said again while it is working. The other is
-  which of the flow's own callbacks it is offering, which is `hmz.agents.tools`.
+  one place this is said too. A flow that declares it off MUST therefore be refused the
+  backends that cannot be told, before the first turn and by name, the way a place declaring
+  a `Goal` refuses a backend with no goal feature.
+- What skills an agent carries MUST NOT be a setting of it, and MUST NOT be adjustable by
+  whoever chose it: a skill installed on this machine is its CLI's own -- installed the way
+  that CLI installs one, switched off the way that CLI switches one off -- and humanize MUST
+  NOT rewrite, override or disable any of them. What a flow brings MUST be mounted onto the
+  sessions it opens instead, which is `hmz.flows.skills`, and what a flow brings is the
+  flow author's to change and nobody else's.
+  Which of *those* one session carries MUST be that session's own answer -- which is the
+  flow's own code speaking, since a session belongs to the flow driving it -- and is one of
+  the two things about what an agent works by that MAY be said again while it is working. The
+  other is which of the flow's own callbacks it is offering, which is `hmz.agents.tools`.
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
   forks the agent and takes the process's signal handling cannot be given.

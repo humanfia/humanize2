@@ -82,8 +82,7 @@ claude/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high
 claude@deepseek/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high,provider=deepseek
-cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only
-cli=claude,model=claude-opus-4-8,effort=high,web_search=off
+cli=claude,model=claude-opus-4-8,effort=high,service_tier=fast
 cli=codex,model=gpt-5.6-sol,effort=max,config.model_context_window=1000000,config.model_auto_compact_token_limit=900000
 ```
 
@@ -105,13 +104,11 @@ unambiguous short spelling go.
   account, not the model: `claude@deepseek`. Written out, it is `provider=`. A CLI is never
   spelled with an `@` in it, so the two are told apart wherever an agent is written. An agent
   that names none runs its CLI as you already run it.
-- `permission=` names [what that agent may do](/reference/agents#what-an-agent-may-do): `read-only`,
-  `workspace-write`, `auto` or `bypass`. It is available in the written-out form only and
-  defaults to `bypass`. A misspelling is refused before any agent runs.
-- `web_search=` says whether that agent [may search the web](/reference/agents#whether-an-agent-may-search-the-web),
-  as `on` or `off`. It is available in the written-out form only and defaults to on, which is
-  what a coding agent has always done. A backend with no way of being told refuses it off
-  before any agent runs.
+- `permission=` and `web_search=` are **not** settings of `-a`. What an agent may do and
+  whether it may read the internet are the flow's, declared beside the agent it drives, and a
+  line that writes one is refused before anything runs, saying where it is said instead. See
+  [Permissions](/user/permissions) and
+  [Writing a flow](/weaver/writing-a-flow#say-what-each-agent-is-allowed).
 - `config.KEY=VALUE` names a Codex app-server `-c` override for **that agent**. Only
   `model_context_window` and `model_auto_compact_token_limit` are taken, both as a positive
   integer, and only on `cli=codex`. This is not `hmz exec -c`, which is the flow's YAML.
@@ -139,7 +136,7 @@ Whatever else a flow does as it is imported is the flow's own, and fails as it w
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f official/flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
 hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
-hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only "$(cat TASK.md)"
+hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,service_tier=fast "$(cat TASK.md)"
 hmz exec -f official/flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 hmz exec -f ./flows/mine -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"

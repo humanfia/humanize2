@@ -1,48 +1,87 @@
 # Permissions
 
-Permissions set what an agent may do at all. Each agent sits on one rung of a four-rung ladder,
-loosest last, named the way these CLIs already name them. Set a rung when you want to bound
-what an agent can touch.
+**This page is the weaver's** — whoever wrote the flow. What an agent may do is declared where
+the flow declares the agent, and nobody running the flow is asked about it: a reviewer that may
+not write is a reviewer whichever CLI fills the place, so it is a thing about the work.
+
+Each agent sits on one rung of a four-rung ladder, loosest last, named the way these CLIs
+already name them.
 
 | Rung | What it means |
 | --- | --- |
 | `read-only` | It may look at anything and change nothing — no edits, no commands. |
 | `workspace-write` | It may change the workspace it was given, and is stopped at the edge of it. |
 | `auto` | It may reach for anything, and what it asks for is granted. |
-| `bypass` | Nothing is asked and nothing is checked. **The default.** |
+| `bypass` | Nothing is asked and nothing is checked. **The loosest rung, and what a place that says nothing declares.** |
 
-## Try it
+## Declaring one
 
-Run a flow with the agent set to `read-only` — it can look at anything and change nothing:
-
-```sh
-hmz exec -f ralph_loop \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
-    "review the current change"
-```
-
-`permission=` is available in the **written-out** form of `-a` only; there is no short spelling
-for it. A flow's Python config takes the same word:
+Write an `AgentDefaults` beside the place, exactly as you write a `Goal` or an `Isolated`:
 
 ```python
-CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="read-only")
+from typing import Annotated, NamedTuple
+
+from hmz.flows import Agent, AgentDefaults, flow
+
+
+class Agents(NamedTuple):
+    builder: Agent
+    reviewer: Annotated[Agent, AgentDefaults(permission="read-only")]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    agents.builder(task)
+    agents.reviewer(f"review what was just done: {task}")
 ```
 
-A misspelling is refused before any agent runs:
+The rung reaches every agent handed to that place, over whatever it was set up with, before its
+first turn. Run it with the ordinary line — a CLI, a model and an effort apiece:
+
+```sh
+hmz exec -f ./review.py -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "$(cat TASK.md)"
+```
+
+A rung no backend has a word for is caught by [`hmz check`](/reference/cli#hmz-check) without
+running the flow, and again as the flow loads:
 
 ```console
-hmz exec: error: bad agent 'cli=codex,model=gpt-5.6-sol,effort=high,permission=rdonly':
-permission must be one of read-only, workspace-write, auto, bypass, not 'rdonly'
+review.py:9: error: unknown-permission: 'rdonly' is no rung there is -- what an agent may
+do is one of read-only, workspace-write, auto, bypass, and a flow declaring anything else is
+refused before its first turn
 ```
 
-At the prompt, it is the `permission` row of the sheet an agent is set up on. Step through it
-with **←/→**.
+## A line cannot say it
 
-## Why `bypass` is the default
+`permission=` is not a setting of `-a`, and a line that writes one is a usage error naming the
+flow as the place to say it:
 
-A flow watches its agent rather than gating it, and a turn that waits on an approval nobody is
-there to give is a flow that has stopped. Anything tighter is a choice — make it deliberately.
-See [Security](/user/security).
+```console
+hmz exec: error: bad agent 'cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only':
+permission is the flow's to say, written beside the agent where the flow declares it -- not on
+the line that runs the flow
+```
+
+There is no row for it on the sheet an agent is set up on, either. An agent is a CLI, an
+account, a model at an effort and how quickly it is served; what that agent is allowed to do
+belongs to the flow driving it.
+
+## A declaration only ever tightens
+
+`bypass` is the loosest rung, and it is what a place that says nothing declares: a flow watches
+its agent rather than gating it, and a turn that waits on an approval nobody is there to give
+is a flow that has stopped. But declaring the loosest rung settles nothing. What an agent
+already carries is never loosened to reach a declaration, so a flow that says nothing runs its
+agents at exactly what they came with, and a flow you call runs at your rung or tighter --
+never looser. Otherwise a run started at `read-only` would be at `bypass` the moment it called
+a flow that mentioned nothing, and calling a flow you did not write would be how your
+`read-only` gets undone. See [Security](/user/security).
+
+**Tighter is not always more visible.** At `bypass` humanize answers each of Claude Code's
+permission requests itself, so a flow's `PERMISSION_REQUEST` hooks see every one; at `auto`
+Claude decides for itself and those hooks see nothing. Tightening `bypass` to `auto` therefore
+buys restriction and costs visibility, so a flow written around watching what its agent asks
+for says `bypass` and means it.
 
 ## What each backend actually does
 
@@ -95,17 +134,21 @@ special from yours.
 
 ## A worked pair
 
-A reviewer that cannot touch the change it is reading:
+A reviewer that cannot touch the change it is reading, said once in the flow:
+
+```python
+class Agents(NamedTuple):
+    actor: Agent
+    reviewer: Annotated[Agent, AgentDefaults(permission="read-only")]
+```
 
 ```sh
-hmz exec -f official/rlar \
-    -a claude/claude-opus-5:max \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
-    "$(cat TASK.md)"
+hmz exec -f ./rlar.py -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "$(cat TASK.md)"
 ```
 
 The actor sits at `bypass` and does the work. The reviewer sits at `read-only` and can only
-look. Two agents, two rungs, one flow.
+look. Two agents, two rungs, one flow — and the same two rungs whoever runs it, on whichever
+CLIs they have.
 
 ## What it does not bound
 
@@ -114,8 +157,6 @@ A rung bounds the **tools the agent reaches for**. It does not confine the proce
 a real boundary, put the agent in [a container of its own](/user/containers).
 
 ## Where a hook gets a say
-
-This section is the weaver's — whoever wrote the flow.
 
 A [hook](/weaver/hooks) hung on `PERMISSION_REQUEST` can refuse something and have the agent
 hear it only where a backend asks before it acts *and waits for the answer*. `auto` is that
