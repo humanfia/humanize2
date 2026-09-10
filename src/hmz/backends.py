@@ -1434,11 +1434,20 @@ PROFILES = (
         mounts=".cursor/skills",
         # What a login leaves behind, beside the settings it keeps in the same directory.
         creds=("cli-config.json", "auth.json"),
+        # `CURSOR_LOCAL_AGENT_API_KEY` because the key its own local runtime is served under
+        # is still a key, read whoever exported it: one left in a shell profile is the account
+        # a turn under a provider would be answered as. Its endpoint and its authless switch
+        # are deliberately not here. They say which runtime a turn is, not whose it is, and
+        # `hmz.agents.cursor` decides how a model is spelled from the runtime it finds
+        # installed -- taking the endpoint away under a provider would leave that answer
+        # describing a turn that no longer happens.
         ambient=(
+            "CURSOR_API_BASE_URL",
             "CURSOR_API_ENDPOINT",
             "CURSOR_API_KEY",
             "CURSOR_API_URL",
             "CURSOR_AUTH_TOKEN",
+            "CURSOR_LOCAL_AGENT_API_KEY",
         ),
         ways=(
             Way(
