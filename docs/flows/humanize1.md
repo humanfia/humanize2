@@ -81,9 +81,9 @@ place for it to be wrong.
 
 A loop carries on with the settings it was set up with. A run set up differently is neither
 quietly overridden nor quietly ignored: it says which setting it disagrees with the loop about,
-and starts a loop of its own. The agents are the one thing that is not a setting — `/agents`
-chooses them per run, and the state file is brought up to date to say who is reading the
-rounds.
+and starts a loop of its own. The agents are the one thing that is not a setting — the Agents
+page of `/flow` chooses them per run, and the state file is brought up to date to say who is
+reading the rounds.
 
 `gen-idea` and `gen-plan` keep nothing: each writes one file, running one again is meant to
 write another, and between their turns there is nothing to carry on from.

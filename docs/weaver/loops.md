@@ -146,9 +146,9 @@ how often it re-reads files it has already read.
 and press **←/→**. A Ralph loop of `low` turns is a different animal from one of `max` turns.
 See [Efforts](/user/efforts).
 
-**Make it read-only.** `/flow` → Agents → the agent → `permission` → **→** to `read-only`. Now
-it can look at the repository and change nothing, which is how you use a loop to *review*
-rather than to build.
+**Make it read-only.** Start it from the command line with
+`-a cli=claude,model=…,effort=high,permission=read-only`. Now it can look at the repository and
+change nothing, which is how you use a loop to *review* rather than to build.
 
 ## See also
 

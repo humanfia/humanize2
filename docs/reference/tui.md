@@ -23,7 +23,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 ```
 
 **At the top**, the box it opens with: the name drawn large, the version, what humanize is, and
-three lines on how to begin — what starts a flow, what `/flow` and `/agents` choose, and what
+three lines on how to begin — what starts a flow, what `/flow` chooses, and what
 `/providers` holds. Nothing about what is set up to run or where it would run — the
 transcript is a record, so a copy of either up there could only ever be the copy that was true
 when you opened it. Both are on the lines round the editor, which are redrawn.
@@ -144,7 +144,6 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
-| `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
 | `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
@@ -440,7 +439,7 @@ cannot change under you mid-session.
 
 ## The menus, and when what they hold lands
 
-`/flow`, `/agents`, `/providers` and `/settings` are menus rather than walks. Three things are
+`/flow`, `/providers` and `/settings` are menus rather than walks. Three things are
 true of all of them:
 
 - **No key is a chord.** A menu asks one thing and its keys are its own, so nothing here needs
@@ -568,47 +567,40 @@ enter opens one. Everything that agent is is a row of one sheet:
   Set up builder
 
   What this one agent is. Enter opens the row under the cursor, and the arrows step the ones
-  that are a rung rather than a list. Save accepts this setup; save as keeps a reusable copy.
+  that are a rung rather than a list. Save accepts this setup.
 
-    1. import       ▸                          copy a saved agent into this one
-  ❯ 2. cli          claude ▸                   which coding agent takes its turns
-    3. provider     as local ▸                 the account those turns run as
-    4. model        claude-opus-5 ▸            which of that CLI's models it runs
-    5. effort       high                       how hard it thinks
-    6. skills       as its CLI finds them ▸    what it will be carrying, which its CLI keeps
-    7. permission   bypass                     what it may do without being asked
-    8. goals        on                         whether the backend's own goals are available
-    9. web search   on                         whether it may search the web
-   10. where        this machine ▸             the machine its work lands on
-   11. save                                    accept this agent setup
-   12. save as      ▸                          save a reusable agent you can import
+  ❯ 1. cli          claude ▸                   which coding agent takes its turns
+    2. provider     as local ▸                 the account those turns run as
+    3. model        claude-opus-5 ▸            which of that CLI's models it runs
+    4. effort       high                       how hard it thinks
+    5. where        this machine ▸             the machine its work lands on
+    6. save                                    accept this agent setup
 
   Enter to open · Esc to close
 ```
 
-One sheet rather than a walk of three, because an agent is one thing: a CLI, an account, a
-model at an effort, a rung of what it may do and a machine its work lands on.
-A walk meant that changing the effort of an agent already set up was four keypresses through two
-sheets with nothing to say.
+**An agent is a CLI, an account, a model and an effort, and nothing else.** What it may do,
+which goals it may reach for and whether it may search the web are the flow's — they are
+[declared where the flow declares the agent](/reference/flows) — and the skills it carries are
+its CLI's, installed and switched off where that CLI keeps them. None of them is a row here,
+because a row offering to set one would be a second answer to a question already settled.
+
+What the flow said and this sheet does not ask comes back off it unchanged: setting the effort
+does not reset anything the sheet never showed you.
 
 The rows are in the order of what depends on what. The CLI settles which accounts there are and
 which models that CLI will name; the account settles which of them it may name. **Changing the
 CLI lets go of the model**, which belonged to the CLI before it.
 
-**The arrows step a row that is a rung in an order** — the effort, what it may do, swarm mode,
-whether goals are available, whether it may search the web. Everything else opens a sheet of its
-own and comes back. `web search` is a row only for a CLI that can be told: Claude Code, Codex,
-Grok Build, Qwen Code, opencode, mimocode and ZCode. A switch for something the backend would
-go on doing either
-way is a switch that lies, so for every other CLI the question is not put. `where` is
-a row only for an agent [the flow says may be pointed at a machine](#where-each-agent-works);
-for one the flow put in a container it is read rather than opened, and for one that works here
-it is not there at all.
+**The arrows step a row that is a rung in an order** — the effort, and swarm mode for a model
+that has one. Everything else opens a sheet of its own and comes back. `where` is a row only
+for an agent [the flow says may be pointed at a machine](#where-each-agent-works); for one the
+flow put in a container it is read rather than opened, and for one that works here it is not
+there at all.
 
 `save` accepts this agent and returns straight to the flow's Agents page. It changes only the
-flow draft; the complete setup is written down when `save` is chosen on that outer page.
-`save as` instead asks for a name and immediately keeps a reusable copy without applying the
-flow. Esc off the agent sheet remains a fallback: it asks whether to accept or discard changes.
+flow draft; the complete setup is written down when `save` is chosen on that outer page. Esc
+off the agent sheet remains a fallback: it asks whether to accept or discard changes.
 
 ## Which CLI, and which account
 
@@ -667,31 +659,6 @@ one that will not answer says why, under the list, and leaves the sheet up.
 Choosing a model you were not already on starts the effort at the hardest that model takes —
 the one to reach for. Choosing the one you are on leaves the effort where you had it.
 
-## Agents kept under a name
-
-`/agents` is not the flow's agents. It is the agents written down under a name, to be imported
-wherever a flow's agent is set up: the reviewer you always use, the cheap one you fan out
-across, the one on somebody's gateway. An agent is a CLI, an account, a model at an effort and
-what it may do — none of which is a thing about the flow that happens to be driving it.
-
-| Key | |
-| --- | --- |
-| `enter` | Set one up, on the same sheet a flow's agent is set up on. |
-| `a` | Add one. It has a `name` row of its own, which a flow's agent has not. |
-| `d` `d` | Take one away. |
-
-The setup sheet for a named agent also ends with `save`, which accepts that agent and returns
-to this list. The outer menu still holds all additions, edits and removals together until the
-menu itself is saved.
-
-They live in `~/.humanize/agents.yaml`, and land there when the menu is saved. The same store
-is on the command line as [`hmz agents`](/reference/cli#hmz-agents), for a machine being set up or a
-CI job.
-
-**A flow imports a copy.** The `import` row of a flow's agent copies everything the saved one
-is; changing it afterwards changes that flow's agent alone. The `save as` row is the other
-half: what you tuned inside a flow, written down under a new name or over one already there.
-
 ## Where each agent works
 
 The `where` row, and **only for an agent whose place the flow declared `Remote`**. Where an
@@ -725,23 +692,13 @@ both red lines when the flow is started, before any turn has run.
 
 ## What each agent carries
 
-The `skills` row reads `as its CLI finds them`, and opening it is a reading rather than a
-choice:
+Nothing here. The skills an agent carries are its CLI's own, found where that CLI looks and
+switched off where that CLI switches one off, and there is nowhere in the interface to change
+them: what a person installed is not something a flow is entitled to rewrite, and a list you
+could adjust here while the CLI's own list said otherwise would be two answers to one
+question.
 
-```
-     1. code-review    Review the current diff… (yours)
-     2. dataviz        Use this skill whenever you… (yours)
-     3. housekeeping   Tidies the tree (this project)
-
-   These are claude's own: add one, or switch one off, where claude keeps them
-```
-
-The skills are found where the CLI itself looks — yours and this project's, read for the name
-and the line each describes itself with — and nothing is asked of the CLI, which would mean
-starting it. **Nothing here changes any of them.** A skill installed on this machine is that
-CLI's own, and what a person installed is not something a flow is entitled to rewrite.
-
-What a run adds to that is [the skills the flow brings](/reference/flows#the-skills-a-flow-brings),
+What a run adds to them is [the skills the flow brings](/reference/flows#the-skills-a-flow-brings),
 mounted onto every session its agents open and taken away again after.
 
 ## The runs that have already happened
@@ -986,9 +943,7 @@ agent in the middle does not silently hand the reviewer's model to the builder. 
 is read back through the flow's own model, so a setting the flow has since dropped or renamed
 is one it starts over from rather than one that quietly comes back.
 
-It lives in `~/.humanize/settings.yaml`. The agents you saved under a name live beside it in
-`~/.humanize/agents.yaml`, which is neither a workspace's nor a flow's. See
-[CLI reference](/reference/cli#files).
+It lives in `~/.humanize/settings.yaml`. See [CLI reference](/reference/cli#files).
 
 ## Colours
 

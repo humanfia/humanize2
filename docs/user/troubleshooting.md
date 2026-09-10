@@ -187,8 +187,8 @@ else — an enterprise policy that arrives with the account, or a `requirements.
 machine whose platform packages Codex — forbidding the `danger-full-access` sandbox that
 [`bypass`](/user/permissions) is. Codex refuses such a call outright, so humanize asks again a
 rung down, at `auto`: the same freedom, with Codex asking before it reaches past the workspace
-and humanize granting what it asks. Set the agent to `auto` in `/agents` to say it yourself and
-skip the note. What the machine allows is its own to say:
+and humanize granting what it asks. Ask for the agent at `permission=auto` to say it yourself
+and skip the note. What the machine allows is its own to say:
 
 ```sh
 cat /etc/codex/requirements.toml

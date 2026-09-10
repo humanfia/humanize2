@@ -255,8 +255,8 @@ interface's to hand over.
 
 ## `pick.py`
 
-The sheets: which flow, how it is set up, what each of its agents is, the agents kept under a
-name, the accounts they run as, and how the run is going. Each MUST be drawn the way Claude
+The sheets: which flow, how it is set up, what each of its agents is, the accounts they run
+as, and how the run is going. Each MUST be drawn the way Claude
 Code draws its own `/model` -- a rule across the top, the question and a line about it, the
 choices numbered with a marker against the one under the cursor, and under them whatever is
 adjusted rather than chosen.
@@ -359,31 +359,35 @@ adjusted rather than chosen.
 
 ### What one agent is
 
-- Everything one agent is MUST be one sheet of rows rather than a walk of a sheet per question:
-  an agent is one thing with a CLI, an account, a model at an effort, a rung of what it may do
-  and a machine its work lands on. A walk meant that changing the effort of
-  an agent already set up was four keypresses through two sheets with nothing to say.
+- An agent MUST be a CLI, an account, a model and an effort, and MUST be nothing else. What it
+  may do, which goals it may reach for and whether it may search the web are the flow's, said
+  where the flow declares the place this agent fills; the skills it carries are its CLI's,
+  installed and switched off where that CLI keeps them. A row offering to set any of those
+  would be a second answer to a question already settled, and two answers to one question is
+  one of them being wrong.
+- Everything one agent is MUST therefore be one sheet of rows rather than a walk of a sheet
+  per question. A walk meant that changing the effort of an agent already set up was four
+  keypresses through two sheets with nothing to say, and there is less to ask than there was.
 - The rows MUST be in the order of what depends on what: the CLI settles which accounts there
   are and which models that CLI will name, and the account settles which of them it may name.
   Changing the CLI MUST therefore let go of the model, which belonged to the CLI before it.
 - The account MUST always offer the machine's own first, as `as local`: an agent nobody has
   been asked about runs as whoever signed the CLI in, and that is a row rather than a blank.
-- A row that is a rung in an order -- the effort, what it may do, whether it runs as a fleet,
-  whether goals are available, whether it may search the web -- MUST be stepped where it
-  stands on the arrows. Everything else MUST open a sheet of its own and come back.
-- Whether it may search the web MUST be a row only for a CLI that can be told: a switch for
-  something the backend would go on doing whichever way it was set is a switch that lies, and
-  a CLI with no way of being told is one this question is not put about.
+- A row that is a rung in an order -- the effort, and whether one turn runs as a fleet -- MUST
+  be stepped where it stands on the arrows. Everything else MUST open a sheet of its own and
+  come back.
+- What the flow said and this sheet does not ask MUST come back off it unchanged. A sheet that
+  reset a setting to its default because it never showed it would be a sheet quietly
+  overruling the flow that set it.
 - Where an agent works MUST be a row only where the flow said that agent may be pointed at a
   machine, and MUST be read rather than opened where the flow settled it: an agent that works
   here, and one the flow isolates in a container of its own, are each a question nobody is
-  being asked. A saved agent belongs to no flow, so it MUST be asked every question there is.
+  being asked.
 - Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
   here less any the flow ruled out, the models offered MUST be the ones that CLI said it runs
-  as the account chosen for it, the efforts offered MUST be the ones that model takes, and the
-  skills shown MUST be the ones that CLI would load. Nothing MUST be asked of a CLI while a
-  sheet is being drawn -- starting one costs seconds a prompt has not got -- so what was kept
-  is what is read.
+  as the account chosen for it, and the efforts offered MUST be the ones that model takes.
+  Nothing MUST be asked of a CLI while a sheet is being drawn -- starting one costs seconds a
+  prompt has not got -- so what was kept is what is read.
 - The models MUST be askable again from the sheet they are chosen on, on `r`, which is the key
   a flowverse is fetched again on. This is where somebody finds out that the model they came
   for is not in the list, and sending them elsewhere to fix it would lose the question they
@@ -395,10 +399,6 @@ adjusted rather than chosen.
 - An account MUST be makeable from the row that asks for one. That row is where somebody finds
   out they have none for that CLI, and sending them to another command to make one loses the
   question they were answering.
-- The skills sheet MUST be a reading and MUST NOT be a checklist: the skills a CLI finds are
-  that CLI's own, installed and switched off where that CLI keeps them, and the sheet MUST say
-  so under the list rather than offer a switch. A CLI that keeps none anywhere MUST say that,
-  rather than that none are installed.
 
 ### Where flows come from
 
@@ -418,18 +418,6 @@ adjusted rather than chosen.
   for the reason `hmz flowverses` shows it that way: a private one is added as
   `https://x-access-token:$TOKEN@...`, git keeps that verbatim, and a token on a screen is a
   token in a photograph. It MUST be taken out in one place, which both ways of showing it ask.
-
-### The agents kept under a name
-
-- The agents menu MUST list the agents written down under a name, and MUST NOT be the agents of
-  a flow: an agent is a CLI, an account, a model at an effort and what it may do, and none of
-  that is a thing about the flow that happens to be driving it. Enter MUST set one up, on the
-  same sheet a flow's agent is set up on; `a` MUST add one; `d` twice MUST take one away.
-- A flow MUST be able to import one where its agents are set up, and MUST take a copy: an agent
-  tuned inside a flow is that flow's, and writing the change back into the thing it was copied
-  from would change every other flow that had imported it.
-- A flow's agent MUST be saveable as one, under a new name or over one already there. Which is
-  the other half of importing: what was tuned in a flow is worth keeping.
 
 ### The accounts
 
@@ -488,10 +476,9 @@ adjusted rather than chosen.
 - It MUST be two pages of one menu rather than two menus, since it is one question at two
   scales: the steps between agents, and the chains between accounts. Both MUST be held until
   the menu is saved, as everything held on a menu is.
-- A step MUST be two agents chosen, and each MUST be chosen on the same sheet a flow's agent
-  and a saved agent are chosen on: an agent is one thing to choose -- a CLI, an account, a
-  model at an effort -- and a second way of choosing one would be a second thing to keep
-  right. An agent that would fall back to itself MUST be refused where it is said.
+- A step MUST be two agents chosen, and each MUST be chosen on the same sheets a flow's agent
+  is chosen on: an agent is one thing to choose -- a CLI, an account, a model at an effort --
+  and a second way of choosing one would be a second thing to keep right. An agent that would fall back to itself MUST be refused where it is said.
 - How a place is tried again before it falls back MUST be three rungs stepped where they stand
   -- how many tries, which wait, and how long the whole may go on for -- rather than three
   numbers to type: a text box for an integer is a text box to validate. It MUST be said here

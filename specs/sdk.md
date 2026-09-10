@@ -6,7 +6,6 @@
 .
 ├── __init__.py
 ├── accounts.py
-├── agents.py
 ├── core.py
 ├── epics.py
 ├── fallbacks.py
@@ -17,8 +16,8 @@
 
 ## `__init__.py`
 
-Expose `Hmz` and every type it hands back: `Accounts`, `Agents`, `Epics`, `Fallbacks`,
-`Flows`, `Flowverses`, `Run`, `Session`, `Taken`.
+Expose `Hmz` and every type it hands back: `Accounts`, `Epics`, `Fallbacks`, `Flows`,
+`Flowverses`, `Run`, `Session`.
 
 ## `core.py`
 
@@ -40,9 +39,6 @@ class Hmz:
 
     @property
     def verses(self) -> Flowverses: ...
-
-    @property
-    def agents(self) -> Agents: ...
 
     @property
     def accounts(self) -> Accounts: ...
@@ -96,7 +92,7 @@ humanize as one object: a workspace, and everything humanize can be asked to do 
   a name already taken, where a flowverse came from, what an agent named on a command line is
   -- so that a command line and a menu answer the same way. What only one of them does MUST
   NOT be: asking somebody at a terminal is a command line's, and drawing is an interface's.
-- Nothing MUST be loaded until it is asked for. A line that lists the agents kept under a name
+- Nothing MUST be loaded until it is asked for. A line that lists the places flows come from
   MUST NOT pay for the tracer, the sandbox and every coding agent driver there is, so every
   layer MUST be reached from inside the call that needs it and never at the top of a module.
   That MUST go for this package's own modules too: naming it is how every command begins, so
@@ -160,42 +156,6 @@ The flows there are, and the places they come from.
   MUST be taken out of it in one place, which every way of showing one asks.
 - What to call a directory that is not a clone of anything is whoever is showing it to say:
   a listing has a column and a sheet has a sentence.
-
-## `agents.py`
-
-```python
-class Taken(ValueError): ...
-
-
-class Agents:
-    def reads(
-        self, spec: str
-    ) -> tuple[Profile, str, str, str, str, tuple[tuple[str, str], ...]]: ...
-    def all(self) -> list[Kept]: ...
-    def find(self, name: str) -> Kept | None: ...
-    def keep(self, agents: list[Kept]) -> None: ...
-    def write(self, name: str, runs: Runs, *, force: bool = True) -> Kept: ...
-    def add(
-        self,
-        name: str,
-        spec: str,
-        *,
-        anchor: str = "",
-        goals: bool = True,
-        web_search: bool | None = None,
-        force: bool = False,
-    ) -> Kept: ...
-    def remove(self, name: str) -> bool: ...
-```
-
-The agents written down under a name.
-
-- One written over MUST keep its place in the list and one that is new MUST go on the end,
-  which is the order they were written down in -- and MUST be so however it was written,
-  since a menu and a command line write down the same thing.
-- A name already written down MUST be its own refusal. What to say about it is whoever
-  asked's: a command line says which flag writes over one, and a menu that has already asked
-  which name to save over says nothing at all.
 
 ## `accounts.py`
 
