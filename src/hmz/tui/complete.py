@@ -24,6 +24,7 @@ _ABOUT = {
     "providers": "Manage the accounts agents run as",
     "fallback": "Where a turn goes when the place taking it cannot take it at all",
     "epics": "The runs of this directory, and what to do with one",
+    "resume": "Carry the last run here on from where it stopped",
     "settings": "What humanize remembers, here and everywhere",
     "status": "Show how the run is going, and the board",
     "clear": "Clear the screen",

@@ -119,6 +119,7 @@ _OWN = (
     "providers",
     "fallback",
     "epics",
+    "resume",
     "settings",
     "status",
     "clear",
@@ -1789,25 +1790,40 @@ class Humanize(App[None]):
         return False
 
     def _mid_run(self, what: str) -> bool:
-        """Whether a flow is running, and says so where that is why nothing happened.
+        """Whether a flow is still going, and says so where that is why nothing happened.
 
         Which is the answer for anything that would change what is running while it runs.
         A flow holds the agents it was handed and drives them by its own control flow: swapped
         underneath it, the run carries on against the ones it already has, and the interface
         starts saying it is running something it is not. Stop it, then choose.
 
+        Still going means told to stop and not yet gone as well as running: those are two
+        answers rather than one, since what to do about them differs.
+
         Args:
           what: The command being turned down, so that the line says which one.
 
         Returns:
-          True if a flow is running, having said so.
+          True if a flow is running or on its way out, having said which.
         """
-        if not self._agents:
-            return False
-        self.show(
-            f"hmz: {what} while a flow is running: ctrl+c twice stops it first", "red"
-        )
-        return True
+        if self._agents:
+            self.show(
+                f"hmz: {what} while a flow is running: ctrl+c twice stops it first",
+                "red",
+            )
+            return True
+        # Told to stop and not yet gone. A flow unwinds in its own time -- a loop sleeps off
+        # its round, a turn is closed out -- and it writes down where it got to as it goes,
+        # so a run picked up from a state that is still moving is a round done twice. And
+        # `ctrl+c twice` is not the answer here: it has already been pressed.
+        if self._stopping:
+            self.show(
+                f"hmz: {what} while the flow is still stopping: it is closing out the "
+                "turn it was in",
+                "red",
+            )
+            return True
+        return False
 
     @work
     async def action_status(self) -> None:
@@ -1919,6 +1935,8 @@ class Humanize(App[None]):
             self.action_fallback()
         elif name == "epics":
             self.action_epics()
+        elif name == "resume":
+            self.action_resume(argv)
         elif name == "flowverses":
             self.action_flowverses()
         elif name == "settings":
@@ -2607,6 +2625,92 @@ class Humanize(App[None]):
             self.show(one)
         if said.doing == carries_on and said.epic is not None:
             self._carries_on(said.epic)
+
+    def action_resume(self, argv: Sequence[str] = ()) -> None:
+        """Carries the last run in this directory on, which is what `/resume` is for.
+
+        `/epics` already offers this of whichever run the cursor is on, and needing to find
+        that row is the whole of what is wrong with it: a loop is left running overnight, the
+        machine goes down, and what somebody who comes back to a stopped one wants is the
+        work carried on rather than a list to look for it in. So this is the last run here
+        and no other -- there is nothing to choose, which is why it is a command rather than
+        a row -- and a run that cannot be carried on says why rather than quietly handing the
+        one before it over: a loop resumed from the day before yesterday because yesterday's
+        died early is a day's work thrown away without anybody being told.
+
+        Args:
+          argv: Whatever was typed after the command, which is nothing: said back rather
+            than dropped, since a run named here and quietly ignored would be somebody
+            watching a different run start than the one they asked for.
+        """
+        if argv:
+            self.show(
+                "hmz: /resume takes nothing: it carries the last run here on, and /epics "
+                "is where another one is named",
+                "red",
+            )
+            return
+        # Before anything is read, since it is the one refusal that is about now rather than
+        # about the record: a run picked up is a flow started, and there is one going.
+        if self._mid_run("no picking a run up"):
+            return
+        runs = self.hmz.epics.all()  # oldest first, so the last of them is the last run
+        if not runs:
+            self.show(
+                "hmz: no flow has been run here, so there is nothing to carry on from",
+                "red",
+            )
+            return
+        epic = runs[-1]
+        ran = self.hmz.epics.read(epic)
+        if ran is None:
+            self.show(
+                f"hmz: {escape(epic.name)} cannot be read back, so there is nothing to "
+                "carry on from",
+                "red",
+            )
+            return
+        if not self._picks_up(ran.flow):
+            self.show(
+                f"hmz: {escape(ran.flow)} does not say it can be picked up, so there is "
+                f"nothing to carry on from in {escape(ran.name)}",
+                "red",
+            )
+            return
+        # Nothing left behind is a run that stopped before it wrote down where it had got
+        # to, or one that emptied what it had written -- which is a flow saying the next run
+        # here starts clean. Either way carrying it on would be a run starting from the top
+        # wearing a line that says which run it came from, which is a record of something
+        # that did not happen. So it says what the next move is instead.
+        if not self.hmz.epics.state(epic, ran.flow):
+            self.show(
+                f"hmz: {escape(ran.name)} left nothing behind, so there is nothing to "
+                "carry on from: say what to do and the flow starts from the top",
+                "red",
+            )
+            return
+        self._carries_on(epic)
+
+    def _picks_up(self, flow: str) -> bool:
+        """Whether one flow says now that it can be picked up.
+
+        Asked of the flow rather than read off the run, as it is wherever it is said: a flow
+        is a file on disk, and one marked resumable since that run is one whose older runs
+        can be carried on now. The same question the runs sheet asks of every row it draws
+        (:meth:`hmz.tui.pick.Epics._picks_up`), which caches it because it asks it of a list;
+        one run is one flow, so this asks it once and keeps nothing.
+
+        Args:
+          flow: The flow, as the run named it.
+
+        Returns:
+          Whether it is resumable, and False for one that will not load at all -- a flow that
+          cannot be read cannot be run, which is what carrying on would come to.
+        """
+        try:
+            return self.hmz.flows.resumes(flow)
+        except Exception:  # noqa: BLE001 -- a flow is a file, and reading one runs it
+            return False
 
     def _carries_on(self, epic: Path) -> None:
         """Runs the flow of one run again, on what that run left behind.

@@ -146,6 +146,7 @@ list appears under the editor with a line about each.
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
 | `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
+| `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run under its cursor, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent that has worked, marked as it works, with the handovers between them drawn as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
@@ -798,6 +799,32 @@ A directory nothing has ever been run in says so under the empty list. The same 
 name which run. A trace of what a directory holds whoever opened it — a session no flow ever
 drove — is `--all` or `--session` there, and is not offered here at all: this is a list of runs,
 and a trace of none of them has nothing here to hang on.
+
+### Carrying the last one on outright
+
+`/resume` is that first row without the list: it carries **the last run in this directory** on,
+which is the one somebody who left a loop running overnight came back for. The flow, its agents
+and what they were asked to do come off that run exactly as they do from the menu, and the line
+it starts on says which run is being picked up — a person who has been away is owed which day's
+work this is.
+
+The last run and no other. A run carried on from the day before yesterday, because yesterday's
+died before it wrote anything down, is a day's work thrown away without anybody being told, so
+where the last run is not one to carry on the reason is said instead:
+
+| | |
+| --- | --- |
+| `no flow has been run here` | Nothing has ever run in this directory. |
+| `<run> cannot be read back` | Its record is not one — a run that died mid-line left a line rather than an epic. |
+| `<flow> does not say it can be picked up` | Asked of the flow as it is today, not of what the run recorded — and a flow that will not load at all reads as one that says no. |
+| `<run> left nothing behind` | Its flow says it can be picked up, and that run either stopped before it wrote down where it had got to or [emptied what it wrote](/user/resuming#when-it-is-saved) — which is a flow saying the next run here starts clean. Starting from the top under a line saying which run it came from would be a record of something that did not happen, so it says what the next move is: say what to do, and the flow starts. |
+| `no picking a run up while a flow is running` | A run picked up is a flow started, and there is one going. [ctrl+c twice](/user/stopping) stops it first. |
+| `no picking a run up while the flow is still stopping` | ctrl+c twice has been pressed and the flow has not gone yet. It unwinds in its own time and writes down where it got to as it goes, so a run picked up from a state still moving under it is a round done twice. A flow that will not unwind at all is what the [third press](/user/stopping) is for. |
+
+`/resume` takes nothing after it. A line that names a run is said back rather than dropped —
+there is nothing to name here, and an argument quietly ignored is a different run starting
+from the one you asked for. Naming an older run is what
+[`/epics`](#the-runs-that-have-already-happened) is for.
 
 ## The accounts themselves
 
