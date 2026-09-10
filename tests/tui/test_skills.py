@@ -233,16 +233,17 @@ def test_pi_is_read_from_the_two_it_loads_without_being_approved(
     assert [one.name for one in skills("pi")] == ["its-own", "shared"]
 
 
-def test_agy_is_read_from_the_root_a_printed_turn_loads(
+def test_agy_is_read_from_its_own_home_and_the_shared_root_beside_the_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Its own home, and not the workspace: `--print` opens no project to read one from."""
+    """The two it opens, and not the shared one under the user's home, which it never reads."""
     _write(tmp_path / "home" / ".gemini" / "antigravity-cli" / "skills", "its-own")
-    _write(tmp_path / "project" / ".agents" / "skills", "unopened")
+    _write(tmp_path / "home" / ".agents" / "skills", "not-the-users")
+    _write(tmp_path / "project" / ".agents" / "skills", "beside-the-project")
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
     monkeypatch.chdir(tmp_path / "project")
 
-    assert [one.name for one in skills("agy")] == ["its-own"]
+    assert [one.name for one in skills("agy")] == ["its-own", "beside-the-project"]
 
 
 def test_a_backend_whose_sdk_carries_none_finds_none(

@@ -35,7 +35,7 @@ down in `hmz.backends`:
 
 | Backend | Yours | This project's |
 | --- | --- | --- |
-| `agy` | `~/.gemini/antigravity-cli/skills/*/SKILL.md` | — a printed turn opens no project |
+| `agy` | `~/.gemini/antigravity-cli/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` |
 | `claude` | `~/.claude/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
 | `codex` | `~/.codex/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md`, `.codex/skills/*/SKILL.md` |
 | `cursor` | `~/.cursor/skills/*/SKILL.md`, `~/.config/cursor/skills/*/SKILL.md` | `.cursor/skills/*/SKILL.md` |
@@ -106,12 +106,11 @@ else maintains is one that keeps up.
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
 | `cursor` | `.cursor/skills/` in the workspace |
-| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
-| `agy`, `dsh`, `pi` | — none: they carry what their CLI installs, and nothing else |
+| `agy`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `dsh`, `pi` | — none: they carry what their CLI installs, and nothing else |
 
-The three given none read no such directory the way humanize drives them. DeepSeek Harness's
-SDK reads none at all; Antigravity CLI is run as `--print` and opens no project to read one
-from; pi reads the
+The two given none read no such directory the way humanize drives them. DeepSeek Harness's
+SDK reads none at all; pi reads the
 workspace's only for a project somebody has approved. A skill copied there would be one no turn
 of that flow would ever load, which is worse than none.
 
