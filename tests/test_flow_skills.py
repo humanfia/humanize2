@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import gc
 import subprocess
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -459,13 +460,15 @@ def test_a_session_opened_after_one_was_closed_is_given_them_too(
     ).exists()  # and the last one to end takes them away
 
 
-def test_a_turn_still_running_keeps_what_it_was_given_when_the_agent_is_stopped(
+def test_a_stop_ends_the_turns_process_and_takes_the_skills_after_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A stop does not wait for the turn it interrupts, so the turn is still reading them.
+    """A stop ends the turn under way -- the process included -- and the skills go after it.
 
-    Taking the skills away as the stop lands would delete a directory the agent's own process
-    is in the middle of reading -- which is not stopping it, only breaking it.
+    In that order and not the other: taking the skills away as the stop lands would delete a
+    directory the agent's own process may still be in the middle of reading, which is not
+    stopping it, only breaking it. So the turn lets go of them as it unwinds, which is the
+    first moment nothing is working by them.
     """
     monkeypatch.chdir(tmp_path)
     written(
@@ -475,11 +478,14 @@ def test_a_turn_still_running_keeps_what_it_was_given_when_the_agent_is_stopped(
         {"note-taking": skill("note-taking")},
     )
 
+    began = time.monotonic()
     Runner("slowly", [ClaudeAgent(CONFIG)]).run(
-        "sleep 0.6; cat .claude/skills/note-taking/SKILL.md > read.txt"
+        "cat .claude/skills/note-taking/SKILL.md > read.txt; sleep 30"
     )
+    took = time.monotonic() - began
     gc.collect()
 
+    assert took < 10  # the stop ended the command rather than waiting out its sleep
     assert "Do the thing" in (tmp_path / "read.txt").read_text()
     assert not (
         tmp_path / ".claude"

@@ -85,6 +85,7 @@ push.
 | [Many backends, one agent](/features/backends) | Native servers, streaming CLIs and Agent Client Protocol backends meet one session contract. |
 | [Two accounts of one CLI](/features/accounts) | Credentials, model catalogues and failure chains stay isolated while a session changes where it runs. |
 | [A line typed mid-turn](/features/steering) | Acknowledged queues put guidance into the turn that is working rather than behind it. |
+| [A turn can be cut off](/features/budgets) | A per-turn cap on tokens or clock, read off the live meter, ends the turn that is running. |
 | [Answers in a shape](/features/shapes) | A pydantic model is both the question and the contract the answer must satisfy. |
 | [It decides when it is done](/features/goals) | A backend-owned pursuit loop continues until the model settles the objective. |
 | [The moments of a turn](/features/hooks) | Typed lifecycle moments let a flow react without teaching the backend about the flow. |

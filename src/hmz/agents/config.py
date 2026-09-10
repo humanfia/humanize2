@@ -12,10 +12,13 @@ if TYPE_CHECKING:
     from hmz.machines import MachineConfig
 
 __all__ = [
+    "CUTOFFS",
+    "OUTCOMES",
     "PERMISSIONS",
     "SERVICE_TIERS",
     "AgentConfig",
     "AgentDefaults",
+    "Budget",
     "Goal",
     "Isolated",
     "Remote",
@@ -46,6 +49,133 @@ PERMISSIONS = ("read-only", "workspace-write", "auto", "bypass")
 #: reasons. Backends map these common meanings into their own request vocabulary and refuse
 #: ``fast`` when they cannot express it exactly.
 SERVICE_TIERS = ("default", "fast")
+
+#: When a spent budget takes hold of the turn it was given to, loosest first:
+#:
+#: - `next-response`: the answer the model is in the middle of is let land, and the turn stops
+#:   on it. What comes back is a whole thought rather than half a sentence, and the tokens
+#:   already paid for are the ones a flow gets to read.
+#: - `immediately`: the turn ends where it stands, whatever it was saying. Which is what a
+#:   runaway is stopped by -- an agent six minutes into an answer nobody wants goes on
+#:   spending for as long as it is left alone, and waiting for that answer is the cost being
+#:   paid rather than avoided.
+#:
+#: `next-response` waits for an answer to land and does not wait for one forever: three of
+#: these backends state what a turn cost only once the turn is over, so nothing arrives
+#: mid-turn to stop on -- and a turn that has gone quiet is exactly the one a clock was set
+#: for. The wait has an end, and the end of it is the cut-off.
+#:
+#: How much a backend can be cut off by differs with how it is driven. A CLI whose turn is a
+#: process of its own -- one command, or one held open across its turns -- is cut off by
+#: ending that process. One whose turn is held somewhere shared, on an app server serving
+#: every session of an agent at once, is stopped at the next answer instead: taking that
+#: server down would end the turns of every other conversation on it.
+CUTOFFS = ("next-response", "immediately")
+
+#: What a turn whose budget is spent comes to:
+#:
+#: - `end`: it answers with what has been said, so a loop reads a short turn rather than an
+#:   exception. Half an answer is still an answer, and a flow that summarises, drafts or
+#:   explores would rather have it than nothing.
+#: - `fail`: it raises, so a flow that cannot use a truncated answer stops instead of feeding
+#:   one forward. It raises `Unrecoverable`, because a budget spent once is spent again on
+#:   the next try: a turn taken over on a schedule would burn the same budget every round.
+#:
+#: `end` is the default because a turn cut off has still done what it did: its edits are on
+#: disk and its conversation is open to the next turn, which is the whole difference between
+#: a cap and a kill. Read as a failure it would be taken again, on a budget refilled for the
+#: retry, and a cap a loop refills every time it is reached is not a cap.
+OUTCOMES = ("end", "fail")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Budget:
+    """What one turn may spend before it is cut off, and what happens when it has.
+
+    Per turn rather than per session: a conversation is many turns, and a cap over all of
+    them would be a flow whose tenth round is cut off for what its first round wrote. Every
+    turn starts with the whole of it, and what is measured is the rise across that turn.
+
+    Humanize's own rather than a flag handed to the CLI. Two of these backends can be given a
+    cap of their own -- Claude Code takes dollars, counted over the process it runs rather
+    than over the turn -- and neither is one a flow could be written against: a cap only some
+    of them have is a question before it is an answer, and one counted per process is not a
+    per-turn cap however it is spelled. So it is held to off the meter every backend feeds.
+
+    A dataclass rather than a handful of arguments so that the question stays one question.
+    A budget is already four answers -- how many tokens, how long, when it bites and what it
+    leaves behind -- and the ones after it (what it may cost in money, how many tools it may
+    reach for) are dimensions of the same thing. Written as a value, a new dimension is a
+    field here and a line in :meth:`over`; written as arguments, it is a signature change in
+    every place a turn can be asked for.
+
+    Nothing is capped unless it is named::
+
+        session.budget = Budget(seconds=90, when="immediately", then="fail")
+        session.budget = Budget()  # and this one is a turn under no budget at all,
+
+    which is what a conversation says to opt out of the budget its agent was configured with.
+
+    Attributes:
+      output: Output tokens one turn may come out with, or 0 for as many as it takes. Output
+        rather than every kind: what a turn spends its time and most of its money on is what
+        it writes, and an input count is what the flow itself put in front of the model.
+      seconds: How long one turn may run for on the clock, or 0 for as long as it takes.
+        Seconds on the clock rather than seconds the model was talking, for the reason a rate
+        is: a turn waiting on a tool, a sandbox or a rate limit is a turn taking that long.
+      when: When a spent budget takes hold, as one of :data:`CUTOFFS`.
+      then: What the turn comes to once it is spent, as one of :data:`OUTCOMES`.
+    """
+
+    output: float = 0.0
+    seconds: float = 0.0
+    when: str = "next-response"
+    then: str = "end"
+
+    def __post_init__(self) -> None:
+        # Said where it is written rather than minutes into the turn it was meant to hold: a
+        # word no cut-off answers to is a budget that would quietly never bite, which is the
+        # one failure a budget must not have.
+        if self.when not in CUTOFFS:
+            raise ValueError(
+                f"when must be one of {', '.join(CUTOFFS)}, not {self.when!r}"
+            )
+        if self.then not in OUTCOMES:
+            raise ValueError(
+                f"then must be one of {', '.join(OUTCOMES)}, not {self.then!r}"
+            )
+        if self.output < 0 or self.seconds < 0:
+            raise ValueError("a budget cannot be less than nothing")
+
+    @property
+    def bounded(self) -> bool:
+        """Whether this budget caps anything at all.
+
+        A budget with nothing named in it is what a session says to run its turns under no
+        budget, and it costs nothing to be given one: nothing is measured and no clock is
+        started for a turn that cannot run through it.
+        """
+        return self.output > 0 or self.seconds > 0
+
+    def over(self, *, output: float = 0.0, seconds: float = 0.0) -> str:
+        """Which cap this turn has run through, if any, said the way a person would read it.
+
+        The one place a reading is compared with a cap, so that a dimension added to a budget
+        is a field above and a line here rather than a change wherever a turn is asked for.
+
+        Args:
+          output: Output tokens this turn has come out with so far.
+          seconds: How long it has been running, on the clock.
+
+        Returns:
+          Why the turn is over budget -- `500 output tokens`, `90s` -- or "" while it is
+          still inside every cap it was given.
+        """
+        if self.output > 0 and output >= self.output:
+            return f"{self.output:g} output tokens"
+        if self.seconds > 0 and seconds >= self.seconds:
+            return f"{self.seconds:g}s"
+        return ""
 
 
 class Goal:
@@ -155,6 +285,11 @@ class AgentConfig:
         A backend with no way of being told refuses it off, the way one with no service tier
         to send refuses `fast` -- an agent that quietly went on searching would be a setting
         that lies.
+      budget: What each turn of each session of this agent may spend before it is cut off, or
+        None for a turn that runs until it is done -- which is what an agent nobody has been
+        asked about runs at, because a cap nobody chose is a cap that would truncate the one
+        turn that needed the room. A conversation may be given one of its own, which is where
+        a loop watching what it is costing says so.
     """
 
     model: str
@@ -165,6 +300,7 @@ class AgentConfig:
     provider: str = ""
     goals: bool = True
     web_search: bool = True
+    budget: Budget | None = None
 
     def __post_init__(self) -> None:
         if self.service_tier not in SERVICE_TIERS:

@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from hmz.machines import MachineConfig
     from hmz.providers import Provider
 
-    from .config import AgentConfig
+    from .config import AgentConfig, Budget
 
 
 class Journal(Protocol):
@@ -85,6 +85,61 @@ def _tee(
         source.close()  # the reader closes what it read, whoever else has finished with it
     if said is not None:
         said.put(None)
+
+
+#: How long a process cut off mid-turn is given to go quietly before it is killed. Short,
+#: because the whole point of cutting a turn off is that it is spending: a CLI that has not
+#: acted on a term signal in two seconds is one that is not going to.
+_CUT_SECONDS = 2.0
+
+
+def _ended(proc: subprocess.Popen[str]) -> None:
+    """Ends a process and everything it started, and takes all of their exit statuses.
+
+    The tree rather than the one process, because that is what these CLIs are: a launcher
+    that starts a runtime that starts the thing doing the work, and a provider's own wrapper
+    in front of all three. Killing only what we spawned would leave the half that is actually
+    talking to the model still talking to it -- a turn cut off that goes on spending.
+
+    Asked to stop and then made to, so that a CLI with a transcript to flush or a session file
+    to close gets the chance: whatever has not gone by then is killed. Waited on either way,
+    since a process nobody waits on stays in the table as a zombie.
+
+    Args:
+      proc: The process the turn is running in, which may already have ended.
+    """
+    import psutil
+
+    if proc.poll() is not None:
+        # Already gone and already reaped. Asking the operating system what is below that pid
+        # now is asking about whoever holds it next, and signalling that is signalling a
+        # stranger's work.
+        return
+    kin: list[psutil.Process] = []
+    with contextlib.suppress(psutil.Error):
+        # Read before anything is signalled: the children of a process that has already gone
+        # are children nothing can name any more.
+        kin = psutil.Process(proc.pid).children(recursive=True)
+    with contextlib.suppress(OSError):
+        proc.terminate()
+    for one in kin:
+        with contextlib.suppress(psutil.Error):
+            one.terminate()
+    try:
+        proc.wait(timeout=_CUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(OSError):
+            proc.kill()
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=_CUT_SECONDS)
+    # Ours is waited on through the handle that holds it and never through psutil: psutil
+    # would reap it as a stranger, and a status taken by a stranger is a status the turn's
+    # own reader never sees -- a turn killed mid-word would then read as one that exited
+    # cleanly. The rest are nobody's children by now and are only watched for.
+    _, alive = psutil.wait_procs(kin, timeout=_CUT_SECONDS)
+    for one in alive:
+        with contextlib.suppress(psutil.Error):
+            one.kill()
 
 
 def _reaped(proc: subprocess.Popen[str]) -> None:
@@ -249,6 +304,14 @@ def _at_once(asked: int, of: int) -> int:
 #: The same window the interface's own readout is over, so that a flow reading a rate and a
 #: person watching one are reading the same number.
 WINDOW = 300.0
+
+#: How long a `next-response` cut-off waits for the answer it is letting land. It is a wait
+#: for something that may never come: three of these backends state what a turn cost only
+#: once the turn is over, so nothing lands mid-turn to stop on -- and a turn that has gone
+#: quiet is exactly the one a clock was set for. A minute is longer than a model takes to
+#: finish an answer it had already started and short enough that a wedged turn is not left
+#: running for the sake of one that will never arrive.
+_LANDING = 60.0
 
 
 class Meter:
@@ -467,6 +530,40 @@ class SessionBase(ABC):
         #: reaches and so is called from another thread while a turn is under way: what the
         #: turn is working by is not taken away underneath it.
         self._working = False
+        #: What each turn of this conversation may spend, where it has been told something
+        #: other than what its agent was configured with, and None where it has not.
+        self._budget: Budget | None = None
+        #: And what the turn now running is actually held to, taken as that turn opened and
+        #: None between turns: a turn runs under the budget it started with, so a flow that
+        #: shortens the next round while this one is running shortens the next round.
+        self._capped: Budget | None = None
+        #: Why the turn now running is to stop short, or "" for one that is not. Two reasons
+        #: rather than one because they arrive from different directions and mean different
+        #: things: `_over` is this session's own budget spent, which says what a spent budget
+        #: leaves behind, and `_cut` is somebody outside -- a watchdog, a person -- ending the
+        #: turn, which always leaves what has been said. Written from whichever thread noticed
+        #: and read on the one taking the turn; both are cleared as a turn opens, so a session
+        #: cut off once is not a session that can never take another turn.
+        self._over = ""
+        self._cut = ""
+        #: What the agent has said in the turn now running, kept so that a turn cut off part
+        #: way through can still answer with it. Cleared as each turn opens: what is held is
+        #: one turn's words, which its backend is holding anyway.
+        self._sofar: list[str] = []
+        #: What the turn now running had already spent when it started, and when it started,
+        #: which is what a per-turn budget is measured against: the meter counts the whole
+        #: conversation, and a tenth round cut off for what the first round wrote would be a
+        #: budget nobody could reason about.
+        self._paid = 0.0
+        self._since = 0.0
+        #: What stops a turn that has run out of clock, for a budget that caps one. A timer
+        #: rather than a thread watching: a turn under no budget starts nothing at all.
+        self._clock: threading.Timer | None = None
+        #: The process a turn is running in for a session driven as one command a turn, or
+        #: None between turns. Here rather than on `CommandSessionBase` because two backends
+        #: held open across their turns borrow that transport for the turns they cannot keep
+        #: warm -- and a turn cut off has to reach whichever process is actually holding it.
+        self._underway: subprocess.Popen[str] | None = None
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._hold(self)
@@ -633,6 +730,210 @@ class SessionBase(ABC):
         """
         self._meter.spend(usage, turn=turn)
         self._agent._meter.spend(usage, turn=turn)
+        # Read where it is written, which is why a budget is worth having at all: the meter
+        # moves as each request to the model comes back, so a turn that has written its
+        # thousand tokens is stopped in the middle of the turn rather than after it. A
+        # settling up is not a response landing, and a budget waiting for one is not paid
+        # out by the accounting.
+        self._checks(landed=turn)
+
+    @property
+    def budget(self) -> Budget | None:
+        """What each turn of this conversation may spend before it is cut off.
+
+        What the agent was configured with, unless this conversation has been told otherwise
+        -- and a flow may say so while the session is running, which is where a loop watching
+        what a round is costing is when it decides the next one is to be shorter. The turn
+        already under way keeps the budget it started with: what has been spent is measured
+        against the cap the turn opened on, and one swapped halfway through would cut a turn
+        off for tokens it was allowed when it wrote them.
+
+        None for an agent nobody has been asked about, which is a turn that runs until it is
+        done. To run this one conversation under no budget where its agent has one, give it
+        an empty `Budget()`: nothing named is nothing capped.
+        """
+        return self._budget if self._budget is not None else self._agent.config.budget
+
+    @budget.setter
+    def budget(self, budget: Budget | None) -> None:
+        """Has this conversation's turns run under something other than the agent's.
+
+        Args:
+          budget: What each turn may spend, or None to go back to the agent's own.
+        """
+        self._budget = budget
+
+    def interrupt(self, *, why: str) -> None:
+        """Cuts the turn now running off, wherever it has got to.
+
+        The one thing a turn could not otherwise be told. Stopping an agent prevents its
+        *next* turn, and a session that is one command per turn has nothing listening -- so
+        without this a turn gone wrong, wedged on a tool or six minutes into an answer nobody
+        wants or past the budget it was given, runs to the end whatever anybody does.
+
+        What it reaches is whatever is actually holding the turn: the process a command turn
+        is running in, or the one a session held open across its turns is spoken to. A
+        backend whose turn is held somewhere shared -- an app server serving every session of
+        an agent at once -- is not taken down for one of them, and stops at the next answer
+        instead: cutting one turn off must not end everybody else's.
+
+        The turn still ends the way every turn ends, on exactly one `result` or one failure.
+        A stream that stopped mid-sentence would leave whatever is reading it waiting for an
+        answer nobody is going to give.
+
+        Args:
+          why: What to say it was cut off for, which is what whoever is watching reads and
+            what a turn that fails for it says.
+        """
+        if not self._working:
+            # Nothing is running, so there is nothing to cut off -- and a reason left standing
+            # would end the next turn before it had said anything. A turn that has not started
+            # is prevented by stopping the agent, which is a different thing.
+            return
+        self._cut = why or "interrupted"
+        self._heard(Event(kind="tool", text=f"cutting the turn off: {self._cut}"))
+        self._cuts()
+        if self._moved_to is not None:
+            # And the conversation this one moved to, since the turn being cut off may be
+            # being taken there: this conversation carried on somewhere else is still this
+            # conversation, and cutting off only the half that is waiting cuts off nothing.
+            self._moved_to.interrupt(why=why)
+
+    def _cuts(self) -> None:
+        """Ends whatever is holding the turn now running, as roughly as it takes.
+
+        Roughly on purpose, and so not :meth:`_shut`: letting go politely is what that is,
+        and politeness is the thing being avoided here. A backend with nothing of its own to
+        end -- a turn held on an app server shared by every session of the agent -- does
+        nothing at all and stops at the next answer instead, since taking that server down
+        would end every other conversation on it.
+        """
+        self._ends_command()
+
+    def _ends_command(self) -> None:
+        """Ends the process a command turn is running in, where this session has one.
+
+        On :class:`SessionBase` rather than on the class whose turns are commands, because
+        two backends held open across their turns run the turns they cannot keep warm through
+        that same transport -- so both what cuts a turn off and what lets go of a session have
+        to reach it, and neither knows which of the two it is looking at.
+        """
+        proc, self._underway = self._underway, None
+        if proc is not None:
+            _ended(proc)
+
+    def _checks(self, *, landed: bool = False) -> None:
+        """Sees whether the turn now running has spent what it was given, and acts if it has.
+
+        Called from wherever a reading moves: the thread taking the turn, as each request to
+        the model comes back, and the turn's own clock where it has one. Idempotent, since
+        both may arrive at once and a turn is cut off the once. Against the budget the turn
+        opened with rather than whatever the session is carrying now: a flow that shortens
+        the next round while this one is running must not cut this one off for tokens it was
+        allowed when it wrote them.
+
+        Args:
+          landed: Whether a response from the model has just arrived. Which is the whole of
+            what `next-response` waits for: a budget that ran out of clock in the middle of
+            an answer lets that answer finish, and the next one to land is where the turn
+            stops. A budget that ran out of tokens ran out *on* a response landing, so it is
+            already at that moment and stops there.
+        """
+        budget = self._capped
+        if budget is None or not self._working:
+            return
+        if not self._over:
+            over = budget.over(
+                output=self._meter.spent().output - self._paid,
+                seconds=time.monotonic() - self._since,
+            )
+            if not over:
+                return
+            self._over = over
+            if not landed and budget.when != "immediately":
+                # Out of clock in the middle of an answer, which is what `next-response`
+                # waits for. Not forever, though: a backend that says what a turn cost only
+                # when the turn is over never lands anything to wait on, and a turn that has
+                # gone quiet is the one a clock was set for. So the wait has an end, and what
+                # is at the end of it is the cut-off.
+                self._waits(_LANDING, landed=True)
+                return
+        if not self._cut and self._capped is not None and self._working:
+            self.interrupt(why=f"{self._over} spent")
+
+    def _budgeting(self) -> None:
+        """Opens a turn's budget: the one it is held to, what it starts from, and its clock.
+
+        Taken once here rather than read as the turn goes, because a turn runs under the
+        budget it opened with -- and because the readings are differences: a baseline that
+        was never set would make the whole conversation's spending, and every second since
+        this machine started, count against the first cap anybody names mid-turn.
+        """
+        self._paid = self._meter.spent().output
+        self._since = time.monotonic()
+        budget = self.budget
+        self._capped = budget if budget is not None and budget.bounded else None
+        if self._capped is not None and self._capped.seconds > 0:
+            self._waits(self._capped.seconds)
+
+    def _waits(self, after: float, *, landed: bool = False) -> None:
+        """Has the turn's budget looked at again in a while, whatever else happens by then.
+
+        Args:
+          after: How long to wait, in seconds.
+          landed: What to say about a response having arrived when the time is up -- which
+            for the wait after a `next-response` budget ran out is yes, that being the wait
+            ending rather than an answer arriving to end it.
+        """
+        clock, self._clock = self._clock, None
+        if clock is not None:
+            clock.cancel()
+        # A daemon, because it is the turn's rather than the run's: an interpreter on its way
+        # out must not wait on the clock of a turn nobody is reading any more.
+        self._clock = threading.Timer(after, self._checks, kwargs={"landed": landed})
+        self._clock.daemon = True
+        self._clock.start()
+
+    def _budgeted(self) -> None:
+        """Closes it, whichever way the turn went, so no clock outlives the turn it was for.
+
+        What the turn was held to goes first, so that a clock which fired in the moment
+        before this reads a turn with no budget and lets a turn that answered stand.
+        """
+        self._capped = None
+        clock, self._clock = self._clock, None
+        if clock is not None:
+            clock.cancel()
+        self._sofar = []
+
+    def _cutting(self) -> str:
+        """Why the turn now running is to stop short, or "" while it is not."""
+        return self._over or self._cut
+
+    def _short(self, why: str, said: str) -> None:
+        """Says a turn was cut off, and fails it where that is what its budget asked for.
+
+        Args:
+          why: What it was cut off for.
+          said: What the agent had said by then, which is what a turn cut off answers with.
+
+        Raises:
+          Unrecoverable: If a spent budget asked for the turn to fail rather than to end.
+            Unrecoverable rather than an ordinary failure because trying it again spends the
+            same budget again: a loop that took the turn over on a schedule would be cut off
+            at the same word every round and never get anywhere.
+        """
+        self._heard(Event(kind="tool", text=f"turn cut off: {why}"))
+        budget = self._capped
+        if self._over and budget is not None and budget.then == "fail":
+            raise Unrecoverable(1, [self._agent.backend], said, f"turn cut off: {why}")
+        if self._id is None and (named := self.named) is not None:
+            # A turn cut off short is a turn that landed: what the agent did is on disk and
+            # the conversation is open to the next turn, which is the whole difference
+            # between a cap and a kill. So the session is opened by it wherever the backend
+            # had already said what to call it -- or the round after a short round would
+            # start a conversation from nothing and lose the work the short one did.
+            self._adopt(named)
 
     @property
     def effort(self) -> str:
@@ -817,6 +1118,12 @@ class SessionBase(ABC):
         # as much as the process is, and two threads calling one session are two turns one
         # after the other. A conversation is a sequence, however many are driving it.
         with self._lock:
+            # Cleared before the turn is open to being cut off rather than as it opens: the
+            # moments a turn fires before the backend is spoken to can each take seconds, and
+            # a reason set in that window and cleared afterwards is a cut-off that quietly
+            # never happened.
+            self._over = self._cut = ""
+            self._sofar = []
             self._working = True
             try:
                 yield from self._turning(prompt, schema=schema)
@@ -862,6 +1169,10 @@ class SessionBase(ABC):
         if submitted.adds:
             prompt = f"{prompt}\n\n{submitted.adds}"
         self._heard(Event(kind="begins", text=prompt))
+        # From here to the `ends` below is the turn, which is what a budget is over: every
+        # turn starts with the whole of what it was given, and what is measured is the rise
+        # across this one.
+        self._budgeting()
         try:
             if submitted.refused:
                 # The turn does not run, and what the hook said instead is what it answers
@@ -878,33 +1189,66 @@ class SessionBase(ABC):
                 # for. On the prompt as it is sent rather than on the one the hooks and the
                 # transcript see, which is the flow's own words: a schema in the transcript
                 # is the plumbing showing through.
-                for event in self._falling_back(prompt, schema=schema):
-                    if event.kind == "result":
-                        # Held back: a hook may yet send the agent on, and a turn that was
-                        # sent on has not answered.
-                        answered = event
-                        continue
-                    self._heard(event)
-                    if event.kind == "tool":
-                        named, _, about = event.text.partition(" ")
-                        self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
-                    elif event.kind in ("subagent", "subagent-ends"):
-                        # An agent this one started of its own, bracketed the way a turn is:
-                        # a fleet under a turn is something a flow may want a word about, and
-                        # the id is what makes the one that started and the one that ended
-                        # one agent rather than two lines.
-                        named, _, about = event.text.partition(" ")
-                        self._fire(
-                            Moment.SUBAGENT_START
-                            if event.kind == "subagent"
-                            else Moment.SUBAGENT_STOP,
-                            tool=named,
-                            about=about,
-                            under=event.whose,
-                        )
-                    yield event
+                try:
+                    for event in self._falling_back(prompt, schema=schema):
+                        if event.kind == "result":
+                            # Held back: a hook may yet send the agent on, and a turn that
+                            # was sent on has not answered.
+                            answered = event
+                            continue
+                        self._heard(event)
+                        if event.kind == "text":
+                            # Kept as it goes, so that a turn cut off in the middle of a
+                            # sentence can still answer with what the agent got as far as
+                            # saying: there is no `result` to read it off once the thing
+                            # saying it has been taken away.
+                            self._sofar.append(event.text)
+                        if event.kind == "tool":
+                            named, _, about = event.text.partition(" ")
+                            self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
+                        elif event.kind in ("subagent", "subagent-ends"):
+                            # An agent this one started of its own, bracketed the way a turn
+                            # is: a fleet under a turn is something a flow may want a word
+                            # about, and the id is what makes the one that started and the
+                            # one that ended one agent rather than two lines.
+                            named, _, about = event.text.partition(" ")
+                            self._fire(
+                                Moment.SUBAGENT_START
+                                if event.kind == "subagent"
+                                else Moment.SUBAGENT_STOP,
+                                tool=named,
+                                about=about,
+                                under=event.whose,
+                            )
+                        yield event
+                except (subprocess.CalledProcessError, OSError, ValueError):
+                    # A turn taken away underneath its own reader comes back as whatever the
+                    # backend makes of that -- a nonzero exit, a pipe closed while something
+                    # was reading it. Only ours to answer for when something was actually
+                    # taken away, which is what `_cut` says and a spent budget on its own
+                    # does not: anything else is a turn that failed on its own account, and
+                    # is raised as one.
+                    if not self._cut:
+                        raise
+                    why = self._cutting()
+                    # A line apiece, which is what each of these is: a block of the
+                    # message, a line the command wrote. Run together they would be one
+                    # word where the agent said two.
+                    said = "\n".join(self._sofar).strip()
+                    self._short(why, said)
+                    yield self._heard(Event(kind="result", text=said))
+                    return
                 # Heard whether or not it is passed on, because what a turn cost is on it.
                 self._heard(answered)
+                if why := self._cutting():
+                    # The answer that was in flight has landed, and the turn stops on it
+                    # rather than going round again -- which is what `next-response` is, and
+                    # what an `immediately` that arrived a moment too late comes to. A hook
+                    # that would have sent the agent on is not asked: a budget spent is not a
+                    # question.
+                    self._short(why, answered.text)
+                    yield answered
+                    return
                 stopping = self._fire(
                     Moment.STOP, said=answered.text, prompt=prompt, again=again
                 )
@@ -913,6 +1257,7 @@ class SessionBase(ABC):
                     return
                 prompt, again = stopping.because, again + 1
         finally:
+            self._budgeted()
             self._heard(Event(kind="ends", text=""))
 
     def _falling_back(
@@ -1002,6 +1347,11 @@ class SessionBase(ABC):
                     # it -- so this one is the turn's own failure, said once.
                     raise
                 except subprocess.CalledProcessError as failed:
+                    if self._cutting():
+                        # A turn cut off is not a turn to take again, here or under the next
+                        # account: the budget would be spent again on the same words, and a
+                        # watchdog that ended a wedged turn did not ask for another one.
+                        raise
                     last = failed
                 else:
                     return
@@ -1575,6 +1925,20 @@ class CommandSessionBase(SessionBase):
     #: which is what every backend driven over a protocol does.
     protocol: ClassVar[bool] = False
 
+    def _shut(self) -> None:
+        """Ends the command a turn is running in, which is what holds this turn open.
+
+        A session that is one command per turn holds nothing *between* them, which is no
+        reason to hold nothing during one: during a turn there is a process, that process is
+        the turn, and this ends it and everything it started. Holding nothing at all is what
+        left a stop and a cut-off with nowhere to reach on half the backends here.
+
+        The turn's own reader finds out the way it finds out about any process that has gone:
+        its streams end and its status is nonzero, which is a failed turn -- and the turn
+        that asked to be cut off is the one that answers for it.
+        """
+        self._ends_command()
+
     def _reads(self, line: str, *, error: bool) -> Iterable[Event]:
         """Reads one line the command wrote into what it says the agent did.
 
@@ -1668,6 +2032,14 @@ class CommandSessionBase(SessionBase):
             ) as proc:
                 assert proc.stdout is not None  # noqa: S101
                 assert proc.stderr is not None  # noqa: S101
+                # Where a stop or a cut-off reaches it. Written before a line has been read,
+                # because the turns worth ending are the ones that have not said anything.
+                self._underway = proc
+                if self._cutting():
+                    # Cut off while this was still starting, when there was nothing yet to
+                    # end. A turn told to stop before it had said a word must not go on to
+                    # say one, so what arrived a moment early is acted on a moment late.
+                    self._cuts()
                 # Every pipe drains from the moment the agent starts: it puts its progress on
                 # stderr and only the final message on stdout, and a prompt larger than the pipe
                 # buffer would deadlock against an agent that prints before reading all of it.
@@ -1717,6 +2089,7 @@ class CommandSessionBase(SessionBase):
                 for pump in pumps:
                     pump.join()
                 status = proc.wait()
+                self._underway = None  # it has ended; there is nothing left to end
 
             stdout = "".join(out)
             if status != 0:
@@ -1818,6 +2191,10 @@ class StreamSessionBase(SessionBase):
             argv = self._command()
             proc = self._start(argv)
             assert proc.stdout is not None  # noqa: S101
+            if self._cutting():
+                # Cut off while this was starting, which for a CLI that takes a second to
+                # come up is a real moment: the turn is over before it is told anything.
+                self._cuts()
             try:
                 self._say(prompt)
             except RuntimeError as gone:
@@ -1919,8 +2296,28 @@ class StreamSessionBase(SessionBase):
             self.took(ticket)
             raise
 
+    def _cuts(self) -> None:
+        """Ends the process this session is spoken to, outright.
+
+        Rather than by closing its stdin, which is what :meth:`_shut` does and what both of
+        the CLIs held open this way answer by finishing the turn they are in the middle of
+        and then leaving -- which is exactly the minutes a cut-off is there to save.
+
+        Its streams are left to the turn's own reader: that reader is sitting in stdout, and
+        a stream closed under a thread blocked on it is a thread that finds out by raising.
+        The process going is what ends the read, and the read ending is what closes them.
+        """
+        super()._cuts()  # the command a shaped turn ran in, for the two backends with one
+        proc = self._proc
+        if proc is not None:
+            _ended(proc)
+
     def _shut(self) -> None:
         """Ends the process, which is what was holding the conversation open."""
+        # And the command a shaped turn ran in, for the turns this backend cannot keep warm:
+        # `_shut` is what a stop reaches, and a stop that left that command running would be
+        # the gap this class's own `_shut` was written to close, reopened for two backends.
+        self._ends_command()
         with self._writing:
             # Taken together, so that nothing is written to a process on its way out and no
             # answer is left owed by one that is gone.
@@ -1935,8 +2332,10 @@ class StreamSessionBase(SessionBase):
             # one that is not -- and that one is being stopped, which should read as stopped.
             proc.wait(timeout=1)
         except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()  # reaped rather than left a zombie, one per turn of a long flow
+            # A turn cut off in the middle of a tool is one of these, and what it is in the
+            # middle of is a process of its own: ending the tree rather than the CLI is what
+            # keeps a `npm test` it started from outliving the turn that started it.
+            _ended(proc)
         # stdout is ours to close: the turn has finished reading it. stderr is not -- the
         # reader is sitting in it, and closing a stream another thread is blocked on waits on
         # that thread, which waits on whatever the agent left holding the write end. It is
