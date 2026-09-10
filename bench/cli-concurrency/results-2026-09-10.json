@@ -149,6 +149,23 @@
    "summary": "evidence-2026-09-10/selected-stage4-summary.json"
   },
   {
+   "backend": "grok",
+   "profile": "held_open_protocol_transport",
+   "concurrency": 20,
+   "gate": "complete_task_p50_p95_at_most_2x_cold_and_warm",
+   "max_complete_task_ratio": 1.700774247714181,
+   "max_startup_ratio": null,
+   "max_fixed_work_ratio": null,
+   "legacy_strict_pass": null,
+   "original_under_the_same_gate": {
+    "concurrency": 14,
+    "max_complete_task_ratio": 1.8564816320209452
+   },
+   "supersedes_row_above": true,
+   "note": "Measured against the complete-task floor alone, with the original's own rungs and the candidate's taken back to back against one set of five fresh serial controls in one measurement group. The row above is the earlier startup and fixed-work evaluation of the same backend and is unchanged.",
+   "summary": "evidence-2026-09-10/grok-held-open-transport-summary.json"
+  },
+  {
    "backend": "kimi",
    "profile": "default_mock_profile",
    "concurrency": 2,

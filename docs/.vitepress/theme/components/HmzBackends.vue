@@ -108,14 +108,14 @@ const BACKENDS: Backend[] = [
   {
     name: 'grok',
     called: 'Grok Build',
-    driven: 'command',
+    driven: 'held',
     efforts: ['xhigh', 'high', 'medium', 'low'],
     steer: 'no',
     shape: 'held to it',
     goal: false,
     trace: false,
     skills: 'eight places, two of them other harnesses’',
-    note: 'The ladder is written as it enumerates them when it refuses one, because a rung it refuses is a turn that never starts.',
+    note: 'The process is `grok agent stdio`, speaking the protocol its own editor clients speak. A rung that takes tools away and a turn held to a shape have no flag on it and are one run of `grok -p` each, resuming the same conversation. The ladder is written as it enumerates them when it refuses one, because a rung it refuses is a turn that never starts.',
   },
   {
     name: 'qwen',
