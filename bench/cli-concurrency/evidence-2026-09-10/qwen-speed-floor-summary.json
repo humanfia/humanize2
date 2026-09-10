@@ -1,0 +1,2260 @@
+{
+  "revision": "qwen-speed-floor-v2",
+  "backend": "qwen",
+  "profile": "default_mock_profile",
+  "floor": 2.0,
+  "metric": "result_seconds, cold and warm p50 and p95, over the serial control of the same run",
+  "synthetic_model": true,
+  "real_model_performance_verified": false,
+  "confirmation_policy": "Five candidate repetitions against the five fresh serial controls of the same run and the same source, repeated as whole rounds and read on the median. One round decides nothing here: the serial control's warm p95 moves by about a third with load outside the cgroup, and the floor divides by it.",
+  "estimator_note": "Nearest-rank p95 of k observations is the ceil(0.95k)-th. A five-repeat serial control has k=5, so its p95 is its maximum; a three-session rung has k=15, so its p95 is also its maximum; four sessions has k=20 and excludes the maximum, five has k=25 and excludes one. The ladder is therefore not monotone -- three sessions is the harshest rung on it -- and this is retained rather than corrected.",
+  "original_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+  "original_source_note": "origin/main already holds the held-open process of 48d1559. The retained 2026-09-10 qwen ratios divide by a 3e0e6ed control that started a CLI per turn -- warm p50 11.0 s against this control's 0.21 s -- so they do not read as this floor.",
+  "cli": {
+    "command": "qwen",
+    "version": "0.23.1",
+    "entry": "/usr/lib/node_modules/@qwen-code/qwen-code/cli-entry.js",
+    "entry_sha256": "68cb29eb7ccc936d78ece5564ef55cae41a55b630e6657dc417c1f2e561cf4c9",
+    "node": "v22.23.2"
+  },
+  "one_session_turn_cost": {
+    "columns": [
+      "cold_seconds",
+      "cold_cpu_seconds",
+      "warm_seconds",
+      "warm_cpu_seconds"
+    ],
+    "quiet": {
+      "original": [
+        6.678,
+        9.306,
+        0.241,
+        0.608
+      ],
+      "candidate": [
+        5.722,
+        8.185,
+        0.21,
+        0.486
+      ],
+      "candidate_without_credential_supervisor_diagnostic": [
+        2.025,
+        4.0,
+        0.158,
+        0.415
+      ]
+    },
+    "busy": {
+      "original": [
+        7.111,
+        10.217,
+        0.278,
+        0.667
+      ],
+      "candidate": [
+        7.023,
+        10.098,
+        0.27,
+        0.625
+      ]
+    }
+  },
+  "measured_and_not_adopted": {
+    "NODE_OPTIONS=--v8-pool-size=1": "warm 0.512 -> 0.520 core-seconds, ratios no better",
+    "NODE_OPTIONS=--v8-pool-size=0": "warm 0.512 -> 0.742 core-seconds",
+    "NODE_OPTIONS=--max-semi-space-size=64": "warm 0.512 -> 0.521 core-seconds",
+    "NODE_OPTIONS=--max-old-space-size=512": "warm 0.486 -> 0.524 core-seconds",
+    "UV_THREADPOOL_SIZE=1": "warm 0.512 -> 0.560 core-seconds",
+    "tools.shell.enableInteractiveShell=false": "warm 0.512 -> 0.515 core-seconds",
+    "privacy.usageStatisticsEnabled=false with the ui.* headless block": "warm 0.512 -> 0.552 core-seconds"
+  },
+  "rounds": {
+    "original": {
+      "explore-1,2,3,4,6,8x3": {
+        "directory": "/tmp/qwen-base3",
+        "requested_repeats": 3,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 3,
+            "correct_items": 3,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.171,
+              "cold.p95": 7.2968,
+              "warm.p50": 0.2109,
+              "warm.p95": 0.2136
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 3,
+            "correct_items": 6,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0883,
+              "cold.p95": 5.2018,
+              "warm.p50": 0.2906,
+              "warm.p95": 0.3173
+            },
+            "ratios": {
+              "cold.p50": 0.7096,
+              "cold.p95": 0.7129,
+              "warm.p50": 1.3775,
+              "warm.p95": 1.4855
+            },
+            "worst_ratio": 1.4855,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 3,
+            "correct_items": 9,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.9031,
+              "cold.p95": 6.3097,
+              "warm.p50": 0.5287,
+              "warm.p95": 0.5689
+            },
+            "ratios": {
+              "cold.p50": 0.8232,
+              "cold.p95": 0.8647,
+              "warm.p50": 2.5065,
+              "warm.p95": 2.6635
+            },
+            "worst_ratio": 2.6635,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 3,
+            "correct_items": 12,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.4591,
+              "cold.p95": 6.2359,
+              "warm.p50": 0.6021,
+              "warm.p95": 0.7314
+            },
+            "ratios": {
+              "cold.p50": 0.7613,
+              "cold.p95": 0.8546,
+              "warm.p50": 2.8542,
+              "warm.p95": 3.4239
+            },
+            "worst_ratio": 3.4239,
+            "verdict": "timing_miss"
+          },
+          "6": {
+            "repeats": 3,
+            "correct_items": 18,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 8.5452,
+              "cold.p95": 10.7046,
+              "warm.p50": 0.7648,
+              "warm.p95": 1.3062
+            },
+            "ratios": {
+              "cold.p50": 1.1916,
+              "cold.p95": 1.467,
+              "warm.p50": 3.6258,
+              "warm.p95": 6.1147
+            },
+            "worst_ratio": 6.1147,
+            "verdict": "timing_miss"
+          },
+          "8": {
+            "repeats": 3,
+            "correct_items": 24,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 11.521,
+              "cold.p95": 12.7383,
+              "warm.p50": 0.9898,
+              "warm.p95": 1.2042
+            },
+            "ratios": {
+              "cold.p50": 1.6066,
+              "cold.p95": 1.7457,
+              "warm.p50": 4.6923,
+              "warm.p95": 5.6374
+            },
+            "worst_ratio": 5.6374,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "A-1,2,3x5": {
+        "directory": "/tmp/qwen-orig-conf",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.9263,
+              "cold.p95": 8.4394,
+              "warm.p50": 0.2568,
+              "warm.p95": 0.3029
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 5,
+            "correct_items": 10,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0475,
+              "cold.p95": 6.1957,
+              "warm.p50": 0.2752,
+              "warm.p95": 0.3198
+            },
+            "ratios": {
+              "cold.p50": 0.6368,
+              "cold.p95": 0.7341,
+              "warm.p50": 1.0714,
+              "warm.p95": 1.0558
+            },
+            "worst_ratio": 1.0714,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.3901,
+              "cold.p95": 5.9404,
+              "warm.p50": 0.4065,
+              "warm.p95": 0.5432
+            },
+            "ratios": {
+              "cold.p50": 0.68,
+              "cold.p95": 0.7039,
+              "warm.p50": 1.583,
+              "warm.p95": 1.7933
+            },
+            "worst_ratio": 1.7933,
+            "verdict": "pass"
+          }
+        }
+      },
+      "B-1,3,4x5": {
+        "directory": "/tmp/qwen-orig-rB",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.1525,
+              "cold.p95": 6.9428,
+              "warm.p50": 0.2225,
+              "warm.p95": 0.2439
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.7951,
+              "cold.p95": 6.8585,
+              "warm.p50": 0.4108,
+              "warm.p95": 0.5727
+            },
+            "ratios": {
+              "cold.p50": 0.9419,
+              "cold.p95": 0.9879,
+              "warm.p50": 1.8464,
+              "warm.p95": 2.3483
+            },
+            "worst_ratio": 2.3483,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.9408,
+              "cold.p95": 5.2824,
+              "warm.p50": 0.4891,
+              "warm.p95": 0.5895
+            },
+            "ratios": {
+              "cold.p50": 0.8031,
+              "cold.p95": 0.7608,
+              "warm.p50": 2.1983,
+              "warm.p95": 2.4171
+            },
+            "worst_ratio": 2.4171,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "C-1,3,4x5": {
+        "directory": "/tmp/qwen-orig-rC",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.4472,
+              "cold.p95": 8.0548,
+              "warm.p50": 0.2539,
+              "warm.p95": 0.337
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.1818,
+              "cold.p95": 7.4514,
+              "warm.p50": 0.4381,
+              "warm.p95": 0.8587
+            },
+            "ratios": {
+              "cold.p50": 0.9644,
+              "cold.p95": 0.9251,
+              "warm.p50": 1.7252,
+              "warm.p95": 2.5478
+            },
+            "worst_ratio": 2.5478,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0972,
+              "cold.p95": 5.5611,
+              "warm.p50": 0.5241,
+              "warm.p95": 0.7533
+            },
+            "ratios": {
+              "cold.p50": 0.6844,
+              "cold.p95": 0.6904,
+              "warm.p50": 2.0638,
+              "warm.p95": 2.235
+            },
+            "worst_ratio": 2.235,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "D-1,2,3x5": {
+        "directory": "/tmp/qwen-orig-rD",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.5148,
+              "cold.p95": 7.1609,
+              "warm.p50": 0.2274,
+              "warm.p95": 0.249
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 5,
+            "correct_items": 10,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.1472,
+              "cold.p95": 5.3038,
+              "warm.p50": 0.3089,
+              "warm.p95": 0.3577
+            },
+            "ratios": {
+              "cold.p50": 0.7901,
+              "cold.p95": 0.7407,
+              "warm.p50": 1.3586,
+              "warm.p95": 1.4366
+            },
+            "worst_ratio": 1.4366,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.3417,
+              "cold.p95": 5.8548,
+              "warm.p50": 0.4995,
+              "warm.p95": 0.6428
+            },
+            "ratios": {
+              "cold.p50": 0.8199,
+              "cold.p95": 0.8176,
+              "warm.p50": 2.1968,
+              "warm.p95": 2.5819
+            },
+            "worst_ratio": 2.5819,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "E-1,2,3x5": {
+        "directory": "/tmp/qwen-orig-rE",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.7601,
+              "cold.p95": 7.3009,
+              "warm.p50": 0.2248,
+              "warm.p95": 0.2812
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 5,
+            "correct_items": 10,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.102,
+              "cold.p95": 5.5566,
+              "warm.p50": 0.3003,
+              "warm.p95": 0.3448
+            },
+            "ratios": {
+              "cold.p50": 0.7547,
+              "cold.p95": 0.7611,
+              "warm.p50": 1.3362,
+              "warm.p95": 1.2261
+            },
+            "worst_ratio": 1.3362,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.6869,
+              "cold.p95": 6.3171,
+              "warm.p50": 0.3797,
+              "warm.p95": 0.4832
+            },
+            "ratios": {
+              "cold.p50": 0.8413,
+              "cold.p95": 0.8653,
+              "warm.p50": 1.6891,
+              "warm.p95": 1.7186
+            },
+            "worst_ratio": 1.7186,
+            "verdict": "pass"
+          }
+        }
+      },
+      "F-1,3x5": {
+        "directory": "/tmp/qwen-orig-rF",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.476,
+              "cold.p95": 7.2163,
+              "warm.p50": 0.232,
+              "warm.p95": 0.237
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.7249,
+              "cold.p95": 5.8822,
+              "warm.p50": 0.4574,
+              "warm.p95": 0.5441
+            },
+            "ratios": {
+              "cold.p50": 0.884,
+              "cold.p95": 0.8151,
+              "warm.p50": 1.9715,
+              "warm.p95": 2.2957
+            },
+            "worst_ratio": 2.2957,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "G-1,3x5": {
+        "directory": "/tmp/qwen-orig-rG",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.7195,
+              "cold.p95": 8.7289,
+              "warm.p50": 0.2495,
+              "warm.p95": 0.3327
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.5323,
+              "cold.p95": 5.8938,
+              "warm.p50": 0.4414,
+              "warm.p95": 0.5513
+            },
+            "ratios": {
+              "cold.p50": 0.8233,
+              "cold.p95": 0.6752,
+              "warm.p50": 1.7693,
+              "warm.p95": 1.6568
+            },
+            "worst_ratio": 1.7693,
+            "verdict": "pass"
+          }
+        }
+      },
+      "paired1-1,3,4x5": {
+        "directory": "/tmp/qwen-orig-rH",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.7945,
+              "cold.p95": 7.7842,
+              "warm.p50": 0.2879,
+              "warm.p95": 0.2969
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.6282,
+              "cold.p95": 7.1247,
+              "warm.p50": 0.438,
+              "warm.p95": 0.5881
+            },
+            "ratios": {
+              "cold.p50": 0.9755,
+              "cold.p95": 0.9153,
+              "warm.p50": 1.5216,
+              "warm.p95": 1.9804
+            },
+            "worst_ratio": 1.9804,
+            "verdict": "pass"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.9991,
+              "cold.p95": 5.2182,
+              "warm.p50": 0.4878,
+              "warm.p95": 0.5417
+            },
+            "ratios": {
+              "cold.p50": 0.7358,
+              "cold.p95": 0.6704,
+              "warm.p50": 1.6945,
+              "warm.p95": 1.8244
+            },
+            "worst_ratio": 1.8244,
+            "verdict": "pass"
+          }
+        }
+      },
+      "paired2-1,3,4,5x5": {
+        "directory": "/tmp/qwen-orig-rI",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.3206,
+              "cold.p95": 8.3062,
+              "warm.p50": 0.2971,
+              "warm.p95": 0.3147
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.9418,
+              "cold.p95": 7.0577,
+              "warm.p50": 0.4692,
+              "warm.p95": 0.6596
+            },
+            "ratios": {
+              "cold.p50": 0.8117,
+              "cold.p95": 0.8497,
+              "warm.p50": 1.5791,
+              "warm.p95": 2.096
+            },
+            "worst_ratio": 2.096,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0262,
+              "cold.p95": 5.159,
+              "warm.p50": 0.4273,
+              "warm.p95": 0.5287
+            },
+            "ratios": {
+              "cold.p50": 0.6866,
+              "cold.p95": 0.6211,
+              "warm.p50": 1.438,
+              "warm.p95": 1.68
+            },
+            "worst_ratio": 1.68,
+            "verdict": "pass"
+          },
+          "5": {
+            "repeats": 5,
+            "correct_items": 25,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.4437,
+              "cold.p95": 7.1132,
+              "warm.p50": 0.5425,
+              "warm.p95": 0.6839
+            },
+            "ratios": {
+              "cold.p50": 0.8802,
+              "cold.p95": 0.8564,
+              "warm.p50": 1.8257,
+              "warm.p95": 2.1734
+            },
+            "worst_ratio": 2.1734,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "paired3-1,3,4x5": {
+        "directory": "/tmp/qwen-orig-rJ",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.5754,
+              "cold.p95": 7.8176,
+              "warm.p50": 0.2992,
+              "warm.p95": 0.3086
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.1889,
+              "cold.p95": 6.8913,
+              "warm.p50": 0.4352,
+              "warm.p95": 0.6548
+            },
+            "ratios": {
+              "cold.p50": 0.817,
+              "cold.p95": 0.8815,
+              "warm.p50": 1.4543,
+              "warm.p95": 2.1222
+            },
+            "worst_ratio": 2.1222,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0019,
+              "cold.p95": 5.2346,
+              "warm.p50": 0.4759,
+              "warm.p95": 0.5543
+            },
+            "ratios": {
+              "cold.p50": 0.6603,
+              "cold.p95": 0.6696,
+              "warm.p50": 1.5903,
+              "warm.p95": 1.7964
+            },
+            "worst_ratio": 1.7964,
+            "verdict": "pass"
+          }
+        }
+      },
+      "paired4-1,5,6x5": {
+        "directory": "/tmp/qwen-orig-rK",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.3829,
+              "cold.p95": 8.0579,
+              "warm.p50": 0.2747,
+              "warm.p95": 0.319
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "5": {
+            "repeats": 5,
+            "correct_items": 25,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.875,
+              "cold.p95": 8.6796,
+              "warm.p50": 0.5686,
+              "warm.p95": 0.7958
+            },
+            "ratios": {
+              "cold.p50": 0.9312,
+              "cold.p95": 1.0772,
+              "warm.p50": 2.0697,
+              "warm.p95": 2.495
+            },
+            "worst_ratio": 2.495,
+            "verdict": "timing_miss"
+          },
+          "6": {
+            "repeats": 5,
+            "correct_items": 30,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 8.0269,
+              "cold.p95": 8.7822,
+              "warm.p50": 0.6317,
+              "warm.p95": 0.8356
+            },
+            "ratios": {
+              "cold.p50": 1.0872,
+              "cold.p95": 1.0899,
+              "warm.p50": 2.2993,
+              "warm.p95": 2.6197
+            },
+            "worst_ratio": 2.6197,
+            "verdict": "timing_miss"
+          }
+        }
+      }
+    },
+    "candidate": {
+      "paired1-1,3,4x5": {
+        "directory": "/tmp/qwen-cand-rJ",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.2985,
+              "cold.p95": 7.8819,
+              "warm.p50": 0.2511,
+              "warm.p95": 0.2849
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.1675,
+              "cold.p95": 6.6947,
+              "warm.p50": 0.3563,
+              "warm.p95": 0.4841
+            },
+            "ratios": {
+              "cold.p50": 0.9792,
+              "cold.p95": 0.8494,
+              "warm.p50": 1.4191,
+              "warm.p95": 1.6989
+            },
+            "worst_ratio": 1.6989,
+            "verdict": "pass"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.5533,
+              "cold.p95": 4.7057,
+              "warm.p50": 0.4049,
+              "warm.p95": 0.4924
+            },
+            "ratios": {
+              "cold.p50": 0.7229,
+              "cold.p95": 0.597,
+              "warm.p50": 1.6128,
+              "warm.p95": 1.7281
+            },
+            "worst_ratio": 1.7281,
+            "verdict": "pass"
+          }
+        }
+      },
+      "paired2-1,3,4,5x5": {
+        "directory": "/tmp/qwen-cand-rK",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.6471,
+              "cold.p95": 6.7008,
+              "warm.p50": 0.2658,
+              "warm.p95": 0.272
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.0455,
+              "cold.p95": 6.5522,
+              "warm.p50": 0.4034,
+              "warm.p95": 0.5491
+            },
+            "ratios": {
+              "cold.p50": 0.9095,
+              "cold.p95": 0.9778,
+              "warm.p50": 1.5176,
+              "warm.p95": 2.0183
+            },
+            "worst_ratio": 2.0183,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.5503,
+              "cold.p95": 4.6926,
+              "warm.p50": 0.4138,
+              "warm.p95": 0.4859
+            },
+            "ratios": {
+              "cold.p50": 0.6846,
+              "cold.p95": 0.7003,
+              "warm.p50": 1.5567,
+              "warm.p95": 1.786
+            },
+            "worst_ratio": 1.786,
+            "verdict": "pass"
+          },
+          "5": {
+            "repeats": 5,
+            "correct_items": 25,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.0208,
+              "cold.p95": 6.6248,
+              "warm.p50": 0.4454,
+              "warm.p95": 0.5264
+            },
+            "ratios": {
+              "cold.p50": 0.9058,
+              "cold.p95": 0.9886,
+              "warm.p50": 1.6755,
+              "warm.p95": 1.9349
+            },
+            "worst_ratio": 1.9349,
+            "verdict": "pass"
+          }
+        }
+      },
+      "paired3-1,3,4x5": {
+        "directory": "/tmp/qwen-cand-rL",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.2801,
+              "cold.p95": 7.5463,
+              "warm.p50": 0.2658,
+              "warm.p95": 0.2765
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0921,
+              "cold.p95": 6.737,
+              "warm.p50": 0.3329,
+              "warm.p95": 0.4683
+            },
+            "ratios": {
+              "cold.p50": 0.6995,
+              "cold.p95": 0.8927,
+              "warm.p50": 1.2525,
+              "warm.p95": 1.6933
+            },
+            "worst_ratio": 1.6933,
+            "verdict": "pass"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.5083,
+              "cold.p95": 4.8968,
+              "warm.p50": 0.3732,
+              "warm.p95": 0.4977
+            },
+            "ratios": {
+              "cold.p50": 0.6193,
+              "cold.p95": 0.6489,
+              "warm.p50": 1.4043,
+              "warm.p95": 1.7996
+            },
+            "worst_ratio": 1.7996,
+            "verdict": "pass"
+          }
+        }
+      },
+      "paired4-1,5,6x5": {
+        "directory": "/tmp/qwen-cand-rM",
+        "requested_repeats": 5,
+        "paired": true,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.4348,
+              "cold.p95": 7.8411,
+              "warm.p50": 0.2673,
+              "warm.p95": 0.3179
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "5": {
+            "repeats": 5,
+            "correct_items": 25,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.4165,
+              "cold.p95": 8.677,
+              "warm.p50": 0.5185,
+              "warm.p95": 0.9046
+            },
+            "ratios": {
+              "cold.p50": 0.863,
+              "cold.p95": 1.1066,
+              "warm.p50": 1.9394,
+              "warm.p95": 2.8456
+            },
+            "worst_ratio": 2.8456,
+            "verdict": "timing_miss"
+          },
+          "6": {
+            "repeats": 5,
+            "correct_items": 30,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.1189,
+              "cold.p95": 8.0276,
+              "warm.p50": 0.5381,
+              "warm.p95": 0.6915
+            },
+            "ratios": {
+              "cold.p50": 0.9575,
+              "cold.p95": 1.0238,
+              "warm.p50": 2.0126,
+              "warm.p95": 2.1754
+            },
+            "worst_ratio": 2.1754,
+            "verdict": "timing_miss"
+          }
+        }
+      }
+    },
+    "candidate_before_the_format_version_stamp": {
+      "explore-1,2,3,4,5x3": {
+        "directory": "/tmp/qwen-cand1",
+        "requested_repeats": 3,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 3,
+            "correct_items": 3,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.5562,
+              "cold.p95": 7.8253,
+              "warm.p50": 0.2921,
+              "warm.p95": 0.2939
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 3,
+            "correct_items": 6,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.5254,
+              "cold.p95": 5.7007,
+              "warm.p50": 0.2689,
+              "warm.p95": 0.3253
+            },
+            "ratios": {
+              "cold.p50": 0.7312,
+              "cold.p95": 0.7285,
+              "warm.p50": 0.9206,
+              "warm.p95": 1.1069
+            },
+            "worst_ratio": 1.1069,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 3,
+            "correct_items": 9,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.091,
+              "cold.p95": 5.3117,
+              "warm.p50": 0.3502,
+              "warm.p95": 0.4056
+            },
+            "ratios": {
+              "cold.p50": 0.6738,
+              "cold.p95": 0.6788,
+              "warm.p50": 1.199,
+              "warm.p95": 1.3798
+            },
+            "worst_ratio": 1.3798,
+            "verdict": "pass"
+          },
+          "4": {
+            "repeats": 3,
+            "correct_items": 12,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.53,
+              "cold.p95": 4.8475,
+              "warm.p50": 0.442,
+              "warm.p95": 0.4938
+            },
+            "ratios": {
+              "cold.p50": 0.5995,
+              "cold.p95": 0.6195,
+              "warm.p50": 1.5134,
+              "warm.p95": 1.6799
+            },
+            "worst_ratio": 1.6799,
+            "verdict": "pass"
+          },
+          "5": {
+            "repeats": 3,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.8525,
+              "cold.p95": 6.8316,
+              "warm.p50": 0.4739,
+              "warm.p95": 0.5327
+            },
+            "ratios": {
+              "cold.p50": 0.7745,
+              "cold.p95": 0.873,
+              "warm.p50": 1.6224,
+              "warm.p95": 1.8125
+            },
+            "worst_ratio": 1.8125,
+            "verdict": "pass"
+          }
+        }
+      },
+      "A-1,3,4x5": {
+        "directory": "/tmp/qwen-conf2",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.4445,
+              "cold.p95": 6.684,
+              "warm.p50": 0.2094,
+              "warm.p95": 0.2136
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.1854,
+              "cold.p95": 5.3386,
+              "warm.p50": 0.3402,
+              "warm.p95": 0.4012
+            },
+            "ratios": {
+              "cold.p50": 0.8046,
+              "cold.p95": 0.7987,
+              "warm.p50": 1.6244,
+              "warm.p95": 1.8783
+            },
+            "worst_ratio": 1.8783,
+            "verdict": "pass"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.4315,
+              "cold.p95": 4.7155,
+              "warm.p50": 0.3878,
+              "warm.p95": 0.4777
+            },
+            "ratios": {
+              "cold.p50": 0.6876,
+              "cold.p95": 0.7055,
+              "warm.p50": 1.8517,
+              "warm.p95": 2.2364
+            },
+            "worst_ratio": 2.2364,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "B-1,3,4x5": {
+        "directory": "/tmp/qwen-cand-rB",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.6903,
+              "cold.p95": 8.733,
+              "warm.p50": 0.2754,
+              "warm.p95": 0.3168
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.2602,
+              "cold.p95": 6.9825,
+              "warm.p50": 0.3685,
+              "warm.p95": 0.552
+            },
+            "ratios": {
+              "cold.p50": 0.814,
+              "cold.p95": 0.7996,
+              "warm.p50": 1.3378,
+              "warm.p95": 1.7423
+            },
+            "worst_ratio": 1.7423,
+            "verdict": "pass"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.4977,
+              "cold.p95": 4.8177,
+              "warm.p50": 0.4291,
+              "warm.p95": 0.4571
+            },
+            "ratios": {
+              "cold.p50": 0.5849,
+              "cold.p95": 0.5517,
+              "warm.p50": 1.558,
+              "warm.p95": 1.4428
+            },
+            "worst_ratio": 1.558,
+            "verdict": "pass"
+          }
+        }
+      },
+      "C-1,3,4x5": {
+        "directory": "/tmp/qwen-cand-rC",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.7013,
+              "cold.p95": 9.0306,
+              "warm.p50": 0.2785,
+              "warm.p95": 0.2898
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.629,
+              "cold.p95": 6.8415,
+              "warm.p50": 0.3689,
+              "warm.p95": 0.6092
+            },
+            "ratios": {
+              "cold.p50": 0.7309,
+              "cold.p95": 0.7576,
+              "warm.p50": 1.3246,
+              "warm.p95": 2.1018
+            },
+            "worst_ratio": 2.1018,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.834,
+              "cold.p95": 5.3611,
+              "warm.p50": 0.4867,
+              "warm.p95": 0.6681
+            },
+            "ratios": {
+              "cold.p50": 0.6277,
+              "cold.p95": 0.5937,
+              "warm.p50": 1.7474,
+              "warm.p95": 2.3051
+            },
+            "worst_ratio": 2.3051,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "D-1,3,4x5": {
+        "directory": "/tmp/qwen-cand-rD",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.1563,
+              "cold.p95": 6.837,
+              "warm.p50": 0.214,
+              "warm.p95": 0.2352
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.1801,
+              "cold.p95": 5.8395,
+              "warm.p50": 0.3229,
+              "warm.p95": 0.5899
+            },
+            "ratios": {
+              "cold.p50": 0.8414,
+              "cold.p95": 0.8541,
+              "warm.p50": 1.5089,
+              "warm.p95": 2.508
+            },
+            "worst_ratio": 2.508,
+            "verdict": "timing_miss"
+          },
+          "4": {
+            "repeats": 5,
+            "correct_items": 20,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.8964,
+              "cold.p95": 5.3831,
+              "warm.p50": 0.4192,
+              "warm.p95": 0.6887
+            },
+            "ratios": {
+              "cold.p50": 0.7953,
+              "cold.p95": 0.7873,
+              "warm.p50": 1.9586,
+              "warm.p95": 2.9282
+            },
+            "worst_ratio": 2.9282,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "E-1,2,3x5": {
+        "directory": "/tmp/qwen-cand-rE",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.6411,
+              "cold.p95": 6.6571,
+              "warm.p50": 0.2073,
+              "warm.p95": 0.2289
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 5,
+            "correct_items": 10,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.5827,
+              "cold.p95": 4.8767,
+              "warm.p50": 0.237,
+              "warm.p95": 0.3539
+            },
+            "ratios": {
+              "cold.p50": 0.8124,
+              "cold.p95": 0.7326,
+              "warm.p50": 1.1432,
+              "warm.p95": 1.5464
+            },
+            "worst_ratio": 1.5464,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0783,
+              "cold.p95": 5.6607,
+              "warm.p50": 0.3676,
+              "warm.p95": 0.5407
+            },
+            "ratios": {
+              "cold.p50": 0.9002,
+              "cold.p95": 0.8503,
+              "warm.p50": 1.7732,
+              "warm.p95": 2.3626
+            },
+            "worst_ratio": 2.3626,
+            "verdict": "timing_miss"
+          }
+        }
+      },
+      "F-1,2,3x5": {
+        "directory": "/tmp/qwen-cand-rF",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.9182,
+              "cold.p95": 8.6631,
+              "warm.p50": 0.2662,
+              "warm.p95": 0.2869
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "2": {
+            "repeats": 5,
+            "correct_items": 10,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.5515,
+              "cold.p95": 4.662,
+              "warm.p50": 0.2476,
+              "warm.p95": 0.2823
+            },
+            "ratios": {
+              "cold.p50": 0.6579,
+              "cold.p95": 0.5381,
+              "warm.p50": 0.9303,
+              "warm.p95": 0.9841
+            },
+            "worst_ratio": 0.9841,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 4.896,
+              "cold.p95": 5.3025,
+              "warm.p50": 0.316,
+              "warm.p95": 0.4117
+            },
+            "ratios": {
+              "cold.p50": 0.7077,
+              "cold.p95": 0.6121,
+              "warm.p50": 1.1871,
+              "warm.p95": 1.4351
+            },
+            "worst_ratio": 1.4351,
+            "verdict": "pass"
+          }
+        }
+      },
+      "G-1,3x5": {
+        "directory": "/tmp/qwen-cand-rG",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.9236,
+              "cold.p95": 6.3093,
+              "warm.p50": 0.2139,
+              "warm.p95": 0.2175
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.2206,
+              "cold.p95": 5.3957,
+              "warm.p50": 0.3118,
+              "warm.p95": 0.4181
+            },
+            "ratios": {
+              "cold.p50": 0.8813,
+              "cold.p95": 0.8552,
+              "warm.p50": 1.4576,
+              "warm.p95": 1.9227
+            },
+            "worst_ratio": 1.9227,
+            "verdict": "pass"
+          }
+        }
+      },
+      "H-1,3x5": {
+        "directory": "/tmp/qwen-cand-rH",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.0029,
+              "cold.p95": 6.6016,
+              "warm.p50": 0.2209,
+              "warm.p95": 0.2258
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.1202,
+              "cold.p95": 5.4666,
+              "warm.p50": 0.3219,
+              "warm.p95": 0.408
+            },
+            "ratios": {
+              "cold.p50": 0.8529,
+              "cold.p95": 0.8281,
+              "warm.p50": 1.4574,
+              "warm.p95": 1.8065
+            },
+            "worst_ratio": 1.8065,
+            "verdict": "pass"
+          }
+        }
+      },
+      "I-1,3x5": {
+        "directory": "/tmp/qwen-cand-final",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.0408,
+              "cold.p95": 6.4271,
+              "warm.p50": 0.2112,
+              "warm.p95": 0.2284
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "3": {
+            "repeats": 5,
+            "correct_items": 15,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.0403,
+              "cold.p95": 5.3863,
+              "warm.p50": 0.337,
+              "warm.p95": 0.4178
+            },
+            "ratios": {
+              "cold.p50": 0.8344,
+              "cold.p95": 0.8381,
+              "warm.p50": 1.596,
+              "warm.p95": 1.8292
+            },
+            "worst_ratio": 1.8292,
+            "verdict": "pass"
+          }
+        }
+      },
+      "high-1,5,6,7x5": {
+        "directory": "/tmp/qwen-conf1",
+        "requested_repeats": 5,
+        "paired": false,
+        "rungs": {
+          "1": {
+            "repeats": 5,
+            "correct_items": 5,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 5.9099,
+              "cold.p95": 6.2425,
+              "warm.p50": 0.2074,
+              "warm.p95": 0.2136
+            },
+            "ratios": {
+              "cold.p50": 1.0,
+              "cold.p95": 1.0,
+              "warm.p50": 1.0,
+              "warm.p95": 1.0
+            },
+            "worst_ratio": 1.0,
+            "verdict": "pass"
+          },
+          "5": {
+            "repeats": 5,
+            "correct_items": 25,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 6.2219,
+              "cold.p95": 7.2051,
+              "warm.p50": 0.4808,
+              "warm.p95": 0.5891
+            },
+            "ratios": {
+              "cold.p50": 1.0528,
+              "cold.p95": 1.1542,
+              "warm.p50": 2.318,
+              "warm.p95": 2.7578
+            },
+            "worst_ratio": 2.7578,
+            "verdict": "timing_miss"
+          },
+          "6": {
+            "repeats": 5,
+            "correct_items": 30,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 7.1037,
+              "cold.p95": 8.0602,
+              "warm.p50": 0.5488,
+              "warm.p95": 0.694
+            },
+            "ratios": {
+              "cold.p50": 1.202,
+              "cold.p95": 1.2912,
+              "warm.p50": 2.6459,
+              "warm.p95": 3.2491
+            },
+            "worst_ratio": 3.2491,
+            "verdict": "timing_miss"
+          },
+          "7": {
+            "repeats": 5,
+            "correct_items": 35,
+            "failed_items": 0,
+            "cleanup_survivors": 0,
+            "complete_turn_seconds": {
+              "cold.p50": 8.715,
+              "cold.p95": 9.5686,
+              "warm.p50": 0.7054,
+              "warm.p95": 0.85
+            },
+            "ratios": {
+              "cold.p50": 1.4746,
+              "cold.p95": 1.5328,
+              "warm.p50": 3.4012,
+              "warm.p95": 3.9793
+            },
+            "worst_ratio": 3.9793,
+            "verdict": "timing_miss"
+          }
+        }
+      }
+    }
+  },
+  "all_trials": {
+    "original": {
+      "2": {
+        "trials": [
+          1.0714,
+          1.3362,
+          1.4366
+        ],
+        "passing_trials": 3,
+        "median_worst_ratio": 1.3362,
+        "verdict": "pass"
+      },
+      "3": {
+        "trials": [
+          1.7186,
+          1.7693,
+          1.7933,
+          1.9804,
+          2.096,
+          2.1222,
+          2.2957,
+          2.3483,
+          2.5478,
+          2.5819
+        ],
+        "passing_trials": 4,
+        "median_worst_ratio": 2.1091,
+        "verdict": "timing_miss"
+      },
+      "4": {
+        "trials": [
+          1.68,
+          1.7964,
+          1.8244,
+          2.235,
+          2.4171
+        ],
+        "passing_trials": 3,
+        "median_worst_ratio": 1.8244,
+        "verdict": "pass"
+      },
+      "5": {
+        "trials": [
+          2.1734,
+          2.495
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.3342,
+        "verdict": "timing_miss"
+      },
+      "6": {
+        "trials": [
+          2.6197
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.6197,
+        "verdict": "timing_miss"
+      }
+    },
+    "candidate": {
+      "3": {
+        "trials": [
+          1.6933,
+          1.6989,
+          2.0183
+        ],
+        "passing_trials": 2,
+        "median_worst_ratio": 1.6989,
+        "verdict": "pass"
+      },
+      "4": {
+        "trials": [
+          1.7281,
+          1.786,
+          1.7996
+        ],
+        "passing_trials": 3,
+        "median_worst_ratio": 1.786,
+        "verdict": "pass"
+      },
+      "5": {
+        "trials": [
+          1.9349,
+          2.8456
+        ],
+        "passing_trials": 1,
+        "median_worst_ratio": 2.3902,
+        "verdict": "timing_miss"
+      },
+      "6": {
+        "trials": [
+          2.1754
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.1754,
+        "verdict": "timing_miss"
+      }
+    },
+    "candidate_before_the_format_version_stamp": {
+      "2": {
+        "trials": [
+          0.9841,
+          1.5464
+        ],
+        "passing_trials": 2,
+        "median_worst_ratio": 1.2652,
+        "verdict": "pass"
+      },
+      "3": {
+        "trials": [
+          1.4351,
+          1.7423,
+          1.8065,
+          1.8292,
+          1.8783,
+          1.9227,
+          2.1018,
+          2.3626,
+          2.508
+        ],
+        "passing_trials": 6,
+        "median_worst_ratio": 1.8783,
+        "verdict": "pass"
+      },
+      "4": {
+        "trials": [
+          1.558,
+          2.2364,
+          2.3051,
+          2.9282
+        ],
+        "passing_trials": 1,
+        "median_worst_ratio": 2.2708,
+        "verdict": "timing_miss"
+      },
+      "5": {
+        "trials": [
+          2.7578
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.7578,
+        "verdict": "timing_miss"
+      },
+      "6": {
+        "trials": [
+          3.2491
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 3.2491,
+        "verdict": "timing_miss"
+      },
+      "7": {
+        "trials": [
+          3.9793
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 3.9793,
+        "verdict": "timing_miss"
+      }
+    }
+  },
+  "paired_trials": {
+    "original": {
+      "3": {
+        "trials": [
+          1.9804,
+          2.096,
+          2.1222
+        ],
+        "passing_trials": 1,
+        "median_worst_ratio": 2.096,
+        "verdict": "timing_miss"
+      },
+      "4": {
+        "trials": [
+          1.68,
+          1.7964,
+          1.8244
+        ],
+        "passing_trials": 3,
+        "median_worst_ratio": 1.7964,
+        "verdict": "pass"
+      },
+      "5": {
+        "trials": [
+          2.1734,
+          2.495
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.3342,
+        "verdict": "timing_miss"
+      },
+      "6": {
+        "trials": [
+          2.6197
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.6197,
+        "verdict": "timing_miss"
+      }
+    },
+    "candidate": {
+      "3": {
+        "trials": [
+          1.6933,
+          1.6989,
+          2.0183
+        ],
+        "passing_trials": 2,
+        "median_worst_ratio": 1.6989,
+        "verdict": "pass"
+      },
+      "4": {
+        "trials": [
+          1.7281,
+          1.786,
+          1.7996
+        ],
+        "passing_trials": 3,
+        "median_worst_ratio": 1.786,
+        "verdict": "pass"
+      },
+      "5": {
+        "trials": [
+          1.9349,
+          2.8456
+        ],
+        "passing_trials": 1,
+        "median_worst_ratio": 2.3902,
+        "verdict": "timing_miss"
+      },
+      "6": {
+        "trials": [
+          2.1754
+        ],
+        "passing_trials": 0,
+        "median_worst_ratio": 2.1754,
+        "verdict": "timing_miss"
+      }
+    }
+  },
+  "candidate_trials_pooled": {
+    "2": {
+      "trials": [
+        0.9841,
+        1.5464
+      ],
+      "passing_trials": 2,
+      "median_worst_ratio": 1.2652,
+      "verdict": "pass"
+    },
+    "3": {
+      "trials": [
+        1.4351,
+        1.6933,
+        1.6989,
+        1.7423,
+        1.8065,
+        1.8292,
+        1.8783,
+        1.9227,
+        2.0183,
+        2.1018,
+        2.3626,
+        2.508
+      ],
+      "passing_trials": 8,
+      "median_worst_ratio": 1.8538,
+      "verdict": "pass"
+    },
+    "4": {
+      "trials": [
+        1.558,
+        1.7281,
+        1.786,
+        1.7996,
+        2.2364,
+        2.3051,
+        2.9282
+      ],
+      "passing_trials": 4,
+      "median_worst_ratio": 1.7996,
+      "verdict": "pass"
+    },
+    "5": {
+      "trials": [
+        1.9349,
+        2.7578,
+        2.8456
+      ],
+      "passing_trials": 1,
+      "median_worst_ratio": 2.7578,
+      "verdict": "timing_miss"
+    },
+    "6": {
+      "trials": [
+        2.1754,
+        3.2491
+      ],
+      "passing_trials": 0,
+      "median_worst_ratio": 2.7123,
+      "verdict": "timing_miss"
+    },
+    "7": {
+      "trials": [
+        3.9793
+      ],
+      "passing_trials": 0,
+      "median_worst_ratio": 3.9793,
+      "verdict": "timing_miss"
+    }
+  }
+}

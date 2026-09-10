@@ -41,6 +41,8 @@ Exact ratios, original/candidate phase distributions, all repeat denominators an
 | grok / rejected optional native worker pool size 2 | 6×3 T |
 | mimo / rejected optional per workspace native database | 2×3 T |
 | opencode / optional per workspace native database | 4×3 T; 3×3 T; 2×5 P |
+| qwen / speed floor, `48d1559` unchanged | 2×5 P P P; 3×5 P P P P T T T T T T; 4×5 P P P T T; 5×5 T T; 6×5 T |
+| qwen / speed floor, headless defaults and compile cache | 2×5 P P; 3×5 P P P P P P P P T T T T; 4×5 P P P P T T T; 5×5 P T T; 6×5 T T; 7×5 T |
 
 The initial [twelve-backend protocol smokes](evidence-2026-09-10/smokes/index.json) and [optional OpenCode two-session exploration](evidence-2026-09-10/optional-opencode-db-n2/index.json) precede this matrix and are retained separately. No failed or interrupted sample was turned into a passing result.
 
@@ -79,3 +81,38 @@ The [CPU phase comparison](evidence-2026-09-10/diagnostics/cli-cpu-phases.json) 
 Lowering Grok's native worker count reduced threads but did not improve absolute task timing. MiMo's per-workspace database profile also missed the fixed-work gate. Both are retained as [rejected experiments](REJECTED.md), alongside OpenCode/MiMo server-reuse prototypes and the Cursor local persistence investigation. [MiMo's native phase diagnostic](evidence-2026-09-10/diagnostics/mimo-default-n2-native-phases.json) locates most of its two-session increase between tool requests; it does not establish SQLite contention as the cause. [Kimi's cleanup diagnostic](evidence-2026-09-10/diagnostics/kimi-notification-cleanup.json) isolates the adopted close-grace improvement.
 
 These results establish observed concurrency for this fixed workload and the installed versions. They do not prove that no future native-runtime or adapter optimization is possible. Official CLI binaries remain unchanged; unsupported protocol substitutions and changes that regressed measured startup were not adopted.
+
+## Qwen at the speed floor
+
+The requirement above is no longer startup ≤2× and fixed work ≤1.10×. It is a complete turn at no worse than 2× the serial control — half the speed of no concurrency at all — cold and warm, p50 and p95, with every correctness check kept. Read that way, **Qwen's six is not six**. Its denominator in the matrix above is commit `3e0e6ed`, which started a CLI per turn: that control answers a warm turn in 11.0 s, where today's `origin/main`, which holds the process open, answers one in 0.21 s. Against a fresh serial control of its own source, unchanged `origin/main` **confirms two**.
+
+The candidate writes Qwen's own lowest settings layer — the system defaults, beside the generated effort file, which a person's own settings still outrank — saying that a turn hmz drives defaults to `general.preventSystemSleep: false` and `general.enableAutoUpdate: false`, and it points Node's `NODE_COMPILE_CACHE` at `~/.cache/humanize/qwen-code` unless the environment names one. It **confirms four**. Every rung of both sources is fully correct: all items passing, fresh execution proofs, immutable fixture and checker, the turn-two conversation-only marker recalled, exactly one result, no cleanup survivors.
+
+| Sessions | Original: trials | Original: median worst × | Candidate: trials | Candidate: median worst × |
+| ---: | ---: | ---: | ---: | ---: |
+| 2 | 3/3 | 1.336 | 2/2 | 1.265 |
+| 3 | 4/10 | **2.109** | 8/12 | 1.854 |
+| 4 | 3/5 | 1.824 | 4/7 | 1.800 |
+| 5 | 0/2 | **2.334** | 1/3 | **2.758** |
+| 6 | 0/1 | **2.620** | 0/2 | **2.712** |
+| 7 | — | — | 0/1 | **3.979** |
+
+Each trial is five repetitions against the five fresh serial controls of the same run and the same source. One trial decides nothing here: the serial control's own warm p95 moves by about a third with load outside the cgroup, and the floor divides by it — so widths are read on the median of their trials, and every trial is retained. The original passes four and misses three; the candidate passes two, three and four alike, which is why four is the width published for it and two for the original. The candidate's column pools its trials from before and after the format-version stamp, which removed a file rewrite and can only have helped; the retained record separates them, and the last four of its trials are the committed source run back to back against the original in the same measurement group.
+
+That the original misses three and passes four is the estimator, not the CLI. Nearest-rank p95 of *k* observations is the ⌈0.95*k*⌉-th: a five-repeat serial control has *k*=5 and its p95 is its maximum; a three-session rung has *k*=15 and its p95 is *also* its maximum; four sessions has *k*=20 and excludes the maximum, five has *k*=25 and excludes one. Three sessions is the harshest rung on this ladder, and the ladder is not monotone. That asymmetry is retained here rather than corrected. In every individual miss the rung's p50 passes and its p95 is set by one repeat whose sessions all ran slow together — the signature of load outside the cgroup, on the measurement group's unallocated SMT siblings, rather than of anything the CLI did.
+
+| | Cold turn | Cold CPU | Warm turn | Warm CPU | Cores per warm turn |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| original `48d1559`, quiet host | 6.678 s | 9.306 | 0.241 s | 0.608 | 2.52 |
+| candidate, quiet host | 5.722 s | 8.185 | 0.210 s | 0.486 | 2.31 |
+| original `48d1559`, busy host | 7.111 s | 10.217 | 0.278 s | 0.667 | 2.40 |
+| candidate, busy host | 7.023 s | 10.098 | 0.270 s | 0.625 | 2.31 |
+| candidate, credential supervisor removed (diagnostic) | 2.025 s | 4.000 | 0.158 s | 0.415 | 2.63 |
+
+One session alone in the same four cores, eight cold/warm pairs, cgroup CPU seconds charged to each turn, taken as two back-to-back pairs an hour apart. The absolute saving is 14% of a cold turn's wall and 20% of a warm turn's CPU on a quiet host, and 1% and 6% of the same on a busy one — contention compresses the difference. The last column, which is the one the floor is about, reads 2.31 either way.
+
+**What caps Qwen is the fourth column against the third, not the first.** A warm turn spends about half a CPU-second in a fifth of a second of wall — 2.3 cores at once — so on four cores the arithmetic ceiling is 4/2.31 × 2 ≈ 3.5 sessions however fast the turn is made: a saving that shortens the turn shortens the serial control with it and divides out. Only the part that lowers cores per turn moves the width, which is why 20% off the CPU buys one session rather than four.
+
+The last row is a diagnostic and not a configuration anybody may use: it removes credential isolation and nothing else. It shows the supervisor is **51% of a cold turn's CPU** and 15% of a warm turn's — by far Qwen's largest single cost, and the reason its absolute times are what they are — but removing it *raises* cores per warm turn to 2.63, because ptrace stops serialize the tracee against its tracer. Faster stops would buy Qwen a great deal of wall time and almost no concurrency.
+
+Measured against the same warm CPU and not adopted: `--v8-pool-size=1` (0.520) and `=0` (0.742), `UV_THREADPOOL_SIZE=1` (0.560), `--max-semi-space-size=64` (0.521), `--max-old-space-size=512` (0.524), `tools.shell.enableInteractiveShell: false` (0.515), and a wider headless block turning off `privacy.usageStatisticsEnabled` and the `ui.*` defaults (0.552) — against 0.512 for the settings change alone at the time each was taken. Exact per-round ratios, distributions, denominators and conditions are in [the retained record](evidence-2026-09-10/qwen-speed-floor-summary.json). With this change, `uv run pytest` passed 2,244 tests with 77 skips and 41 warnings, and `uv run pre-commit run --all-files` passed.
