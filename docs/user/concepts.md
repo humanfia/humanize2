@@ -81,8 +81,13 @@ directory the flow runs in. So one agent can work in several places at once — 
 worktree, their turns going together. See
 [Agents](/reference/agents#the-directory-a-session-works-in).
 
+A session can also be **branched**, `session.fork()`: a second conversation carrying this one's
+history and going its own way from there, made of the CLI's own fork. That is how a flow tries
+two ways out of an expensive conversation without paying for it twice. See
+[Branching a conversation](/weaver/branching).
+
 Every session the backend opened is written down under an id, which is how its transcript is
-found again later.
+found again later — a forked one under an id of its own, beside the one it was cut from.
 
 ## Turn
 

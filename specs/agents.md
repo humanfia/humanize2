@@ -250,6 +250,11 @@ class AgentBase(ABC):
 - A backend made from something other than a config MUST say how one of it is made rather than
   answer `clone` differently: the person at the prompt is made from nothing at all, and `clone`
   MUST be one thing wherever it is called.
+- What a session does MUST NOT be called this. An agent is structure, so cloning one copies
+  the structure and none of the history: the clone has held no conversation. A session is
+  history, so branching one copies the history and none of the structure. Two things, so two
+  words: `SessionBase.fork`, which is also what every CLI that has the operation calls it.
+  Each MUST say, where it is written, that it is not the other.
 - `reconfigure` MUST replace what every turn from then on runs at, and MUST leave the turn
   under way as it started: a model does not think harder halfway through an answer. It is the
   one thing that changes a frozen config, and it is for the one case that config was frozen
@@ -344,6 +349,17 @@ class SessionBase(ABC):
         """
         raise NotImplementedError
 
+    @property
+    def forks(self) -> bool:
+        """Whether this backend can carry this conversation into a second one."""
+
+    def fork(self) -> SessionBase:
+        """A second conversation carrying this one's history, and its own from there on.
+
+        Returns:
+            The new session, unopened with the backend until its first turn.
+        """
+
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
         """Runs the session under a goal the agent keeps itself going toward.
 
@@ -414,6 +430,39 @@ class SessionBase(ABC):
   there, or one outside that workspace, MUST be refused before the turn rather than left to a
   backend that cannot start in it.
 - MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
+- `fork` MUST answer with a second conversation carrying this one's history: what the child
+  knows MUST be what this session knew at the moment it was made, and what either of them is
+  told afterwards MUST be its own. It MUST be made of the backend's own fork -- `claude
+  --fork-session`, codex's `thread/fork`, `opencode run --fork`, `kimi fork`, ACP's
+  `session/fork` -- and MUST NOT be a transcript replayed into a session opened from nothing:
+  a conversation re-read is turns paid for twice, and what it re-reads is not what was there.
+- It MUST raise `NotImplementedError` on a backend with no fork of its own, the way `pursue`
+  refuses one with no goal feature, and MUST NOT hand back a second handle on the one
+  conversation instead -- two flows each continuing what they take to be their own is a run
+  nothing downstream could explain. `forks` MUST say beforehand which backends can, so that a
+  flow may ask rather than catch, and MUST be read off `hmz.backends`: the one place a fact
+  about a CLI is written down is the one place this is said.
+- It MUST raise `RuntimeError` while no turn has landed here. A session that has got nowhere
+  has no history to carry, and is one to open rather than one to fork.
+- The fork MAY be the child's first turn rather than a call of its own, since most of these
+  CLIs have no prompt-free fork. Where it is, the boundary MUST still be where `fork` was
+  called: a child whose parent has been given a turn since MUST be refused rather than cut
+  from where those turns left it. A branch from somewhere nobody chose that reads as the
+  branch that was asked for is the failure this exists to prevent.
+- A child whose first turn comes back naming the conversation it was cut from MUST raise
+  rather than take that id. A CLI that took the fork flag and did not fork is the one way this
+  fails with nothing looking wrong, and a session that adopted it would be the second handle
+  the whole of this refuses to hand out.
+- The child MUST be a conversation of its own in every way a run counts one: its own id, its
+  own meter, its own place in its agent's `opened`, its own line in the run's record. Nothing
+  spent on the one it came from MUST count twice. What this conversation is running by MUST
+  come across rather than what its agent was set up with -- the effort it has got to, the
+  skills it is carrying now, the callbacks it is offering -- since that is what the child is a
+  continuation of.
+- It MUST be unopened with the backend until its first turn: a fork nobody uses MUST cost
+  nothing at all.
+- The run MUST be told which conversation a child was cut from, where it is told the child was
+  opened: the backend's own log says only that a session began knowing things.
 - A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
   that a flow catches turns rather than transports. What it says MUST include why: a
   `CalledProcessError` says only `returned non-zero exit status 1` and keeps the reason in a

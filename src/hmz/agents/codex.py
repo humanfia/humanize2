@@ -1091,16 +1091,20 @@ class CodexSession(SessionBase):
             self._agent.config.permission, self._agent.config.service_tier
         )
         if (thread := self._id) is None:
-            return str(
-                server.call(
-                    "thread/start",
-                    {
-                        "cwd": self._workspace(),
-                        "model": self._agent.config.model,
-                        **rung,
-                    },
-                )["thread"]["id"]
-            )
+            started = {
+                "cwd": self._workspace(),
+                "model": self._agent.config.model,
+                **rung,
+            }
+            if self._forked_from is not None:
+                # Forked rather than started: the server loads that thread and answers with
+                # a thread of its own holding what it had got to, which is this session.
+                return str(
+                    server.call(
+                        "thread/fork", {"threadId": self._forked_from, **started}
+                    )["thread"]["id"]
+                )
+            return str(server.call("thread/start", started)["thread"]["id"])
         # Said again on the way back in: a thread picked up is picked up under the settings it
         # was left with, and this session's rung is what its agent is configured for now.
         server.call("thread/resume", {"threadId": thread, **rung})

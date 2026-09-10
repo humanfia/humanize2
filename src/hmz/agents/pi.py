@@ -143,6 +143,12 @@ class PiSession(StreamSessionBase):
             "--session-id",
             pinned,
         ]
+        if self._id is None and self._forked_from is not None:
+            # `--fork` opens this session on top of the one it names, so the turns of that
+            # conversation are here and what follows them is not written into it. Whichever
+            # id pi ends up calling this -- the one asked for above, or one of its own -- it
+            # says so in the `session` event, and that is the one this session takes.
+            argv += ["--fork", self._forked_from]
         if self._agent.config.permission == "read-only":
             # Not a mode it is put in but tools it is not given: an agent without the three
             # that change anything is one that can only look, which is the rung asked for.

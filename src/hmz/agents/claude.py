@@ -224,6 +224,27 @@ class ClaudeCodeSession(StreamSessionBase):
         """What Claude called this session, which it says on the first line it writes."""
         return self._id or self._named
 
+    def _holding(self) -> list[str]:
+        """Which conversation this process is to be holding: this one, or a fork of another.
+
+        Three ways in, and the flag says which. A session with an id resumes it. A fork has
+        no id of its own yet and the id of the one it was cut from: `--fork-session` is
+        `--resume` told to mint a new id rather than reuse the one it was handed, so Claude
+        loads the parent's turns and calls what follows a session of its own -- which it says
+        on the first line it writes, and which this session then takes for good. Anything
+        else is a conversation that does not exist yet, and is named up front.
+
+        Returns:
+          The flags, to go on the command line as they are.
+        """
+        if self._id is not None:
+            return ["--resume", self._id]
+        if self._forked_from is not None:
+            return ["--resume", self._forked_from, "--fork-session"]
+        # A fresh id per attempt: an opening turn that failed may still have left Claude
+        # holding the id it was given, and retrying under that one would collide forever.
+        return ["--session-id", str(uuid.uuid4())]
+
     def _command(self) -> list[str]:
         """Builds the ``claude --print`` that reads turns from stdin and says events on stdout.
 
@@ -231,9 +252,6 @@ class ClaudeCodeSession(StreamSessionBase):
         an anchored session needs: its process ends with each turn, so the next one has a
         conversation to rejoin. An unanchored session opens once and stays open.
         """
-        # A fresh id per attempt: an opening turn that failed may still have left Claude holding
-        # the id it was given, and retrying under that one would collide forever.
-        pinned = self._id or str(uuid.uuid4())
         argv = [
             "claude",
             "--print",
@@ -242,8 +260,7 @@ class ClaudeCodeSession(StreamSessionBase):
             "--output-format",
             "stream-json",
             "--verbose",
-            "--resume" if self._id else "--session-id",
-            pinned,
+            *self._holding(),
             "--permission-mode",
             _PERMITTED[self._agent.config.permission],
             *(

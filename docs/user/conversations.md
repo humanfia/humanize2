@@ -83,6 +83,19 @@ A session costs nothing until a turn lands in one. See [Worktrees](/weaver/workt
 several-directories case, and [Concepts › Session](/user/concepts#session) for why this is the
 single most important choice a flow makes.
 
+A conversation that has got somewhere can also be **branched**, which is one more of these:
+
+```python
+careful, quick = session.fork(), session.fork()   # both know what session knows
+```
+
+Each child is a conversation of its own — its own id, its own spending, its own line in the
+[trace](/user/tracing) saying which conversation it was forked from — and it starts out knowing
+everything the one it came from knew. So an hour of reading a codebase is paid for once and
+tried two ways. The CLI's own fork does the carrying, so a backend that has not got one refuses
+rather than quietly handing back the same conversation twice; `session.forks` says which before
+you ask. See [Branching a conversation](/weaver/branching).
+
 ## Two things this is not
 
 **Not the person.** A flow that talks to you talks to you here, so the conversation with [the
