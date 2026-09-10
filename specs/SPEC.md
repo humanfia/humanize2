@@ -158,6 +158,10 @@ load.
 - A model id MUST NOT be written down here, nor anywhere else in this package. What a CLI
   runs is not a fact that keeps: it ships models without asking anybody, and which of them an
   account may name is that account's. `models.py` is what asks.
+- What a CLI can be told and what it cannot MUST be written down here rather than on the class
+  that drives it -- whether it can be told its agents may not search the web, whether it can
+  carry a conversation it is holding into a second one -- so that whatever refuses a flow the
+  thing a backend has not got refuses it out of the one place that says what that backend is.
 - The efforts MUST be written down, being that backend's own vocabulary rather than a
   catalogue of things that come and go. A rung the backend takes without documenting MUST be
   written down as one, since no listing of the backend's own will ever name it.
@@ -473,6 +477,10 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   turns ran as and what the backend called it. The backend's own log says only the last of
   those: two agents at one configuration are one agent to anything reading the logs alone,
   and two accounts of one CLI are one account.
+- A session forked from another MUST be written down as one, naming the conversation it was
+  cut from. The backend's own log shows only a session that began knowing things, so nothing
+  but the run can say where it knew them from -- and two branches of one conversation that
+  nothing recorded as branches are a run that reads as two agents who happened to agree.
 - A session MUST also be given a name of its own, which MUST hold the agent, the CLI, the
   account and the backend's id, and MUST be one directory name. An id alone says nothing
   about whose session it was, and a directory of forty of them is one nobody can read.

@@ -212,6 +212,7 @@ def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
         "builder-claude@local-the-session",
         one.at,
         str(tmp_path / "flow"),
+        "",  # forked from nothing, which is what a session nobody branched is
     )
     assert one.name == called("builder", "claude", "", "the-session")
 

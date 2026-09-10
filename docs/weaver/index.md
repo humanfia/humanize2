@@ -37,6 +37,7 @@ Taken in order, each a whole flow written from scratch.
 | [Hooks](/weaver/hooks) | Python callables hung on the moments of a turn |
 | [Callbacks as tools](/weaver/tools) | Functions of the flow's own, put in front of the agent |
 | [The person as an agent](/weaver/human-agent) | You, driven by a flow like any other agent |
+| [Branching a conversation](/weaver/branching) | Two ways out of one conversation, paid for once |
 | [Worktrees](/weaver/worktrees) | One agent working in several directories at once |
 
 ## Checking and publishing

@@ -487,6 +487,42 @@ than interleaving two.
 Discarding a session is how a flow forgets. They are held weakly by the agent, so a Ralph loop
 running for days does not grow one by a session a turn.
 
+### A conversation that goes two ways
+
+`fork` branches it — a second conversation carrying this one's history, its own from there on:
+
+```python
+session("read src/ and tell me what this service does")
+
+careful, quick = session.fork(), session.fork()   # both know what that turn found out
+```
+
+The CLI's own fork does the carrying, so nothing is replayed and the hour of reading is paid for
+once. The child is a conversation in every way a run counts one: its own `id`, its own
+`spent()`, its own place in `agent.opened`, its own line in the run's record — and the run
+records which conversation it was forked from, since the backend's log says only that a session
+opened already knowing things. It is unopened until its first turn, which is the turn that
+forks, so a fork nobody uses costs nothing.
+
+Which is also why the child has to be used before the parent is given another turn: the branch
+point is where `fork()` was called, and a child driven after the parent has moved on raises
+rather than branching from somewhere nobody chose. Fork again for the newer boundary.
+
+What the conversation is running by comes across — the effort it has got to, the skills it is
+carrying now, the callbacks it is offering — because that is what the child continues. What the
+*agent* was set up with was never the session's.
+
+```python
+session.forks           # whether this backend has a fork of its own
+agent.new().fork()      # RuntimeError: nothing has landed, so there is nothing to carry
+```
+
+On a backend with no fork, `fork` raises `NotImplementedError` rather than answering with a
+second handle on the one conversation. Not to be confused with
+[`agent.clone`](#an-agent-that-is-not-quite-the-one-you-were-handed), which is the other half
+and deliberately not the same word: an agent is structure, so its clone knows nothing; a session
+is history, so its fork knows everything. See [Branching a conversation](/weaver/branching).
+
 ## The directory a session works in
 
 A session is opened *at* a directory, and every turn of it runs there:
@@ -1236,6 +1272,7 @@ command-per-turn backend it ends the turn under way rather than only preventing 
 | Driven through | its command line, held open for ordinary turns | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, held open for ordinary turns | its command line, one run per turn | its app server |
 | [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
 | [`pursue`](#goals) | no | yes | yes | no | yes | no | yes | no | no | no | yes |
+| [`session.fork`](#a-conversation-that-goes-two-ways) | no | `--fork-session` | `thread/fork` | no | no | `--fork-session` | `kimi fork` | `--fork` | `--fork-session` | `run --fork` | no |
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
 | [`SubagentStart`/`SubagentStop`](#not-every-backend-runs-every-moment) | no | yes | yes | yes | no | no | no | no | no | no | no |
 | [Callbacks as tools](#callbacks-of-the-flow-s-own) | no | `--mcp-config` | `-c mcp_servers…` | no | no | no | no | no | no | no | no |
@@ -1592,10 +1629,12 @@ class SessionBase:
     cwd: str                # where this conversation works, as the machine it lands on names it
 
     shapes: ClassVar[bool]  # whether the backend can be held to a schema
+    forks: bool             # whether the backend can fork this conversation into a second
 
     def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
     def stream(prompt: str, *, schema: type[BaseModel] | None = None) -> Iterator[Event]
     def pursue(objective: str, *, suppress: bool = False) -> str
+    def fork() -> SessionBase    # a second conversation carrying this one's history
 
     async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
     async def apursue(objective: str, *, suppress: bool = False) -> str

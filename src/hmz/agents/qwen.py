@@ -339,8 +339,13 @@ class QwenCodeSession(StreamSessionBase):
             # holds the last message to rather than asking the model to keep to.
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]
         # The first turn opens the conversation and every later one resumes it by the id that
-        # first turn reported.
-        argv += ["--resume", self._id] if self._id is not None else []
+        # first turn reported. A fork's first turn resumes the one it was cut from instead,
+        # with `--fork-session` -- which is what makes Qwen carry those turns into a session
+        # of its own rather than go on writing into the one they are in.
+        if self._id is not None:
+            argv += ["--resume", self._id]
+        elif self._forked_from is not None:
+            argv += ["--resume", self._forked_from, "--fork-session"]
         return argv, prompt
 
     def _environment(self) -> dict[str, str]:

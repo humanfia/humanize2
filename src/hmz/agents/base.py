@@ -53,8 +53,8 @@ class Journal(Protocol):
     :class:`hmz.epic.Epic` is what answers to it.
     """
 
-    def opened(self, agent: AgentBase, session: str) -> None:
-        """Writes down a session one of the agents has just opened."""
+    def opened(self, agent: AgentBase, session: str, parent: str = "") -> None:
+        """Writes down a session one of the agents has just opened, and what it came from."""
         ...
 
 
@@ -435,7 +435,8 @@ class SessionBase(ABC):
 
     The first turn opens the backend session; every later one resumes it, so the agent
     still has the earlier turns in context. Discarding the session is how a flow forgets:
-    a new instance starts from nothing.
+    a new instance starts from nothing. :meth:`fork` is how it branches instead -- a
+    second conversation carrying this one's history and going its own way from there.
     """
 
     #: Whether this backend can be held to a shape, rather than asked to keep to one. A
@@ -489,6 +490,19 @@ class SessionBase(ABC):
         #: Where this conversation works, as it was given, or None for wherever the flow is.
         self._cwd = os.fspath(cwd) if cwd is not None else None
         self._id: str | None = None
+        #: The backend's id for the conversation this one was forked from, or None for one
+        #: that started from nothing -- which is every session but a fork. Read by the
+        #: driver as its first turn opens: that turn is the one that says fork this rather
+        #: than start one, and from the moment it lands this session has an id of its own and
+        #: this is only where it came from.
+        self._forked_from: str | None = None
+        #: That conversation itself, weakly, and how many turns it had taken when the fork
+        #: was asked for -- which is the boundary the child is to be cut at, and is checked
+        #: as the child opens. None for a session nobody forked.
+        self._forked_at: tuple[weakref.ref[SessionBase], int] | None = None
+        #: How many turns have been sent to this conversation. Only a fork reads it, and only
+        #: to know whether the conversation has moved since it was asked for.
+        self._turns = 0
         #: What this conversation is to think at from its next turn on, where it has been
         #: told something other than what its agent runs at, and None where it has not.
         self._effort: str | None = None
@@ -1163,6 +1177,12 @@ class SessionBase(ABC):
         """
         if self._agent._stopped:
             raise Stopped(f"{self._agent.id} was stopped")
+        # Before anything else, for a session that is a fork and has not opened yet: this
+        # turn is the fork, and where it cuts is settled by where the conversation it came
+        # from is now rather than by where it was.
+        if self._id is None:
+            self._at_the_boundary()
+        self._turns += 1  # what a fork of this conversation checks it against
         # Anything said while nobody was working goes into this turn. A flow's own prompt is
         # the only way into a turn that has not started, so it is asked for here rather than
         # written to the session: a session between turns would answer it on its own.
@@ -2070,14 +2090,139 @@ class SessionBase(ABC):
 
         Args:
           session_id: The backend's id for this session.
+
+        Raises:
+          RuntimeError: If a fork's first turn came back naming the conversation it was cut
+            from. That is a CLI that took the fork flag and did not fork, and taking the id
+            would make this session a second handle on the one conversation -- which is the
+            failure `fork` exists to refuse, arriving where nothing downstream could explain
+            it. Loud here rather than silent for the rest of the run.
         """
         if self._id is None:  # an id is fixed for the life of the session it names
+            if session_id and session_id == self._forked_from:
+                raise RuntimeError(
+                    f"{self._agent.backend}: the fork landed back in {session_id}, "
+                    "which is the conversation this one was cut from"
+                )
             self._id = session_id
             self._agent._opens(session_id)
             if self._agent.epic is not None:
                 # The run is the only thing that knows this session was one of its own: the
-                # backend logs it under this id and never says whose it was.
-                self._agent.epic.opened(self._agent, session_id)
+                # backend logs it under this id and never says whose it was. Nor which
+                # conversation it was cut from, for one that was cut from another: a fork
+                # reads as a session that began knowing things, and where it got them is a
+                # fact about the run rather than one the backend keeps.
+                self._agent.epic.opened(
+                    self._agent, session_id, self._forked_from or ""
+                )
+
+    @property
+    def forks(self) -> bool:
+        """Whether this backend can carry this conversation into a second one.
+
+        Read off the backend rather than written down on the class, so that the one place
+        that says what a CLI is is the one place this is said too. A flow that means to try
+        two continuations of one conversation asks this where it is choosing its agents,
+        rather than finding out from a session that refused hours in.
+
+        Returns:
+          True where the CLI has a fork of its own, and False for one that can only resume
+          the id it minted, and for a name no backend answers to at all. A CLI somebody added
+          answers True on the strength of the protocol having the call, which is the most that
+          can be known about a backend described only by the protocol it speaks: one that has
+          not implemented it refuses where the fork is asked for, which is still a refusal.
+        """
+        from hmz.backends import named
+
+        profile = named(self._agent.backend)
+        return profile is not None and profile.forks
+
+    def fork(self) -> SessionBase:
+        """A second conversation carrying this one's history, and its own from here on.
+
+        Which is what a conversation that has got somewhere is worth: a flow that has spent
+        an hour reading a codebase can try two ways out of that hour without paying for the
+        reading twice::
+
+            careful, quick = session.fork(), session.fork()
+
+        The backend's own fork does the carrying -- there is no replaying of turns here, and
+        no transcript passed between two CLIs -- so what the child knows is exactly what this
+        session knew at the moment it was made, and what either of them is told afterwards is
+        its own. Two conversations from that moment, which is the whole of the point.
+
+        Not :meth:`AgentBase.clone`, which is the other half of the same idea and is
+        deliberately not called this: an agent is structure, so cloning one copies the
+        structure and none of the history; a session is history, so forking one copies the
+        history and none of the structure. Two words for two things.
+
+        Everything a run puts on a conversation rather than carries into it is the child's
+        own: its own id, its own meter, its own place in what the agent has opened, its own
+        line in the run's record. Nothing spent here is spent there.
+
+        The fork itself is the child's first turn -- there is no prompt-free fork on most of
+        these CLIs -- so the child must be used before this conversation moves on. One taken
+        after another turn has been sent here would branch from somewhere else, which is not
+        what was asked for, and is refused rather than done quietly.
+
+        Returns:
+          The new session, unopened with the backend: it is the fork, and the fork happens
+          where its first turn does. Which is what makes two forks of one conversation cost
+          nothing until they are used.
+
+        Raises:
+          NotImplementedError: If this backend has no fork to reach for. A flow handed back a
+            second handle on the one conversation would be two loops writing into one, so it
+            is refused where it is asked -- and :attr:`forks` is how a flow asks first.
+          RuntimeError: If no turn has landed here yet, so there is no conversation to carry:
+            a session that has got nowhere is one to open rather than one to fork.
+        """
+        if not self.forks:
+            raise NotImplementedError(
+                f"{self._agent.backend} has no way of carrying a conversation "
+                "into a second one"
+            )
+        seed = self.id  # raises while nothing has landed, which is nothing to carry
+        made = self._agent._opens_at(self._cwd)
+        made._forked_from = seed
+        # Where this conversation had got to when the fork was asked for, and a weak hold on
+        # the conversation itself: the child checks both as it opens, so that a fork taken
+        # here and used after two more turns is refused rather than cut from where those
+        # turns left it. Weak, because a child is not a reason for its parent to stay alive.
+        made._forked_at = (weakref.ref(self), self._turns)
+        # What this conversation is running by goes with it, since that is what the child is
+        # a continuation of: the effort it has got to, and the skills it is carrying now
+        # rather than the ones the flow started it on. The callbacks too, offered again on
+        # the new session so that the toolbox holds an entry for each of the two.
+        made._skills = self._skills
+        made._effort = self._effort
+        if self._tools:
+            made.offers(self._tools)
+        return made
+
+    def _at_the_boundary(self) -> None:
+        """Refuses a fork whose conversation has moved on since it was asked for.
+
+        The fork is the child's first turn, so between the two this conversation may have
+        been given turns the fork was never meant to carry. A child cut from those is a
+        branch from somewhere nobody chose -- and it would read as the branch that was asked
+        for, which is the one failure worth stopping the run over.
+
+        Raises:
+          RuntimeError: If a turn has been sent to the conversation this one was forked from
+            since the fork was asked for.
+        """
+        if self._forked_at is None:
+            return
+        whence, at = self._forked_at
+        parent = whence()
+        # A conversation nobody holds any more is one nothing here can drive on, so there is
+        # nothing left for the fork to be cut from but where the backend has it.
+        if parent is not None and parent._turns != at:
+            raise RuntimeError(
+                f"{self._agent.backend}: the conversation this one was forked from has "
+                "taken a turn since; fork it again to branch from where it is now"
+            )
 
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
         """Runs the session under a goal, which the agent then keeps itself going toward.
@@ -2105,6 +2250,11 @@ class SessionBase(ABC):
         """
         if not self._agent.goals_enabled:
             raise RuntimeError(f"{self._agent.id}: goals are disabled")
+        # A goal is turns of this conversation like any other, however many of them the
+        # backend takes: it opens a session that has none and moves one that has.
+        if self._id is None:
+            self._at_the_boundary()
+        self._turns += 1
         try:
             return self._pursue(objective)
         except Unrecoverable:
@@ -3069,6 +3219,12 @@ class AgentBase(ABC):
 
         And nothing about it can be said afterwards. That is the whole of the point: what an
         agent is, is settled where it is made, and this is where a second one is made.
+
+        Not :meth:`SessionBase.fork`, which is the opposite half of it and is deliberately
+        not called this. An agent is structure, so cloning one copies the structure and none
+        of the history: the clone has held no conversation. A session is history, so forking
+        one copies the history and none of the structure: the child is another conversation
+        of this same agent, which knows everything the first one knows.
 
         Args:
           config: What every session of it runs at, or None for this agent's own.

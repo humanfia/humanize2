@@ -339,6 +339,7 @@ export default defineConfig({
             { text: 'Hooks', link: '/weaver/hooks' },
             { text: 'Callbacks as tools', link: '/weaver/tools' },
             { text: 'The person as an agent', link: '/weaver/human-agent' },
+            { text: 'Branching a conversation', link: '/weaver/branching' },
             { text: 'Worktrees', link: '/weaver/worktrees' },
           ],
         },
