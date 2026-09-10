@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from ._inputs import snapshot
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
-from .event import Event, Failed, Usage
+from .event import Event, Failed, Saying, Usage
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -141,6 +141,10 @@ class AntigravityCLISession(StreamSessionBase):
         #: What the agent answered with, and what went wrong with it if anything did.
         self._said = ""
         self._failed: str | None = None
+        #: The deltas it answers in, gathered into the answers they are pieces of: a step
+        #: says its words a token at a time, and a paragraph is worth one row rather than
+        #: one row a word.
+        self._saying = Saying()
         #: What the turn now running has cost, which it reports once, at the end.
         self._costing = Usage()
         self._previous = Usage()
@@ -235,7 +239,7 @@ class AntigravityCLISession(StreamSessionBase):
           prompt off stdin.
         """
         self._said, self._failed = "", None
-        self._costing = Usage()
+        self._costing, self._saying = Usage(), Saying()
         self._announced = None
         argv = [
             _COMMAND,
@@ -291,6 +295,9 @@ class AntigravityCLISession(StreamSessionBase):
         if kind == "step_update":
             yield from self._step(told)
         elif kind == "result":
+            # The turn is over, so the last step's words are whole: nothing follows them to
+            # close them, and words held back for a boundary that never came are words lost.
+            yield from self._saying.rest()
             self._said = str(told.get("response") or "")
             if self._shaping is not None and "structured_output" in told:
                 # Display text includes rejected finish calls and native tool metadata.
@@ -327,11 +334,13 @@ class AntigravityCLISession(StreamSessionBase):
             kind = (
                 "reasoning" if str(told.get("step_type") or "") == _THINKING else "text"
             )
-            yield Event(kind=kind, text=words)
+            self._saying.delta(kind, words)
             return
         # A tool is shown as it starts rather than once per state it passes through.
         named = str(told.get("tool_name") or "")
         if named and str(told.get("state") or "") != "DONE":
+            # What it said before reaching for something is what says why it reached.
+            yield from self._saying.upto()
             about: dict[str, Any] = told.get("tool_info") or {}
             first = next(
                 (

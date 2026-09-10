@@ -427,6 +427,12 @@ class _AppServer:
                         item = message["params"]["item"]
                         if item.get("type") == "agentMessage":
                             said = item["text"]
+                            if not self._watched():
+                                # A goal runs for as long as it takes to be met, and nothing
+                                # above this yields while it does. So its own words are the
+                                # only sign it is running -- said whole, as each message of
+                                # it lands, which is how a turn is watched here too.
+                                say(said, sys.stderr)
                     case "thread/goal/updated":
                         pursuing = message["params"]["goal"]["status"] == "active"
                     case "thread/goal/cleared":
@@ -715,7 +721,15 @@ class _AppServer:
             raise Failed(1, self._argv, "", str(gone)) from gone
 
     def _pump(self) -> None:
-        """Reads the server's whole stream, teeing the agent's words to ours as they arrive."""
+        """Reads the server's whole stream, handing each message to whoever is waiting.
+
+        The pieces of a message are not teed on the way past. The server sends each of them
+        twice over -- once as an `item/agentMessage/delta` while it writes, and once as the
+        `item/completed` the message is read from -- and a stream that put both on stderr put
+        the same paragraph there twice, the second run-on from the first for want of a
+        newline. What is watched is the message, said whole where every other backend says
+        one.
+        """
         assert self._proc.stdout is not None  # noqa: S101
         for line in self._proc.stdout:
             message: dict[str, Any] = json.loads(line)
@@ -746,12 +760,6 @@ class _AppServer:
                     }
                 )
                 continue
-            if (
-                message.get("method") == "item/agentMessage/delta"
-                and not self._watched()
-            ):
-                # So that a goal running for an hour stays as watchable as a turn that prints.
-                say(message["params"]["delta"], sys.stderr, end="")
             self._messages.put(message)
         self._messages.put(None)  # it has stopped, and nothing more is coming
 
@@ -841,8 +849,8 @@ class _AppServer:
     def _watched(self) -> bool:
         """Whether something is watching the agents this server runs turns for.
 
-        A watcher is given each message whole as the turn says it, so teeing the pieces as
-        well would show every message twice.
+        Whatever is watching owns the screen, so a line of this driver's own goes on the
+        terminal only when nothing is.
 
         Returns:
           Whether anything is watching.

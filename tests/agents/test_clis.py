@@ -263,7 +263,9 @@ out({"type": "tool_call", "toolCallId": "call_1", "toolName": "run_terminal_cmd"
      "kind": "execute", "status": "in_progress", "title": "echo " + said,
      "rawInput": {"command": "echo " + said}})
 out({"type": "tool_call_update", "toolCallId": "call_1", "status": "completed"})
-out({"type": "text", "data": said})
+# A letter a line, as the real one streams: what comes back must be the word.
+for letter in said:
+    out({"type": "text", "data": letter})
 out({"type": "usage", "messageId": "resp_1", "stopReason": "end_turn",
      "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}})
 out({"type": "end", "stopReason": "end_turn", "sessionId": session, "num_turns": 1})
@@ -722,12 +724,17 @@ def test_grok_is_one_run_per_turn_resuming_the_session_it_opened(
 
 
 def test_grok_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
-    """A tool is shown as it starts rather than once per status it passes through."""
+    """A tool is shown as it starts rather than once per status it passes through.
+
+    And the words it streamed a letter at a time come back as the one thing it said: a
+    transcript of one row per token is not the paragraph the agent wrote.
+    """
     said = list(GrokBuildAgent(GROK).new().stream("hi"))
 
     kinds = [event.kind for event in said]
     assert kinds == ["reasoning", "tool", "text", "result"]
     assert "run_terminal_cmd echo hi" in said[1].text
+    assert said[2].text == "hi"
     assert said[-1].spent.total == 8
     assert said[-1].tokens == {"grok-4.6": 8}
 

@@ -24,14 +24,57 @@
 
 ## `__init__.py`
 
-Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Stopped`, `Failed`, `Unrecoverable`,
-`Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, `Tool`, `Toolbox`, `Board`,
-`Item`, and all agent and session classes.
+Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Saying`, `Stopped`, `Failed`,
+`Unrecoverable`, `Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, `Tool`,
+`Toolbox`, `Board`, `Item`, and all agent and session classes.
 
 ## `event.py`
 
-`Event`, `Question`, `Stopped`, `Usage`, `Failed`, `Unrecoverable` and `say`: what a turn says
-while it runs, what it asks, what it cost, and how it failed -- with no behaviour on them.
+`Event`, `Question`, `Stopped`, `Usage`, `Failed`, `Unrecoverable`, `Saying` and `say`: what a
+turn says while it runs, what it asks, what it cost, how it failed, and how the fragments it
+arrives in are put back together -- with no behaviour on the values themselves.
+
+```python
+class Saying:
+    def delta(self, kind: str, text: str, whose: str = "") -> None:
+        """Takes one fragment of an answer, which is nothing to show on its own."""
+
+    def whole(self, kind: str, text: str, whose: str = "") -> None:
+        """Takes one kind of an answer entire, as the backend has it."""
+
+    def upto(self, whose: str = "") -> list[Event]:
+        """Says one answer as far as it has got, and remembers how far that was."""
+
+    def ended(self, whose: str = "") -> list[Event]:
+        """The same, and then lets the answer go: it has now been said in full."""
+
+    def rest(self) -> list[Event]:
+        """Everything gathered and not yet said, whichever answer it belongs to."""
+```
+
+- `Saying` MUST gather the fragments a streaming backend sends into the utterances they are
+  pieces of, and every backend that streams MUST read its deltas through it rather than saying
+  one as it arrives. A fragment is not a thing to show: an `Event` per token is a line per
+  token on a terminal and a bulleted, blank-line-spaced block per token in a transcript --
+  one paragraph broken into fifty rows of one word, which is not what the agent said and
+  cannot be read as it. One coalescer, not one per backend: the same fragments arrive from all
+  of them and the same mistake was made twice already.
+- An utterance MUST be said the moment the agent reaches for a tool, because what it said
+  before reaching is what says why it reached, and again as its message ends. It MUST NOT be
+  held for the end of the turn: a turn is minutes of tool calls, and one that showed nothing
+  until it was over is a flow that reads as hung for all of them.
+- What has been said MUST NOT be said twice, so that a backend repeating the whole message once
+  it is finished adds only the part nobody has seen -- and one that streamed nothing says the
+  whole of it, both arriving the same way.
+- Nothing MUST be left gathered once a turn's stream stops: a backend whose turn ends without
+  closing its last message MUST say what it was holding, or the turn swallows its own answer.
+- Several answers MAY be in flight at once, so each is gathered under whatever the backend
+  numbers it by -- a message id, the step of the turn. A backend with one at a time MUST be
+  able to name none, and so MUST the event that closes a message on a backend that names the
+  rest: what has just come back is what the fragments before it were fragments of.
+- What was thought MUST be said before what was said, whichever of them arrived first: the
+  thinking is what says why the words followed, and an order that moved with the stream would
+  put the two round the other way as often as not.
 
 - `Failed` MUST be a `subprocess.CalledProcessError` that says what went wrong where whoever it
   happened to can read it: a flow catches turns rather than transports, and the sentence a CLI
@@ -432,7 +475,14 @@ class SessionBase(ABC):
   session that has gone quiet is a goal that has stopped only once the goal itself says so.
 - A backend that reports a turn finished before what it said can be read back MUST be read once
   more afterwards, and one that hands back a message still being written MUST be read again
-  until it is not. Neither may leave a landed turn answering with nothing.
+  until it is not. Neither may leave a landed turn answering with nothing. A message still
+  being written MUST NOT be said as it stands either: half a sentence shown as a thing of its
+  own is a paragraph broken across as many parts as the backend was read, with whatever grew
+  in place afterwards never shown at all.
+- What a turn says MUST reach whoever is watching as the utterances the agent made, not as the
+  fragments they crossed the wire in, and MUST be put on stderr the same way and once for a run
+  nothing is watching. A backend teeing its own pieces as they arrive MUST NOT also tee the
+  message they came to: the same paragraph twice over is not what the agent said either.
 
 ### `StreamSessionBase`
 
