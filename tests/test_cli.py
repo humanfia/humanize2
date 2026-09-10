@@ -32,6 +32,7 @@ COMMANDS = [
         {"sdk", "runner", "flows", "backends", "telemetry", "settings", "kept"},
     ),
     ("trace", set[str]()),
+    ("export", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),
     ("check", set[str]()),

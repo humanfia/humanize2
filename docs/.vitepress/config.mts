@@ -276,7 +276,7 @@ export default defineConfig({
             { text: 'Falling back', link: '/user/fallback' },
             { text: 'Completion', link: '/user/completion' },
             { text: 'History', link: '/user/history' },
-            { text: 'Exporting a transcript', link: '/user/export' },
+            { text: 'Exporting a run', link: '/user/export' },
             { text: 'What a project remembers', link: '/user/settings' },
             { text: 'Stopping', link: '/user/stopping' },
           ],

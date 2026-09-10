@@ -48,7 +48,7 @@ true under any flow, and [Steering](/features/steering) is how.
 Nothing. What was said is the conversation, logged turn by turn by the backend that ran it, and
 a session is opened rather than reopened — so starting this again is another conversation
 rather than the last one carried on. To read one back, [collect the trace](/user/tracing) or
-[export the transcript](/user/export).
+[export the run](/user/export).
 
 ## See also
 

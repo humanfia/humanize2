@@ -108,5 +108,6 @@ is one transcript.
 ## See also
 
 - [Talking to a running turn](/user/steering)
-- [Exporting a transcript](/user/export), which writes the one being read
+- [Exporting a run](/user/export), which puts every conversation that has been read in the
+  archive it writes
 - [Worktrees](/weaver/worktrees)

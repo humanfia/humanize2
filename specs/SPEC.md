@@ -12,6 +12,7 @@
 ├── coganchor
 ├── daemon
 ├── epic.py
+├── exporting.py
 ├── fallbacks.py
 ├── flows
 ├── kept.py
@@ -506,6 +507,99 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   a flow is picked up from is the last run of it, and two started inside one second would
   otherwise be ordered at random.
 
+## `exporting.py`
+
+```python
+BUNDLE = "{epic}.epic.tar.gz"
+MANIFEST = "manifest.json"
+TRANSCRIPT = "transcript.md"
+REDACTED = "[redacted]"
+STRUCK: tuple[str, ...]
+
+
+def bundle(
+    epic: Path,
+    at: str | os.PathLike[str] | None = None,
+    *,
+    transcript: str | None = None,
+) -> tuple[Path, dict[str, Any]]: ...
+def logged(epic: Path) -> dict[str, dict[str, Path]]: ...
+def plain(said: str, struck: Sequence[str] = ()) -> str: ...
+def sized(count: int) -> str: ...
+```
+
+One whole run, packaged up to send to somebody who was not there. An epic is written to be
+read on the machine that ran it; this is the other reading of the same run, and it is what a
+report of a bug is developed against.
+
+- A bundle MUST hold everything the run wrote down about itself -- its own record, a record
+  per flow it called, what a resumable flow left behind, the profile of a run that was
+  profiled, and every trace gathered of it -- and MUST hold the session logs themselves rather
+  than the links pointing at them. `epic.py` points at a backend's own log by a link on
+  purpose; a directory of symlinks into somebody's home is an archive with nothing in it the
+  moment it leaves their machine, and a bundle that carried the names alone would be a bundle
+  the recipient cannot read a single turn out of.
+- A session the bundle holds no log for MUST say why. A CLI that keeps its sessions in a
+  database of its own writes nothing humanize can read, and an absence that means that reads
+  exactly like an absence that means a log was lost -- only one of which is a bug worth
+  chasing.
+- It MUST be one archive. What is being asked for is a thing to attach to an issue, and a
+  directory of forty files is not one.
+- **No credential MUST ride along, in any file of it.** What a bundle carries is otherwise the
+  user's -- what they typed, what the agents said, what was in the files those agents touched
+  -- and that is the opposite of what `telemetry.py` promises about what humanize sends on its
+  own initiative, deliberately: this is somebody sending their own run on purpose, and a
+  report without the run in it is a report nobody can develop against. A key is nobody's to
+  send. So every byte written MUST go through one scrubbing: the value of every variable any
+  account here runs a turn with, struck literally, since no pattern knows what somebody
+  pasted; the shapes the vendors mint keys in; whatever is signed into a URL, which is where
+  `hmz flowverses` already takes one out; and any value a log named as a token, a secret, a
+  key or a password.
+- The scrubbing MUST NOT be the one `telemetry.py` does. That module keeps a promise about
+  names and counts on humanize's behalf, and this keeps a promise about credentials on the
+  user's; one regular expression serving both would be one promise quietly answering for the
+  other.
+- It MUST NOT strike out what the run is read by. `input_tokens` is how every one of these
+  backends writes down what a turn cost, and an account may hold the model to ask for -- Kimi
+  Code's does, and half the gateway configurations do. A bundle with the bill taken out of it,
+  or with the model struck out because some other account had that name in a variable, is a
+  bundle nobody can read.
+- It MUST carry a manifest saying what this was: humanize's own version, the flow and how it
+  was set up, each agent and what it ran -- CLI, model, effort, and the account by **name**
+  only -- the workspace and the commit it is on where it is a repository, and per backend the
+  version it says it is and the hash of the executable that took the turns. These CLIs move
+  weekly and two installs of one version are not always one program; a run that cannot be
+  pinned to a build is a run nobody can repeat.
+- The manifest MUST say the shape the run ran in, not only the files it holds: every flow the
+  run called at whatever depth, each saying which record called it, and every session saying
+  which record it was opened in. A flow called twice is two records and two conversations, and
+  a manifest that named only the flow would leave a reader unable to tell which of them a log
+  belongs to. Read off the records rather than off the run's own, which says only what it
+  called directly -- that would be the first branch of a tree offered as the tree.
+- It MUST carry nothing about whoever made it beyond what the run already says. An archive
+  records its writer's login name by default, and that is not a thing an export needs to hand
+  anybody.
+- It MUST be written whole and moved into place under a name nothing else would pick, and MUST
+  leave nothing behind if it fails: an archive read while it is being written is one nothing
+  can open, and two exports of one run at once must not be two streams into one file.
+- It MUST be readable by whoever exported it and by nobody else. What is in it is their
+  prompts and their agents' output, and a shared machine is a shared machine.
+- Where it lands MUST be where somebody is standing rather than inside humanize's own home the
+  way a trace of a run goes. A trace belongs with the run because the sessions it points at
+  are already there; a bundle exists in order to leave, and one filed under a directory nobody
+  can find is one nobody sends. A file or a directory named outright MUST win.
+- It MUST be named for the run rather than for the moment it was written. A run has a name
+  already and that name holds the moment it started, so exporting one run twice MUST replace
+  the earlier archive rather than leave two nobody can tell apart -- the later one is the
+  earlier one plus whatever has happened since.
+- A directory holding no run MUST be refused rather than packaged up as an archive of nothing.
+- What the manifest says the bundle holds MUST be what actually went in it. What each session
+  was logged to MUST therefore be read once and written once: a log that rolls away between the
+  reading and the writing would otherwise be named in the manifest and absent from the archive,
+  which is the ambiguity above with the two sides swapped. Whatever asked for the bundle MUST
+  say what is in it out of the manifest rather than by reading the run again afterwards -- for
+  a run that is still going, the second reading is a different answer.
+
 ## `runner.py`
 
 ```python
@@ -714,6 +808,45 @@ holds -- and the number of programs, for a run that was profiled.
 Environment Variables:
 
 - `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `KIMI_CODE_HOME`: The path to agent home directories for discovering session logs. If not set, use the default paths of each agent. A home directory that does not exist is skipped.
+
+## `hmz export`
+
+```shell
+hmz export [<epic>] [-o|--output <output>]
+```
+
+Packages one whole run up as one archive: what it did, what every session of every agent it
+drove was logged as, and what this machine was running -- with every credential taken out.
+
+- It MUST be one command and one thing done. `hmz trace` has what there is to do to a trace
+  under it because there is more than one; there is one thing to do to a bundle, which is
+  make it, and a verb under `export` would be a word to type for no reason.
+- What it writes MUST be the run with every link followed. An epic points at each backend's
+  own log rather than copying it, which is right where the run happened and worth nothing
+  anywhere else -- so a bundle that carried the links would be an archive with nothing in it.
+- It MUST refuse a directory that holds no run and a name no run of this directory answers to,
+  rather than exporting whichever run happens to sort last: a bundle attached to the wrong
+  report is worse than no bundle.
+- It MUST print where the archive landed, how much of the run is in it and how big it came
+  out. What somebody reads off that line is whether they can attach it to something.
+- A session the bundle holds no log for MUST be counted in that line as well as said in the
+  manifest: a CLI that keeps its sessions to itself is a thin bundle for a reason, and a
+  reader should not have to open one to find out which reason.
+
+Args:
+
+- `<epic>`: Which run, by the name of its directory, by a leading part of that name, or by the
+  path to it. If not provided, the last run of this directory. A path as well as a name
+  because a run of another workspace has no name here to answer to, and its directory is the
+  whole of what somebody has to point at it with.
+- `-o`, `--output <output>`: Where to write it -- a file, or a directory to write it into
+  under its own name. If not provided, `.humanize/<run>.epic.tar.gz` in this directory. A
+  bundle exists in order to be sent, so it lands where somebody is standing rather than in
+  humanize's own home the way a trace of a run does; a file named outright still wins, since a
+  bundle is also a thing to attach to an issue.
+
+Prints the output path, which run it is of, how many sessions and how many logs it holds, how
+many of those sessions logged nothing, and how big the archive came out.
 
 ## `hmz flowverses`
 
