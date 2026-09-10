@@ -83,5 +83,6 @@ flow can therefore log that its agent wanted to ask, without answering it.
 ## See also
 
 - [Questions](/user/questions) — what an agent asking actually looks like
+- [Picking a run up](/user/resuming) — `/resume`, for the run that stopped while you were away
 - [The person as an agent](/weaver/human-agent)
 - [TUI › Questions, and being away](/reference/tui#questions-and-being-away)
