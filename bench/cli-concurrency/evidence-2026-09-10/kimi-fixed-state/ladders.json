@@ -1,0 +1,950 @@
+{
+ "backend": "kimi",
+ "base_commit": "02bade722358973c0725287ce61a3e5d7e667af8",
+ "fixture_endpoint": "http://127.0.0.1:18939",
+ "instances": "shared -- one `kimi web` daemon serves every session of the rung",
+ "ladder_notes": {
+  "ladder-a-correctness-only": "The two correctness fixes and nothing else; 1, 2, 3, 4, 6, 8.",
+  "ladder-b": "The same, plus the reduced daemon reads; 1, 4, 6, 8.",
+  "ladder-c": "That driver; 1, 3, 4, 5.",
+  "ladder-d": "That driver again, confirming 4 and 5; 1, 4, 5.",
+  "ladder-e": "The reported driver, after review; 1, 4, 5.",
+  "ladder-f": "The reported driver, the five-session rung again; 1, 5.",
+  "ladder-g": "The reported driver, the five-session rung a third time; 1, 5."
+ },
+ "ladders": {
+  "ladder-a-correctness-only": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.236444259993732,
+     "p50": 2.181709256954491,
+     "p95": 2.236444259993732
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.2829282199963927,
+     "p50": 0.24039518693462014,
+     "p95": 0.2829282199963927
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "2": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 10,
+     "max": 2.3544512579683214,
+     "p50": 2.2818973294924945,
+     "p95": 2.3544512579683214
+    },
+    "concurrency": 2,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 10,
+    "ratios": {
+     "cold.result_seconds.p50": 1.046,
+     "cold.result_seconds.p95": 1.053,
+     "warm.result_seconds.p50": 1.161,
+     "warm.result_seconds.p95": 1.013
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 20,
+    "warm": {
+     "count": 10,
+     "max": 0.2864809869788587,
+     "p50": 0.2790579260326922,
+     "p95": 0.2864809869788587
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.161
+   },
+   "3": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 15,
+     "max": 2.611046307021752,
+     "p50": 2.4824124519946054,
+     "p95": 2.611046307021752
+    },
+    "concurrency": 3,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 15,
+    "ratios": {
+     "cold.result_seconds.p50": 1.138,
+     "cold.result_seconds.p95": 1.167,
+     "warm.result_seconds.p50": 1.346,
+     "warm.result_seconds.p95": 1.562
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 30,
+    "warm": {
+     "count": 15,
+     "max": 0.4419932209420949,
+     "p50": 0.32352608698420227,
+     "p95": 0.4419932209420949
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.562
+   },
+   "4": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 20,
+     "max": 2.7182994129834697,
+     "p50": 2.535377652500756,
+     "p95": 2.7154040309833363
+    },
+    "concurrency": 4,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 20,
+    "ratios": {
+     "cold.result_seconds.p50": 1.162,
+     "cold.result_seconds.p95": 1.214,
+     "warm.result_seconds.p50": 1.666,
+     "warm.result_seconds.p95": 1.744
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 40,
+    "warm": {
+     "count": 20,
+     "max": 0.5449832079466432,
+     "p50": 0.4004290785524063,
+     "p95": 0.49334668507799506
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.744
+   },
+   "6": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 30,
+     "max": 2.944098312058486,
+     "p50": 2.8717507779365405,
+     "p95": 2.9413889619754627
+    },
+    "concurrency": 6,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 30,
+    "ratios": {
+     "cold.result_seconds.p50": 1.316,
+     "cold.result_seconds.p95": 1.315,
+     "warm.result_seconds.p50": 2.441,
+     "warm.result_seconds.p95": 2.393
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 60,
+    "warm": {
+     "count": 30,
+     "max": 0.7415577089414,
+     "p50": 0.5868831939878874,
+     "p95": 0.6769240139983594
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 2.441
+   },
+   "8": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 40,
+     "max": 3.4023128090193495,
+     "p50": 3.2112185370060615,
+     "p95": 3.3164058800321072
+    },
+    "concurrency": 8,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 40,
+    "ratios": {
+     "cold.result_seconds.p50": 1.472,
+     "cold.result_seconds.p95": 1.483,
+     "warm.result_seconds.p50": 3.131,
+     "warm.result_seconds.p95": 2.966
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 80,
+    "warm": {
+     "count": 40,
+     "max": 0.8446052469080314,
+     "p50": 0.7527672889991663,
+     "p95": 0.8392461760668084
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 3.131
+   }
+  },
+  "ladder-b": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.6813949020579457,
+     "p50": 2.4293026770465076,
+     "p95": 2.6813949020579457
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.33745651005301625,
+     "p50": 0.32285758503712714,
+     "p95": 0.33745651005301625
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "4": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 20,
+     "max": 3.3597953200805932,
+     "p50": 3.1105372680467553,
+     "p95": 3.3044676380231977
+    },
+    "concurrency": 4,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 20,
+    "ratios": {
+     "cold.result_seconds.p50": 1.28,
+     "cold.result_seconds.p95": 1.232,
+     "warm.result_seconds.p50": 1.345,
+     "warm.result_seconds.p95": 1.827
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 40,
+    "warm": {
+     "count": 20,
+     "max": 0.6206993369851261,
+     "p50": 0.43410778749966994,
+     "p95": 0.6165255079977214
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.827
+   },
+   "6": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 30,
+     "max": 3.8474056649720296,
+     "p50": 3.5419355290359817,
+     "p95": 3.8308428620221093
+    },
+    "concurrency": 6,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 30,
+    "ratios": {
+     "cold.result_seconds.p50": 1.458,
+     "cold.result_seconds.p95": 1.429,
+     "warm.result_seconds.p50": 1.939,
+     "warm.result_seconds.p95": 2.406
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 60,
+    "warm": {
+     "count": 30,
+     "max": 0.812360764015466,
+     "p50": 0.6259952940163203,
+     "p95": 0.8118716930039227
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 2.406
+   },
+   "8": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 40,
+     "max": 4.504138178075664,
+     "p50": 3.978609017038252,
+     "p95": 4.49100423802156
+    },
+    "concurrency": 8,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 40,
+    "ratios": {
+     "cold.result_seconds.p50": 1.638,
+     "cold.result_seconds.p95": 1.675,
+     "warm.result_seconds.p50": 2.385,
+     "warm.result_seconds.p95": 3.037
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 80,
+    "warm": {
+     "count": 40,
+     "max": 1.8204257690813392,
+     "p50": 0.7701133554801345,
+     "p95": 1.0248531409306452
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 3.037
+   }
+  },
+  "ladder-c": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.5869061979465187,
+     "p50": 2.2071237780619413,
+     "p95": 2.5869061979465187
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.26540515397209674,
+     "p50": 0.2619985199999064,
+     "p95": 0.26540515397209674
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "3": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 15,
+     "max": 2.7448210599832237,
+     "p50": 2.416394707048312,
+     "p95": 2.7448210599832237
+    },
+    "concurrency": 3,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 15,
+    "ratios": {
+     "cold.result_seconds.p50": 1.095,
+     "cold.result_seconds.p95": 1.061,
+     "warm.result_seconds.p50": 1.124,
+     "warm.result_seconds.p95": 1.544
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 30,
+    "warm": {
+     "count": 15,
+     "max": 0.40967892995104194,
+     "p50": 0.29441339906770736,
+     "p95": 0.40967892995104194
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.544
+   },
+   "4": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 20,
+     "max": 2.679907819023356,
+     "p50": 2.551600443024654,
+     "p95": 2.678621336002834
+    },
+    "concurrency": 4,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 20,
+    "ratios": {
+     "cold.result_seconds.p50": 1.156,
+     "cold.result_seconds.p95": 1.035,
+     "warm.result_seconds.p50": 1.538,
+     "warm.result_seconds.p95": 1.669
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 40,
+    "warm": {
+     "count": 20,
+     "max": 0.4736383560812101,
+     "p50": 0.40289525501430035,
+     "p95": 0.4429369929712266
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.669
+   },
+   "5": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 25,
+     "max": 3.45909702393692,
+     "p50": 2.729839368024841,
+     "p95": 3.4210075719747692
+    },
+    "concurrency": 5,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 25,
+    "ratios": {
+     "cold.result_seconds.p50": 1.237,
+     "cold.result_seconds.p95": 1.322,
+     "warm.result_seconds.p50": 1.799,
+     "warm.result_seconds.p95": 2.785
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 50,
+    "warm": {
+     "count": 25,
+     "max": 0.8012569879647344,
+     "p50": 0.4713026329409331,
+     "p95": 0.7391730359522626
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 2.785
+   }
+  },
+  "ladder-d": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.4174088860163465,
+     "p50": 2.268764778971672,
+     "p95": 2.4174088860163465
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.3563805150333792,
+     "p50": 0.29597115505021065,
+     "p95": 0.3563805150333792
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "4": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 20,
+     "max": 3.199524712981656,
+     "p50": 2.921099175524432,
+     "p95": 3.197630728012882
+    },
+    "concurrency": 4,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 20,
+    "ratios": {
+     "cold.result_seconds.p50": 1.288,
+     "cold.result_seconds.p95": 1.323,
+     "warm.result_seconds.p50": 1.522,
+     "warm.result_seconds.p95": 1.539
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 40,
+    "warm": {
+     "count": 20,
+     "max": 0.5981887719826773,
+     "p50": 0.45049011654919013,
+     "p95": 0.5483284839428961
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.539
+   },
+   "5": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 25,
+     "max": 3.4571999909821898,
+     "p50": 3.0354431939776987,
+     "p95": 3.4241189550375566
+    },
+    "concurrency": 5,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 25,
+    "ratios": {
+     "cold.result_seconds.p50": 1.338,
+     "cold.result_seconds.p95": 1.416,
+     "warm.result_seconds.p50": 2.046,
+     "warm.result_seconds.p95": 2.222
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 50,
+    "warm": {
+     "count": 25,
+     "max": 0.8131300749955699,
+     "p50": 0.6056345660472289,
+     "p95": 0.7918880829820409
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 2.222
+   }
+  },
+  "ladder-e": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.5128738379571587,
+     "p50": 2.224845481105149,
+     "p95": 2.5128738379571587
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.3212886960245669,
+     "p50": 0.2541897500632331,
+     "p95": 0.3212886960245669
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "4": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 20,
+     "max": 2.942210317007266,
+     "p50": 2.6915935419965535,
+     "p95": 2.9401686770142987
+    },
+    "concurrency": 4,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 20,
+    "ratios": {
+     "cold.result_seconds.p50": 1.21,
+     "cold.result_seconds.p95": 1.17,
+     "warm.result_seconds.p50": 1.73,
+     "warm.result_seconds.p95": 1.6
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 40,
+    "warm": {
+     "count": 20,
+     "max": 0.5139859040500596,
+     "p50": 0.4396854020305909,
+     "p95": 0.5139098709914833
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.73
+   },
+   "5": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 25,
+     "max": 3.442768094013445,
+     "p50": 2.846803048043512,
+     "p95": 3.4396673010196537
+    },
+    "concurrency": 5,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 25,
+    "ratios": {
+     "cold.result_seconds.p50": 1.28,
+     "cold.result_seconds.p95": 1.369,
+     "warm.result_seconds.p50": 1.898,
+     "warm.result_seconds.p95": 1.907
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 50,
+    "warm": {
+     "count": 25,
+     "max": 0.6206324480008334,
+     "p50": 0.48245447408407927,
+     "p95": 0.6125662110280246
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.907
+   }
+  },
+  "ladder-f": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.623821072978899,
+     "p50": 2.3255661480361596,
+     "p95": 2.623821072978899
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.3231869450537488,
+     "p50": 0.29733827302698046,
+     "p95": 0.3231869450537488
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "5": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 25,
+     "max": 3.3248500369954854,
+     "p50": 2.972584365052171,
+     "p95": 3.324830872938037
+    },
+    "concurrency": 5,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 25,
+    "ratios": {
+     "cold.result_seconds.p50": 1.278,
+     "cold.result_seconds.p95": 1.267,
+     "warm.result_seconds.p50": 1.687,
+     "warm.result_seconds.p95": 2.127
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 50,
+    "warm": {
+     "count": 25,
+     "max": 0.7372562849195674,
+     "p50": 0.5016380499582738,
+     "p95": 0.6874206550419331
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 2.127
+   }
+  },
+  "ladder-g": {
+   "1": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 5,
+     "max": 2.7268994440091774,
+     "p50": 2.618376989965327,
+     "p95": 2.7268994440091774
+    },
+    "concurrency": 1,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 5,
+    "ratios": {
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "pass",
+    "turns": 10,
+    "warm": {
+     "count": 5,
+     "max": 0.34436949098017067,
+     "p50": 0.3161109939683229,
+     "p95": 0.34436949098017067
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 1.0
+   },
+   "5": {
+    "cleanup_survivors": 0,
+    "cold": {
+     "count": 25,
+     "max": 3.587544727954082,
+     "p50": 3.257830342045054,
+     "p95": 3.56305683508981
+    },
+    "concurrency": 5,
+    "failed_items": 0,
+    "instances": "shared",
+    "invalid_turns": 0,
+    "items": 25,
+    "ratios": {
+     "cold.result_seconds.p50": 1.244,
+     "cold.result_seconds.p95": 1.307,
+     "warm.result_seconds.p50": 1.722,
+     "warm.result_seconds.p95": 2.08
+    },
+    "repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "speed_floor_gate": "miss",
+    "turns": 50,
+    "warm": {
+     "count": 25,
+     "max": 0.7224106580251828,
+     "p50": 0.5444688210263848,
+     "p95": 0.7162320310017094
+    },
+    "watchdog_kills": 0,
+    "worst_complete_turn_ratio": 2.08
+   }
+  }
+ },
+ "measured_on": "2026-09-10",
+ "reading": "Four sessions clears the floor in every ladder that ran it -- 1.744, 1.827, 1.669, 1.539, 1.730, worst 1.827 -- and is the reported width. Five is the boundary and misses: 2.785, 2.222, 1.907, 2.127, 2.080, median 2.127. One reading below the line out of five is a draw, not a confirmation. Six (2.441, 2.406) and eight (3.131, 3.037) miss outright. Every rung in every ladder had all of its items correct, all of its turns valid, no cleanup survivor and no watchdog kill.",
+ "resource_group": "hmzbench groups: 4 exclusive physical cores by cgroup v2 cpuset, cpu.max 400000/100000, memory.max 16 GiB, memory.swap.max 0. Every rung recorded valid_4cpu_16gib true. Taken after the hmzbench-run occupancy guard was fixed; hmzbench-status was recorded beside every rung in conditions.txt.",
+ "speed_floor": "Complete-turn latency, turn submission to result with startup included, at most 2x the serial control of the same source, cold and warm p50 and p95 alike.",
+ "state_control": "A pristine kimi state directory before every repeat, so the daemon boot both sides pay is the same boot. Without it a serial cold turn is 16 to 127 seconds of `kimi web` replaying its own accumulated query-store, which dominates the cold ratio and does not hold still between repeats. The installed CLI's own ~/.kimi-code was read but never written by the control; each repeat used its own HOME beneath /tmp.",
+ "synthetic_model": true,
+ "validity_checks_retained": "All items correct, a fresh execution proof per turn, immutable task inputs, the turn-two marker recalled from the conversation alone and absent from the task files, exactly one result, at least one tool event, no cleanup survivors, no watchdog kill."
+}

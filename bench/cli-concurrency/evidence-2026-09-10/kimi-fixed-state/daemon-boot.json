@@ -1,0 +1,44 @@
+{
+ "backend": "kimi",
+ "measured_on": "2026-09-10",
+ "question": "What in a grown ~/.kimi-code makes `kimi web` boot slowly, and how much of it is bundle compilation?",
+ "method": "One cold/warm task pair per condition through the unchanged driver, with `_AppServer.__init__` (spawn to the daemon's own listening line) and every REST call timed. Each condition ran in an hmzbench group: 4 exclusive physical cores by cgroup v2 cpuset, cpu.max 400000/100000, memory.max 16 GiB, memory.swap.max 0. The installed CLI was never modified; the fresh conditions used a HOME beneath /tmp, and the grown condition only read the real ~/.kimi-code.",
+ "conditions": [
+  {"state": "grown", "state_bytes": 441344700, "state_files": 5266, "node_compile_cache": false, "boot_seconds": 125.06, "cold_seconds": 127.32, "warm_seconds": 1.29},
+  {"state": "grown", "state_bytes": 442849171, "state_files": 5270, "node_compile_cache": "cold", "boot_seconds": 108.53, "cold_seconds": 109.91, "warm_seconds": 1.41},
+  {"state": "grown", "state_bytes": 443076406, "state_files": 5275, "node_compile_cache": "warm", "boot_seconds": 33.10, "cold_seconds": 34.75, "warm_seconds": 1.60},
+  {"state": "fresh", "state_bytes": 162172, "state_files": 53, "node_compile_cache": false, "boot_seconds": 1.46, "cold_seconds": 1.97, "warm_seconds": 0.25},
+  {"state": "fresh", "state_bytes": 162153, "state_files": 53, "node_compile_cache": "cold", "boot_seconds": 1.54, "cold_seconds": 2.05, "warm_seconds": 0.23},
+  {"state": "fresh", "state_bytes": 332804, "state_files": 81, "node_compile_cache": "warm", "boot_seconds": 1.48, "cold_seconds": 2.00, "warm_seconds": 0.23}
+ ],
+ "repeated_boots_grown_state": {
+  "note": "Bare `kimi web` to its listening line, real ~/.kimi-code, no driver. The spread is the point: the same state boots in 16 seconds or in 48.",
+  "write_ahead_log_bytes": 183107143,
+  "seconds": [29.91, 48.35, 27.09, 16.61, 15.76],
+  "sigterm_exit_seconds": [1.32, 2.67, 2.97, 1.52, 1.12],
+  "sigkill_needed": false,
+  "wal_bytes_after_clean_exit": [183300000, 183800000, 183800000, 183900000, 183900000]
+ },
+ "cpu_profile_of_one_slow_boot": {
+  "how": "NODE_OPTIONS=--cpu-prof on the daemon process only, a diagnostic pointer through the environment; no installed file was touched. 33.5 s of samples at a 2 ms interval.",
+  "boot_seconds": 32.29,
+  "self_seconds": {
+   "getField @main.mjs:230855": 8.82,
+   "(anonymous) @main.mjs:230856": 5.4,
+   "decode @main.mjs:233225": 5.29,
+   "(garbage collector)": 2.14,
+   "(idle)": 1.7,
+   "insertDoc @main.mjs:230884": 0.81,
+   "insert @main.mjs:228261": 0.76,
+   "add @main.mjs:231159": 0.65,
+   "crc32 @main.mjs:229508": 0.46,
+   "liveRecordsRaw @main.mjs:238578": 0.35,
+   "rebuildOneSecondaryIndex @main.mjs:236690": 0.31,
+   "compileSourceTextModule @utils:343": 0.28,
+   "SkipNode @main.mjs:228130": 0.14
+  }
+ },
+ "finding": "The boot is `kimi web` replaying ~/.kimi-code/cache/query-store: an append-only, CRC-checked write-ahead log across sixteen shards, decoded record by record into a skip list with its secondary indexes rebuilt. The log had reached 183 MB and grows by roughly a megabyte and a half per session created; it is not truncated when the daemon shuts down cleanly, and the daemon does shut down cleanly -- SIGTERM was answered in 1.1 to 3.0 seconds every time, well inside the driver's five-second grace, and the log was the same size afterwards. Bundle compilation is 0.28 s of a 33 s boot.",
+ "compile_cache_verdict": "NODE_COMPILE_CACHE is not worth setting for kimi. On a fresh state it moves a 1.46 s boot to 1.48 s -- inside the noise -- and the profile says why: 0.28 s of that boot is compiling the 21 MB bundle. It cannot help at width either, because kimi boots one daemon per agent rather than one process per session: at eight sessions the bundle is compiled once, not eight times. The three grown-state figures are not a compile-cache measurement at all, they are three draws from the 16-to-127-second spread above.",
+ "what_the_driver_can_do": "Nothing to the store, which is the CLI's own and must not be pruned or redirected. The one lever is how many daemons are booted, and the driver already boots the fewest it can: one per agent, lazily, shared by every session. Booting one per session would multiply this by N."
+}
