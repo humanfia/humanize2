@@ -32,8 +32,8 @@ hmz exec -f official/parallel_flame_chase \
 
 All seven open with the backend's [goal feature](/features/goals) turned off —
 `AgentDefaults(goals=False)` beside each — because a lane's turn ends where the lane protocol
-says it ends rather than where a model decides it has met the objective. That is what `/agents`
-opens on, not something it holds you to.
+says it ends rather than where a model decides it has met the objective. It is the flow's to
+say, so nothing at the prompt turns it back on.
 
 ## One writer, and two that cannot write
 

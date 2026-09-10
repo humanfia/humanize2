@@ -44,13 +44,13 @@ between keystrokes.
 /flow ./flows/mine
 ```
 
-Nothing else completes either. Model ids are chosen where an agent is set up: on the agents
-page of `/flow`, or in a saved agent in `/agents`. You choose from the list the CLI itself said
-it runs. There is no completion for a task, because a task is prose.
+Nothing else completes either. Model ids are chosen where an agent is set up, which is the
+agents page of `/flow`, and you choose from the list the CLI itself said it runs. There is no
+completion for a task, because a task is prose.
 
 ## Searching on a sheet
 
-The lists a sheet puts up are flows, models, skills and accounts. Narrow them with **s**
+The lists a sheet puts up are flows, models and accounts. Narrow them with **s**
 instead, since every other letter on a sheet is a key of its own:
 
 - **Flows** narrow by name. What each says about itself sits beside its name and is *not*

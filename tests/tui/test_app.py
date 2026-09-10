@@ -19,7 +19,7 @@ import pytest
 from textual import events
 from textual.widgets import Label, OptionList, Static
 
-from hmz.agents import PERMISSIONS, DshSession
+from hmz.agents import DshSession
 from hmz.backends import Model
 from hmz.epic import epics
 from hmz.kept import Runs
@@ -1618,7 +1618,7 @@ async def test_what_an_agent_runs_is_a_row_of_its_own_and_an_effort_the_arrows_m
         # Walked into the way it is walked into: a flow, then what each of its agents is.
         await into_flows(app, driver)
         await into_agent(app, driver)
-        assert rows(app)[:5] == ["import", "cli", "provider", "model", "effort"]
+        assert rows(app) == ["cli", "provider", "model", "effort", "save"]
 
         # The CLIs installed here, opened from the row that says which one it is.
         await opens(app, driver, "cli")
@@ -2409,91 +2409,3 @@ async def test_the_person_asked_for_a_shape_is_asked_a_question_at_a_time(
         "tests": True,
         "rounds": 3,
     }
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-) -> None:
-    """A row of the agent's own, stepped where it stands rather than chosen from a list."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        await opens(app, driver, "cli")
-        await until(lambda: isinstance(app.screen, Clis), driver)
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Agent), driver)
-        await opens(app, driver, "model")
-        await until(lambda: isinstance(app.screen, Catalogue), driver)
-        await until(
-            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
-        )
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Agent), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-
-        def permission() -> str:
-            return str(
-                listing.get_option_at_index(rows(app).index("permission")).prompt
-            )
-
-        # It opens at what an agent nobody has been asked about has always run at.
-        await onto(app, driver, "permission")
-        assert "bypass" in permission()
-        await driver.press("right")
-        await driver.pause()
-        assert "read-only" in permission()
-        await driver.press("right")
-        await driver.pause()
-        assert "workspace-write" in permission()
-
-        await keeps(app, driver)
-        await keeps(app, driver)
-
-    # It rides along with what the agent runs, and is kept with it.
-    chosen = Runs("claude/claude-opus-5:high", "", "workspace-write")
-    assert app._models == [chosen]
-    assert app.settings.agents(app._flow_named) == [chosen]
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_the_loosest_rung_is_written_down_as_nothing_at_all(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-) -> None:
-    """A file written before there was such a setting reads the same way as one that has it."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        await opens(app, driver, "cli")
-        await until(lambda: isinstance(app.screen, Clis), driver)
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Agent), driver)
-        await opens(app, driver, "model")
-        await until(lambda: isinstance(app.screen, Catalogue), driver)
-        await until(
-            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
-        )
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Agent), driver)
-
-        # All the way round, back to the one it opened on.
-        await onto(app, driver, "permission")
-        for _ in range(len(PERMISSIONS)):
-            await driver.press("right")
-        await driver.pause()
-
-        await keeps(app, driver)
-        await keeps(app, driver)
-
-    assert app._models == [Runs("claude/claude-opus-5:high")]
-    assert app.settings.agents(app._flow_named) == [Runs("claude/claude-opus-5:high")]

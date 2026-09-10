@@ -10,15 +10,15 @@ to see which skills an agent loads, and to change what a flow brings.
 
 ## Try it
 
-The `skills` row of the sheet an agent is set up on reads `as its CLI finds them`. Opening it
-is a reading:
+There is nothing to try in the interface, and that is the point: the skills a CLI finds are
+that CLI's own. To see what one agent will be carrying, ask the CLI where it keeps them, or
+ask humanize from Python:
 
-```
-     1. code-review    Review the current diff… (yours)
-     2. dataviz        Use this skill whenever you… (yours)
-     3. housekeeping   Tidies the tree (this project)
+```python
+from hmz.agents.skills import skills
 
-   These are claude's own: add one, or switch one off, where claude keeps them
+for one in skills("claude"):
+    print(one.name, one.whose)
 ```
 
 To change what a **flow** brings instead, change the flow: press `f` on it in `/flow` to copy
@@ -145,4 +145,3 @@ and nothing here switches one of those on or off.
 - [Flows › The skills a flow brings](/reference/flows#the-skills-a-flow-brings)
 - [Permissions](/user/permissions) — a per-agent narrowing that *is* one
 - [Agents › The skills an agent carries](/reference/agents#the-skills-an-agent-carries)
-- [TUI › What each agent carries](/reference/tui#what-each-agent-carries)
