@@ -138,6 +138,12 @@ line, with what the flow is doing beside the transcript.
   terminal MUST NOT also be shown here. A turn thinks for minutes and says nothing for most of
   them, so the line saying one has started is the whole of what a flow looks like while it
   works.
+- What the agent said MUST be one part of the transcript per thing it said, and never one per
+  piece it arrived in. The parts are bulleted and set apart by a blank line, so a paragraph
+  that came a token at a time would be read as fifty answers of one word rather than as the
+  one answer it is. As it happens is the message, not the token: a backend streams its words
+  and what is shown is the utterance they came to, said when the agent reaches for a tool and
+  again as the message ends.
 - `/details` MUST toggle all of what a turn did on the way to its answer -- tool calls,
   thinking, and whatever a backend printed on its way past -- and MUST start off. They are one
   question, how much of the working to show, and were two switches for no reason. Off, because

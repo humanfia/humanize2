@@ -16,7 +16,16 @@ from typing import IO, TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-__all__ = ["Event", "Failed", "Question", "Stopped", "Unrecoverable", "Usage", "say"]
+__all__ = [
+    "Event",
+    "Failed",
+    "Question",
+    "Saying",
+    "Stopped",
+    "Unrecoverable",
+    "Usage",
+    "say",
+]
 
 #: The kinds every backend here counts, and which of them each also counts beside those. A
 #: kind is named the same thing wherever it is counted, so that one flow reading two backends
@@ -245,6 +254,159 @@ class Question:
 
     text: str
     options: tuple[str, ...] = ()
+
+
+class Saying:
+    """The fragments of an answer, gathered into the utterances they are pieces of.
+
+    Every backend that streams sends its words a fragment at a time, and a fragment is not a
+    thing to show. Said one at a time they are a line per token on a terminal and a bulleted
+    block per token in a transcript -- one paragraph broken into fifty rows of one word each,
+    which is not what the agent said and is not readable as it. So the fragments are gathered
+    here and said whole: at the moment the agent reaches for something, since what it said
+    before reaching is what says why it reached, and again when the answer ends.
+
+    How much of each has already gone out is remembered, so a backend that repeats the whole
+    message once it is finished says only the part nobody has seen -- and one that streams
+    nothing at all says the whole of it, the two arriving here the same way.
+
+    Several answers may be in flight at once, and a backend with more than one numbers them:
+    by message id, or by the step of the turn each belongs to. Each is gathered under whatever
+    the backend calls it. A backend with one at a time names none, and so does the event that
+    ends a message on a backend that names the rest -- what has just come back is what the
+    fragments before it were fragments of -- so an unnamed answer means the one last written
+    to.
+    """
+
+    __slots__ = ("_latest", "_said", "_shown")
+
+    def __init__(self) -> None:
+        """Initializes a reading in which nothing has been said yet."""
+        #: What has arrived, by the answer it belongs to and the kind of thing it is.
+        self._said: dict[tuple[str, str], str] = {}
+        #: How much of each of those has been passed on already.
+        self._shown: dict[tuple[str, str], int] = {}
+        #: Which answer is being streamed, for the events that name none.
+        self._latest = ""
+
+    def delta(self, kind: str, text: str, whose: str = "") -> None:
+        """Takes one fragment of an answer, which is nothing to show on its own.
+
+        Args:
+          kind: What the fragment is a piece of -- `text` or `reasoning`.
+          text: The fragment, as it arrived, with its spacing left alone: what makes the
+            pieces one paragraph again is that nothing was put between them.
+          whose: Which answer it belongs to, or "" for the one being streamed.
+        """
+        at = self._at(kind, whose)
+        self._said[at] = self._said.get(at, "") + text
+
+    def whole(self, kind: str, text: str, whose: str = "") -> None:
+        """Takes one kind of an answer entire, as the backend has it.
+
+        The deltas put back together, which is what a backend hands over when a message ends
+        -- and what one that streamed nothing hands over instead. It replaces what arrived
+        rather than adding to it, since it is the same words and the backend's copy is the
+        one to trust.
+
+        Args:
+          kind: What it is -- `text` or `reasoning`.
+          text: The whole of that kind of it.
+          whose: Which answer it is, or "" for the one being streamed.
+        """
+        at = self._at(kind, whose)
+        if (
+            self._said.get(at, "")[: self._shown.get(at, 0)]
+            != text[: self._shown.get(at, 0)]
+        ):
+            # Not the pieces after all: a backend that trimmed them, or squared up their
+            # spacing, hands back a message that says the same thing at different offsets --
+            # and how far into the old one had been shown then means nothing about this one.
+            # Said from the start rather than cut at a place that now lands mid-word.
+            self._shown[at] = 0
+        self._said[at] = text
+
+    def upto(self, whose: str = "") -> list[Event]:
+        """Says one answer as far as it has got, and remembers how far that was.
+
+        Args:
+          whose: Which answer, or "" for the one being streamed.
+
+        Returns:
+          What it has thought and said beyond whatever has been shown, one event per kind,
+          and nothing at all where everything of it has been shown already.
+        """
+        return self._saying(whose or self._latest, forget=False)
+
+    def ended(self, whose: str = "") -> list[Event]:
+        """The same, and then lets the answer go: it has now been said in full.
+
+        Args:
+          whose: Which answer, or "" for the one being streamed.
+
+        Returns:
+          Whatever of it nobody has seen.
+        """
+        return self._saying(whose or self._latest, forget=True)
+
+    def rest(self) -> list[Event]:
+        """Everything gathered and not yet said, whichever answer it belongs to.
+
+        What a turn ends on, for a backend whose stream stops rather than closing each answer:
+        words held back for a boundary that never came are words the turn would swallow.
+
+        Returns:
+          All of it, oldest answer first.
+        """
+        said: list[Event] = []
+        for marked in list(dict.fromkeys(marked for marked, _ in self._said)):
+            said += self._saying(marked, forget=True)
+        return said
+
+    def _at(self, kind: str, whose: str) -> tuple[str, str]:
+        """Where one piece of one answer is gathered, taking note of which answer that is.
+
+        Args:
+          kind: What the piece is.
+          whose: Which answer it is of, or "" for the one being streamed.
+
+        Returns:
+          The key it is held under.
+        """
+        if whose:
+            self._latest = whose
+        return (whose or self._latest, kind)
+
+    def _saying(self, whose: str, *, forget: bool) -> list[Event]:
+        """One answer as far as it has got, and how far that was written down.
+
+        Args:
+          whose: Which answer.
+          forget: Whether to let go of it afterwards.
+
+        Returns:
+          What of it has not been shown, one event per kind, stripped -- the spacing between
+          the fragments is what made them a paragraph, and the spacing around them is not.
+        """
+        said: list[Event] = []
+        # Thinking before talking, whichever arrived first: what a model thought is what says
+        # why it then said what it said, and an order that moved with the stream would put
+        # the two round the other way as often as not.
+        keys = sorted(
+            (key for key in self._said if key[0] == whose),
+            key=lambda key: key[1] != "reasoning",
+        )
+        for at in keys:
+            rest = self._said[at][self._shown.get(at, 0) :]
+            self._shown[at] = len(self._said[at])
+            if forget:
+                del self._said[at]
+                del self._shown[at]
+            if words := rest.strip():
+                said.append(Event(kind=at[1], text=words))
+        if forget and self._latest == whose:
+            self._latest = ""
+        return said
 
 
 def say(text: str, sink: IO[str], *, end: str = "\n") -> None:

@@ -311,18 +311,53 @@ def test_a_goal_uses_the_official_same_session_goal_tools() -> None:
     assert prompt.endswith("the suite passes")
 
 
+def test_a_streamed_answer_is_one_event_rather_than_one_per_chunk() -> None:
+    Harness.next_scripts.append(
+        [
+            *(
+                (
+                    "assistant/chunk",
+                    {
+                        "turn": 1,
+                        "step": 1,
+                        "chunk": {"type": "text-delta", "text": piece},
+                    },
+                )
+                for piece in ("one ", "sentence, ", "said ", "in five ", "pieces.")
+            ),
+            assistant("one sentence, said in five pieces."),
+            completed(),
+        ]
+    )
+    session = DshAgent(configured()).new()
+
+    events = list(session.stream("work"))
+
+    assert [(one.kind, one.text) for one in events] == [
+        ("text", "one sentence, said in five pieces."),
+        ("result", "one sentence, said in five pieces."),
+    ]
+
+
 def test_the_opening_session_id_is_visible_while_its_turn_is_running() -> None:
     Harness.next_scripts.append(
         [
-            (
-                "assistant/chunk",
-                {
-                    "turn": 1,
-                    "step": 1,
-                    "chunk": {"type": "text-delta", "text": "working"},
-                },
+            *(
+                (
+                    "assistant/chunk",
+                    {
+                        "turn": 1,
+                        "step": 1,
+                        "chunk": {"type": "text-delta", "text": piece},
+                    },
+                )
+                for piece in ("work", "ing")
             ),
-            assistant("done"),
+            (
+                "tool/call",
+                {"turn": 1, "step": 1, "name": "bash", "arguments": ""},
+            ),
+            assistant("working"),
             completed(),
         ]
     )
@@ -330,13 +365,16 @@ def test_the_opening_session_id_is_visible_while_its_turn_is_running() -> None:
     session = agent.new()
     streamed = session.stream("work")
 
+    # What led up to the tool call, said whole, and then the call.
     assert next(streamed).text == "working"
+    assert next(streamed).text == "bash"
     opening = session.named
     assert opening is not None
     assert opening.startswith("session-")
     assert agent.opened == []
 
-    assert [event.text for event in streamed] == ["done"]
+    # And nothing again for the message that ends: it is the pieces put back together.
+    assert [event.text for event in streamed] == ["working"]
     assert session.id == opening
     assert agent.opened == [opening]
 

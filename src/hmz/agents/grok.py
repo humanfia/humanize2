@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, CommandSessionBase
 from .config import AgentConfig
-from .event import Event, Failed, Usage
+from .event import Event, Failed, Saying, Usage
 
 if TYPE_CHECKING:
     import os
@@ -76,6 +76,9 @@ class GrokBuildSession(CommandSessionBase):
         #: if anything did. The text arrives in chunks, so the answer is what they come to.
         self._said: list[str] = []
         self._failed: str | None = None
+        #: Those same chunks, gathered into the answers they are pieces of: a response is one
+        #: paragraph and is worth one row of a transcript rather than one row a word.
+        self._saying = Saying()
         #: What the turn now running has cost, added up as each response of it comes back, and
         #: the tool calls already shown -- a call is shown as it starts and updated after.
         self._costing = Usage()
@@ -92,7 +95,7 @@ class GrokBuildSession(CommandSessionBase):
           piped stdin as the prompt.
         """
         self._said, self._failed, self._shown = [], None, set()
-        self._costing = Usage()
+        self._costing, self._saying = Usage(), Saying()
         argv = [
             _COMMAND,
             "--output-format",
@@ -144,6 +147,8 @@ class GrokBuildSession(CommandSessionBase):
             marked = str(said.get("toolCallId") or "")
             if marked not in self._shown:
                 self._shown.add(marked)
+                # What it said before reaching for something is what says why it reached.
+                yield from self._saying.upto()
                 yield Event(kind="tool", text=_called(said))
         elif kind == "usage":
             # Told as each response lands rather than once the run is over, which is what a
@@ -152,12 +157,18 @@ class GrokBuildSession(CommandSessionBase):
             self._costing = self._costing + self._cost(
                 cast("dict[str, Any]", said.get("usage") or {})
             )
+            # And a response that has been counted is a response that has finished saying
+            # what it had to say, so this is where its words are whole.
+            yield from self._saying.ended()
+        elif kind == "end":
+            # A turn that ended without a count for its last response still said it.
+            yield from self._saying.rest()
         elif (says := _SAYS.get(kind)) is not None:
             words = str(said.get("data") or "")
             if words:
                 if says == "text":
                     self._said.append(words)
-                yield Event(kind=says, text=words)
+                self._saying.delta(says, words)
 
     def _cost(self, counted: dict[str, Any]) -> Usage:
         """What one response cost, by the kind each token went on.
