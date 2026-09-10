@@ -493,6 +493,22 @@ def test_a_relative_path_opened_after_a_chdir_is_still_answered(tmp_path: Path) 
 
 @traced
 @pytest.mark.timeout(60)
+def test_a_path_spelled_the_long_way_round_is_the_same_path(account: Account) -> None:
+    """What the kernel reads it as is what it is, however the program happened to spell it.
+
+    The supervisor decides on the bytes a program named a path with, which is what makes a
+    session's tens of thousands of stops cheap -- and a path holding a `.`, a `..` or a
+    doubled separator is not the path those bytes say it is. One of those is still resolved.
+    """
+    long_way = f"{account.named.parent}/.//../{account.named.parent.name}/./{account.named.name}"
+
+    done = account.run("cat", long_way)
+
+    assert done.stdout == PROVIDER, done.stderr
+
+
+@traced
+@pytest.mark.timeout(60)
 def test_everything_the_program_names_that_is_not_a_credential_is_its_own(
     account: Account, tmp_path: Path
 ) -> None:

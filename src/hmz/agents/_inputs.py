@@ -8,13 +8,21 @@ import os
 import stat
 from pathlib import Path
 
+#: How much of a file is read to tell it from the version before it. Contents count -- see
+#: below -- but only where reading them costs less than being wrong about them: a settings
+#: file, a skill, a command, a prompt are each far under this, and what is over it is a
+#: bundled artifact whose size, modification time and change time are in the fingerprint
+#: already. This is asked once a turn per session, and a skills directory that has grown a
+#: `node_modules` would otherwise be a tree read whole every time any of them starts one.
+_READ_TO = 1 << 20
+
 
 def snapshot(paths: set[Path]) -> bytes:
     """Fingerprints native inputs, including linked skills and plugin dependencies.
 
-    Contents count too: a same-size edit with a restored mtime can happen within one
-    filesystem ctime tick. Missing paths count too. Directory identities bound
-    symbolic-link cycles.
+    Contents count too, up to :data:`_READ_TO`: a same-size edit with a restored mtime can
+    happen within one filesystem ctime tick. Above it, that identity is what a file is taken
+    on. Missing paths count too. Directory identities bound symbolic-link cycles.
     """
     digest = hashlib.sha256()
     visited: set[tuple[int, int]] = set()
@@ -35,7 +43,7 @@ def snapshot(paths: set[Path]) -> bytes:
             info.st_ctime_ns,
         )
         digest.update(str(identity).encode())
-        if stat.S_ISREG(info.st_mode):
+        if stat.S_ISREG(info.st_mode) and info.st_size <= _READ_TO:
             try:
                 with path.open("rb") as contents:
                     digest.update(hashlib.file_digest(contents, "sha256").digest())

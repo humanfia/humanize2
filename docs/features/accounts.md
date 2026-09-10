@@ -51,6 +51,24 @@ runs unchanged. And two supervisors cannot be nested, since a process has one tr
 that is also [anchored](/features/anchor) hands its redirects to the anchor instead of wrapping
 it.
 
+## What the supervisor costs, and where that cost went
+
+Every syscall a redirected agent makes that could name a path stops for the supervisor, and a
+coding turn makes tens of thousands of them: the CLI's own startup, every file it reads, and
+every program it runs underneath itself. Almost none of them name a credential.
+
+So almost none of them are worked out. The answer is read off the bytes the program named the
+path with — one that is already absolute, already tidy, and does not begin with anything this
+account answers is the program's own, and nothing else about it is looked at. Only a path that
+could match is decoded, resolved against the process's directory and held against the table.
+Nothing is allocated per stop: the registers and the window its paths are read through belong
+to the supervisor and are read over at every one of them.
+
+What is left is the stop itself, which is the kernel's. It is why the same conversation is
+faster under the account this machine is already signed into than under one humanize keeps —
+and why a flow running many sessions of an account at once is doing the same work in the same
+four cores as its agents.
+
 ## The environment is part of the account
 
 A CLI reads a key, a token or an endpoint out of the environment, and it does not care whether
