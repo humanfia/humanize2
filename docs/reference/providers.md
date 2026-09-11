@@ -456,6 +456,24 @@ native speed, and the agent is told none of it. That supervisor is a process hum
 for itself: a supervisor forks the program it watches, and a flow pumping turns from threads
 of its own has no signal handling to lend one.
 
+Which file a path is answered with depends on what the call is about to do with it:
+
+- **A read is answered out of memory.** The credential is copied once into a directory of the
+  turn's own on `/dev/shm`, and everything that asks about it or opens it to read — `statx`,
+  `newfstatat`, `access`, `openat` for reading — is given the copy. A pi turn asks about its
+  `auth.json` between six and eight hundred times, which is over half of every path syscall it
+  makes; exactly one of those still names the account's directory.
+- **A write is answered with the provider's own file.** Anything that creates, writes, renames,
+  unlinks or touches a credential is given the path under `~/.humanize/providers/`, unchanged, so
+  a refreshed token is durable the moment the CLI writes it rather than at the end of the turn.
+  That write drops the copy, and the next read makes a new one from what was just written.
+- **The copy is the turn's own and goes when it does.** A directory at `0700` holding files at
+  `0600`, under a name that cannot be guessed, unlinked when the supervisor exits — and swept up
+  by whoever killed it where it was killed, which is how a turn usually ends. What a killed
+  driver leaves behind is swept by the next redirected run on that machine.
+- **An anchored turn has none of it.** The copy belongs to the supervisor that made it, and an
+  anchor is handed the provider's own paths on the machine the turn lands on.
+
 ## Requirements and limits
 
 - **Linux on x86-64**, as running an agent under an anchor needs. There is nothing to install.

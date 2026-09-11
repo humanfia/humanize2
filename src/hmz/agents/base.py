@@ -118,10 +118,13 @@ def _ended(proc: subprocess.Popen[str]) -> None:
     """
     import psutil
 
+    from hmz.providers.redirect import swept
+
     if proc.poll() is not None:
         # Already gone and already reaped. Asking the operating system what is below that pid
         # now is asking about whoever holds it next, and signalling that is signalling a
         # stranger's work.
+        swept(proc.pid)
         return
     kin: list[psutil.Process] = []
     with contextlib.suppress(psutil.Error):
@@ -148,6 +151,9 @@ def _ended(proc: subprocess.Popen[str]) -> None:
     for one in alive:
         with contextlib.suppress(psutil.Error):
             one.kill()
+    # And what the turn was answering its credential paths out of: a supervisor takes its own
+    # copies away when it is done, and a supervisor that was killed here never got to.
+    swept(proc.pid)
 
 
 def _reaped(proc: subprocess.Popen[str]) -> None:
@@ -161,10 +167,15 @@ def _reaped(proc: subprocess.Popen[str]) -> None:
     Args:
       proc: The process to end, which may already have ended.
     """
+    from hmz.providers.redirect import swept
+
     with contextlib.suppress(OSError):
         proc.kill()
     with contextlib.suppress(OSError):
         proc.wait()
+    # A turn under an account is run inside a supervisor, and the copies it was answering
+    # credential paths out of are what it takes away when it exits. `SIGKILL` exits nothing.
+    swept(proc.pid)
 
 
 #: What a turn is told when its backend has no way of being held to a shape. The schema is the
