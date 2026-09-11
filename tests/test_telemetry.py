@@ -8,7 +8,7 @@ path of theirs, no key. The rest is the plumbing that lets a report say what was
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -409,9 +409,8 @@ def test_a_document_is_scrubbed_value_by_value_rather_than_whole() -> None:
     """
     long_enough = "x" * (telemetry._LONG - 10)
 
-    said = telemetry._plainly([long_enough, long_enough, long_enough])
+    said = cast("list[Any]", telemetry._plainly([long_enough] * 3))
 
-    assert isinstance(said, list)
     assert len(said) == 3
     assert all(one == long_enough for one in said)
 
