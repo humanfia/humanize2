@@ -595,9 +595,8 @@ def kimi(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
     # serves the REST the daemon serves and not the socket it notifies over, so every read
     # here is the plain polling the backend ran on before there were notifications -- one
     # read a second, and a turn is many reads. That is a cadence rather than anything under
-    # test: what these check is which calls were made, not how long apart. On the slower of
-    # the two systems the matrix runs it was thirty-seven seconds a test, and a turn nobody
-    # could steer inside the six seconds this file gives one.
+    # test: what these check is which calls were made, not how long apart. Fifty-two tests
+    # in ten seconds rather than sixty.
     monkeypatch.setattr(kimicode, "_POLL_SECONDS", 0.1)
     monkeypatch.setattr(kimicode, "_RECOVERY_SECONDS", 1.0)
     return _install("kimi", _KIMI, tmp_path, monkeypatch)
