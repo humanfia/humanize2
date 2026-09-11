@@ -32,14 +32,18 @@ CONFIG = AgentConfig(model="m", effort="high")
 #: what reads it is a sampler, taking one every :data:`hmz.tracing.profile.EVERY`, and a
 #: program that lives for a handful of those is one a loaded machine can miss altogether.
 #: Twenty samples is the difference between a test of the profiler and a test of the clock.
-FLOW = """
+#: What the turn runs, which is a shell running a sleep -- two programs, and the profile has
+#: to hold both.
+SAID = "sleep 1; echo the-session"
+
+FLOW = f"""
 from hmz.agents import AgentBase
 from hmz.flows import flow
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
-    agents[0].new()("sleep 1; echo the-session")
+    agents[0].new()("{SAID}")
 """
 
 
@@ -66,7 +70,10 @@ def test_a_run_is_profiled_when_the_workspace_asks_for_it(
     ran = read(epic / PROFILE)
     assert ran, "the programs the turn ran are not in the run's profile"
     # The turn itself, which is a shell running a sleep: both are programs this run started.
-    assert {"sh", "sleep"} <= {one.name for one in ran}
+    # The shell is named by what it was given rather than by what it is called, one system's
+    # `/bin/sh` being another's `bash`; the sleep is called the same thing everywhere.
+    assert "sleep" in {one.name for one in ran}
+    assert any(one.argv[-2:] == ("-c", SAID) for one in ran)
 
 
 @pytest.mark.timeout(90)
@@ -100,7 +107,7 @@ def test_the_programs_and_the_sessions_are_one_document(
     assert int(document["otherData"]["programs"]) >= 2
     events = json.loads(output.read_text())["traceEvents"]
     names = [one["args"]["name"] for one in events if one["name"] == "process_name"]
-    assert any(name.startswith("sh · ") for name in names)
+    assert any(name.startswith("sleep · ") for name in names)
     # And the whole of it is one span of time: the programs are where the turns are, rather
     # than at some other point on the clock. Not a span with anything in it, though -- what
     # bounds it is a sampler, and a sampler that caught both of these programs in the one

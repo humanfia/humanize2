@@ -216,18 +216,30 @@ def test_a_terminal_that_has_not_been_told_its_own_size_is_the_ordinary_one_too(
 def test_a_terminal_is_put_into_raw_and_put_back_again(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Raw is what every multiplexer does: the run does its own echoing and line editing."""
+    """Raw is what every multiplexer does: the run does its own echoing and line editing.
+
+    Asked of those two modes rather than of the whole of `tcgetattr`, which also carries
+    state nobody set: `PENDIN` says the kernel has input to retype and comes and goes on its
+    own, so a terminal put back exactly still does not compare equal to what it was.
+    """
     controller, follower = pty.openpty()
     try:
         monkeypatch.setattr(attach, "_IN", follower)
         monkeypatch.setattr(attach, "_OUT", follower)
-        before = termios.tcgetattr(follower)
+        before = termios.tcgetattr(follower)[3]
+        assert before & termios.ECHO
+        assert before & termios.ICANON
 
         with attach._raw():
-            inside = termios.tcgetattr(follower)
+            inside = termios.tcgetattr(follower)[3]
 
-        assert inside != before, "the terminal was never put into raw mode"
-        assert termios.tcgetattr(follower) == before
+        assert not inside & termios.ECHO, "the terminal was never put into raw mode"
+        assert not inside & termios.ICANON
+        after = termios.tcgetattr(follower)[3]
+        assert after & termios.ECHO, (
+            "the terminal was left doing none of its own echoing"
+        )
+        assert after & termios.ICANON
     finally:
         os.close(follower)
         os.close(controller)
