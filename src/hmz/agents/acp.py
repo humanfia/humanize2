@@ -12,15 +12,20 @@ nobody is at a prompt here -- so every request is granted, by the *kind* of the 
 than by its id, which is the agent's own to name.
 """
 
+# The teardown every driver shares is base's, and reaching for it is what grok, agy, qwen
+# and the watchdog already do.
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from .base import AgentBase, SessionBase
+from .base import AgentBase, SessionBase, _ended
 from .config import AgentConfig
 from .event import Event, Failed, Saying
 from .watchdog import Watchdog
@@ -185,30 +190,22 @@ class AcpConnection:
         proc, self.proc = self.proc, None
         if proc is None:
             return
-        with contextlib_suppress():
+        with contextlib.suppress(OSError, ValueError):
             if proc.stdin is not None:
                 proc.stdin.close()
         try:
             proc.wait(timeout=1)
         except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-        with contextlib_suppress():
+            # The tree, not the launcher: an ACP backend starts a runtime that inherits
+            # stdout, and killing only what we spawned leaves the half that is actually
+            # talking to the model still holding the pipe this session reads.
+            _ended(proc)
+        with contextlib.suppress(OSError, ValueError):
             if proc.stdout is not None:
                 proc.stdout.close()
-        with contextlib_suppress():
+        with contextlib.suppress(OSError, ValueError):
             if proc.stderr is not None:
                 proc.stderr.close()
-
-
-class contextlib_suppress:  # noqa: N801 -- a tiny stand-in, kept local
-    """Swallows the errors a descriptor being closed twice raises."""
-
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, kind: object, value: object, traceback: object) -> bool:
-        return isinstance(value, (OSError, ValueError))
 
 
 class AcpSession(SessionBase):

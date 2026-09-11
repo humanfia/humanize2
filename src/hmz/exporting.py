@@ -41,7 +41,6 @@ import json
 import os
 import platform
 import re
-import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -764,7 +763,9 @@ def _cli(name: str) -> dict[str, Any]:
     if profile is None:
         return {"command": name, "executable": "", "version": "", "sha256": ""}
     command = profile.runs()
-    found = shutil.which(command)
+    # Where a backend may be installed is backends' to know: shutil.which alone
+    # calls a CLI under ~/.local/bin not installed, and the manifest would say so.
+    found = backends.program(command)
     held: dict[str, Any] = {
         "command": command,
         "executable": found or "",
