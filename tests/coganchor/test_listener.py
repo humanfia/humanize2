@@ -32,6 +32,23 @@ if TYPE_CHECKING:
 TOKEN = "not-a-real-shared-secret"
 
 
+def _has_ipv6() -> bool:
+    """Whether this machine has an IPv6 loopback to listen on at all."""
+    if not socket.has_ipv6:
+        return False
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as one:
+            one.bind(("::1", 0))
+    except OSError:
+        return False
+    return True
+
+
+#: A machine with IPv6 switched off is one this cannot be asked of, rather than one it fails
+#: on -- and CI runners are configured by whoever runs them.
+ipv6 = pytest.mark.skipif(not _has_ipv6(), reason="there is no IPv6 loopback here")
+
+
 def _caught(monkeypatch: pytest.MonkeyPatch) -> list[listener._ThreadedServer]:
     """Catches the server on its way past, so a test has something to stop.
 
@@ -245,6 +262,7 @@ def test_a_listener_on_its_way_out_does_not_leave_commands_running_on_the_target
     client.close()
 
 
+@ipv6
 @pytest.mark.timeout(60)
 def test_an_address_with_a_colon_in_it_is_listened_on_as_ipv6(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
