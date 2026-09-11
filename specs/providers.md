@@ -5,6 +5,7 @@
 ```
 .
 ├── __init__.py
+├── _staging.py
 ├── _trace.py
 ├── login.py
 ├── redirect.py
@@ -122,7 +123,7 @@ def points(cli: str, name: str, at: str) -> bool: ...
   rather than about the credentials it runs with, and `hmz.fallbacks` is the one place both it
   and where the turn goes next are written. Two places saying it would be two places to drift.
 
-## `redirect.py` / `_trace.py`
+## `redirect.py` / `_trace.py` / `_staging.py`
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -136,6 +137,17 @@ def command(swaps: Iterable[tuple[str, str]], argv: Sequence[str]) -> list[str]:
 
 
 def run(swaps: Swaps, argv: Sequence[str]) -> int: ...
+
+
+def swept(pid: int) -> None: ...
+
+
+class Staging:
+    def reading(self, path: str) -> str | None: ...
+
+    def wrote(self, path: str) -> None: ...
+
+    def close(self) -> None: ...
 ```
 
 - A turn under a provider MUST be run with the paths that backend keeps its credentials at
@@ -158,6 +170,41 @@ def run(swaps: Swaps, argv: Sequence[str]) -> int: ...
   the backend's own command line unchanged.
 - Two supervisors MUST NOT be nested -- a process has one tracer -- so a turn that is also
   anchored MUST hand its swaps to the anchor instead of wrapping it.
+- A call that only asks about a credential MUST be answered with a copy held in memory, and one
+  that could change it MUST be answered with the provider's own file. These CLIs ask hundreds of
+  times a turn and change one once in a while -- pi asks about its `auth.json` six to eight
+  hundred times, which is over half of every path syscall it makes -- so a credential read
+  thousands of times is one that should be in memory, and a credential written once is one that
+  should be on disk. Which of the two a syscall is MUST be said the safe way round: a call
+  nobody has classified is one that changes things, since answering a write with a copy would
+  put a refreshed token somewhere that is thrown away.
+- A write MUST take the copy with it, so the next read makes a new one. Otherwise the CLI reads
+  back the token it has just replaced. The write itself MUST NOT be staged and copied back: a
+  refreshed token has to be durable the moment it lands, a run that is killed between the two
+  would lose it, and two agents of one account would race over whose copy was last.
+- A copy MUST also be given up when the file it was made from has changed underneath it, within
+  a bounded time and without asking the disk at every read. That write is the other agent of the
+  same account refreshing the same token, and a cache that went on serving a secret which has
+  been rotated away is an account that stops working.
+- Only a regular file MUST be copied. A directory is listed and written into, a link is asked
+  about rather than read, and a lock is a rendezvous between processes that a copy would hide
+  from the process on the other side of it.
+- The copies MUST be this user's alone: a directory of the run's own at `0700`, holding files at
+  `0600`, under a name nobody can guess, made rather than opened so that a name somebody got in
+  first with is refused. It is memory that is shared and world-writable, and a credential put
+  there carelessly is one handed to whoever else is on the machine.
+- The directory MUST be taken away when the run ends, and that MUST NOT be the only thing that
+  takes it away: a turn is ended by killing the supervisor it ran in, and `SIGKILL` runs no
+  teardown, so the normal end of a turn is the case to answer rather than the exception. Whoever
+  killed a supervisor MUST sweep up after it once it has been waited on, and a run MUST sweep up
+  after runs that are over before it makes a directory of its own -- which is what covers the
+  driver that was killed too. A directory whose run may still be going MUST be left where it is,
+  leaking that one rather than taking the credentials from a run that is reading them.
+- A machine with nowhere to put a copy, or no room for one, MUST answer every path with the
+  provider's own file as it did before: a copy is where the reads go, never what makes them
+  possible.
+- An anchored turn MUST NOT be told any of this. A copy is on the machine whose supervisor made
+  it, and what an anchor is handed is the provider's own paths on the machine the turn lands on.
 
 ## `login.py`
 

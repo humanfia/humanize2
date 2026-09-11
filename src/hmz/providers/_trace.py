@@ -11,6 +11,13 @@ the provider's directory is written into the tracee and the register pointed at 
 syscall then runs, natively, against the file it was given. One that cannot be rewritten is
 failed rather than let through: a turn that read the credentials of whoever is at this machine
 would be a turn run as the wrong account, which is worse than a turn that did not run.
+
+Which of the provider's paths depends on what the call is about to do with it. One that only
+asks about a credential or opens it to read is given the copy :mod:`hmz.providers._staging`
+holds in memory, because a CLI asks about its token hundreds of times a turn and the answer
+is the same every time. One that could change it is given the provider's own file, and drops
+that copy: a refreshed token is durable where it is written, and the next read makes the copy
+again.
 """
 
 from __future__ import annotations
@@ -24,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 from hmz.coganchor.linux import procfs, ptrace
 from hmz.coganchor.linux.syscalls import NR
 
+from ._staging import Staging
 from .redirect import UNSWAPPABLE, failed
 
 if TYPE_CHECKING:
@@ -100,6 +108,39 @@ _PATHS: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.LINKAT: ((0, 1), (2, 3)),
 }
 
+#: Which of those only ask about a path, and so can be answered with a copy of what is there.
+#: Said this way round on purpose: a call nobody has thought about is one that changes things,
+#: and a call that changes things must reach the provider's own file. Adding a syscall to the
+#: table above and forgetting this one costs a read of a disk, which is what the table above
+#: did before there was a copy at all; the other way round would write a refreshed token into
+#: a directory that is thrown away when the turn ends.
+#:
+#: `readlink` is one of them, and is safe to be: what is copied is a regular file, so the copy
+#: answers `EINVAL` exactly as the file it was made from would. `chdir` is another, and never
+#: reaches a copy: a directory is not something there is a copy of.
+_READS = frozenset(
+    {
+        NR.STAT,
+        NR.LSTAT,
+        NR.ACCESS,
+        NR.READLINK,
+        NR.CHDIR,
+        NR.NEWFSTATAT,
+        NR.STATX,
+        NR.FACCESSAT,
+        NR.FACCESSAT2,
+        NR.READLINKAT,
+    }
+)
+
+#: What an `open` has to ask for to be one that changes things: anything but reading. A file
+#: opened for writing is one about to be written whether or not it ever is, and one created,
+#: truncated or appended to is changed by the call itself.
+_WRITING = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
+
+#: Where `struct open_how` keeps the flags, which is the front of it.
+_OPEN_HOW_FLAGS = 0
+
 
 class Tracing:
     """One redirected run: the processes it is watching, and what each of them is told."""
@@ -111,6 +152,8 @@ class Tracing:
           swaps: Which paths are answered by which others.
         """
         self._swaps = swaps
+        #: The copies this run answers reads with, made as they are first asked for.
+        self._staging = Staging()
         #: Every path this table could answer, as the bytes a process names one with. A path
         #: that does not start with one of them is not one of the provider's, whatever else
         #: it is: `Swaps.swap` answers a path that is one of these, is inside one, or is one
@@ -135,6 +178,10 @@ class Tracing:
     def trapped(self) -> list[int]:
         """The syscalls the filter has to stop, which is every one that names a path."""
         return sorted(_PATHS)
+
+    def close(self) -> None:
+        """Takes away the copies this run was answering reads with."""
+        self._staging.close()
 
     def watch(self, pid: int) -> int:
         """Services one process and everything it starts, until the first of them exits.
@@ -222,6 +269,10 @@ class Tracing:
         taken = (
             0  # what the paths already planted have used, so two do not overwrite one
         )
+        # Worked out at the first path this call names that is one of the provider's, which
+        # is none of them at nearly every stop: what the call is about to do costs a lookup
+        # and a register, and a stop that answers nothing must not pay for either.
+        changes: bool | None = None
         for descriptor, argument in _PATHS.get(registers.syscall_number, ()):
             raw = self._peek.cstring(pid, registers.arg(argument))
             # An empty path names the descriptor itself rather than a file, and a path that
@@ -237,6 +288,12 @@ class Tracing:
             instead = self._swaps.swap(named)
             if instead is None:
                 continue
+            if changes is None:
+                changes = self._changes(pid, registers)
+            if changes:
+                self._staging.wrote(instead)
+            else:
+                instead = self._staging.reading(instead) or instead
             if self._confined(pid, registers):
                 self._cancel(pid, registers)
                 return
@@ -248,6 +305,33 @@ class Tracing:
         if registers.dirty:
             _try(ptrace.setregs, pid, registers)
         _try(ptrace.cont, pid)
+
+    def _changes(self, pid: int, registers: Registers) -> bool:
+        """Whether this call could change what is at the path it names.
+
+        Args:
+          pid: The process.
+          registers: Its registers at the stop.
+
+        Returns:
+          True for a call to answer with the provider's own file, which is every one that
+          writes, creates, renames, unlinks or touches -- and an `open` that asked for
+          anything but reading. False for one to answer with the copy in memory.
+        """
+        number = registers.syscall_number
+        if number in _READS:
+            return False
+        if number == NR.OPEN:
+            return bool(registers.arg(1) & _WRITING)
+        if number == NR.OPENAT:
+            return bool(registers.arg(2) & _WRITING)
+        if number == NR.OPENAT2:
+            try:
+                raw = procfs.read_bytes(pid, registers.arg(2), _OPEN_HOW_FLAGS + 8)
+            except OSError:
+                return True  # unread is unknown, and unknown is the durable answer
+            return bool(int.from_bytes(raw[_OPEN_HOW_FLAGS:], "little") & _WRITING)
+        return True
 
     def _confined(self, pid: int, registers: Registers) -> bool:
         """Whether this call asked for a resolution an answered path cannot be given.
