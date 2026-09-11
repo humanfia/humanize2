@@ -47,11 +47,13 @@ jobs:
   test:
     name: test (${{ matrix.os }}, python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    # Room for the slower of the two systems and for every test that has to time out before
-    # the run can say so: a job killed at the wall reports nothing about what it was doing.
-    # macOS spends about four seconds apiece on the suites that spawn a CLI per test, which
-    # is most of the difference between the two.
-    timeout-minutes: 45
+    # Room for the slowest combination the matrix has. Ubuntu finishes in about thirteen
+    # minutes and macOS on 3.12 and 3.14 in about fourteen; macOS on 3.13 takes three times
+    # that, reproducibly, for reasons that are the interface suite's and not this repository's
+    # to fix. Generous rather than tight on purpose: a job killed at the wall reports nothing
+    # at all about what it was doing, which is the one outcome worth spending minutes to
+    # avoid. What bounds a single test is `timeout` in pyproject.toml, not this.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
