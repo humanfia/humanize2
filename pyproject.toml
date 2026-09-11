@@ -69,6 +69,12 @@ asyncio_mode = "auto"
 # A marker nobody registered is a typo, and a typo in `-m` selects nothing.
 # `-ra` names what was skipped, so a test that quietly stops running says so.
 addopts = ["--strict-markers", "--strict-config", "-ra"]
+# A ceiling on any one test that did not ask for its own. Everything here drives processes,
+# sockets and pseudoterminals, and every one of those has a way of waiting forever -- which
+# without this is a whole job sitting at the wall until CI kills it, saying nothing about
+# which test it was sitting in. A test that needs longer says so with `@pytest.mark.timeout`,
+# which wins over this.
+timeout = 300
 
 [tool.ruff]
 # The formatter wraps at 88; `pycodestyle` below lets prose the formatter cannot

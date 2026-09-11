@@ -47,7 +47,9 @@ jobs:
   test:
     name: test (${{ matrix.os }}, python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # Room for the slower of the two systems and for every test that has to time out before
+    # the run can say so: a job killed at the wall reports nothing about what it was doing.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
