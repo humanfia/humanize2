@@ -19,7 +19,7 @@ import pytest
 
 from hmz import backends, cli, providers
 from tests.providers.test_login import CLAUDE_LOGIN, stand_in
-from tests.providers.test_redirect import traced
+from tests.supervising import traced
 
 if TYPE_CHECKING:
     from pathlib import Path

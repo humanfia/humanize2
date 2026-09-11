@@ -7,8 +7,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.coganchor import standin
 from tests.coganchor.tasks import SMOKE_TASKS, SmokeTask
+from tests.supervising import WITHOUT_BINDINGS
+
+if (
+    WITHOUT_BINDINGS
+):  # what is imported below is the binding itself, so it is asked first
+    pytest.skip(WITHOUT_BINDINGS, allow_module_level=True)
+
+from hmz.coganchor import standin
 
 if TYPE_CHECKING:
     from pathlib import Path

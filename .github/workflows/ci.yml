@@ -45,8 +45,8 @@ jobs:
         run: uv build
 
   test:
-    name: test (python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }}, python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -54,6 +54,15 @@ jobs:
         # Every stable minor at or above the floor `requires-python` sets. A new one
         # ships, a new one goes here -- that is what the README promises.
         python: ["3.12", "3.13", "3.14"]
+        # Both systems humanize is installed on. The half that runs an agent under an
+        # anchor is a seccomp filter and a ptrace supervisor, which is Linux on x86-64
+        # and says so by skipping everywhere else; everything above it -- the interface,
+        # the flows, the backends, the daemon, the serving half of an anchor -- is meant
+        # to work on either, and this is what holds it to that.
+        #
+        # `macos-latest` rather than a pinned Intel runner: the DeepSeek runtime, which
+        # is an ordinary dependency, publishes a macOS wheel for arm64 alone.
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
 

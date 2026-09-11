@@ -108,6 +108,23 @@ def test_bundle_reports_failure_in_its_exit_status(tmp_path: Path) -> None:
     assert "malformed listen address" in result.stderr
 
 
+def _bare() -> dict[str, str]:
+    """The environment the anchored run below gets, which is the one the probe must use.
+
+    Deliberately small -- a `PATH`, the source tree, and a home to read an ssh config out of
+    -- so that what reaches the far side is what humanize puts there rather than whatever the
+    suite happened to be started with. `SSH_AUTH_SOCK` is the one that matters: an agent
+    forwarded into the terminal running the tests would let a probe in and leave the run
+    itself outside, which is a skip that never happens in front of a failure that always
+    does.
+    """
+    return {
+        "PATH": "/usr/bin:/bin",
+        "PYTHONPATH": str(REPO_ROOT / "src"),
+        "HOME": str(Path.home()),
+    }
+
+
 def _ssh_to_localhost_works() -> bool:
     try:
         probe = subprocess.run(
@@ -122,6 +139,7 @@ def _ssh_to_localhost_works() -> bool:
             ],
             capture_output=True,
             timeout=20,
+            env=_bare(),
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -162,11 +180,7 @@ def test_ssh_transport_bootstraps_and_runs(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
-        env={
-            "PATH": "/usr/bin:/bin",
-            "PYTHONPATH": str(REPO_ROOT / "src"),
-            "HOME": str(Path.home()),
-        },
+        env=_bare(),
         timeout=150,
         check=False,
     )
