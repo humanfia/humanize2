@@ -86,5 +86,5 @@ jobs:
       # and a list of the slowest twenty-five is how that stays visible.
       - name: pytest
         run: >
-          uv run --frozen pytest -q --durations=25 --timeout-method=thread
+          uv run --frozen pytest -v --durations=25 --timeout-method=thread
           --cov=hmz --cov-report=term-missing --cov-report=xml
