@@ -13,9 +13,13 @@ answers: a container without `CAP_SYS_PTRACE` has every module and can supervise
 :data:`WITHOUT` is that answer, and :data:`traced` is the mark that leaves a test out where
 it is no.
 
-Here rather than beside the supervisor's own tests because a conftest needs the answer too --
-the anchored suites skip a fixture on it -- and a conftest is a pytest plugin rather than a
-module to import from, so it cannot be the one that holds it.
+Here rather than beside the supervisor's own tests because most of what asks is somewhere
+else. A turn run as a named account is a supervised turn -- the paths that turn reads are
+answered by others, which is what the filter and the tracer are for -- so the accounts, the
+catalogues kept per account, an epic naming the account a session ran as and a flow running
+one CLI as two of them all ask this before they ask for one. A conftest asks too, and a
+conftest is a pytest plugin rather than a module to import from, so it cannot be the one that
+holds it.
 """
 
 from __future__ import annotations
