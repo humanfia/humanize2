@@ -174,9 +174,13 @@ def test_why_a_terminal_was_let_go_of_is_said_where_it_can_be_read(
     try:
         terminal.until(b"open")
         held.detach()
+
+        # Read while there is still a terminal to read from. Closing the far side of a
+        # pseudoterminal throws away whatever was still in it on some systems, so a goodbye
+        # gathered after the reader has gone is a goodbye gathered from nothing.
+        drawn = terminal.until(b"detached")
         assert _until(lambda: terminal.gone)
 
-        drawn = terminal.drew(1.0)
         # The sequence that leaves the alternate screen comes first, and the reason after it.
         assert b"\x1b[?1049l" in drawn
         assert drawn.index(b"\x1b[?1049l") < drawn.index(b"detached")

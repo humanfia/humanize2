@@ -4,14 +4,27 @@ from __future__ import annotations
 
 import errno
 import os
-from typing import TYPE_CHECKING
+import signal
+import socket
+import threading
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz.coganchor.proto import Frame, Kind, Op, RemoteOSError
+from hmz.coganchor.proto import (
+    PROTOCOL_VERSION,
+    Channel,
+    Frame,
+    Kind,
+    Op,
+    RemoteOSError,
+)
+from hmz.coganchor.remote import RemoteClient
 from hmz.coganchor.serve import fsops
 from hmz.coganchor.serve.exports import Export, ExportTable
+from hmz.coganchor.serve.server import Server
 from hmz.coganchor.serve.sessions import compose_env
+from tests.coganchor.conftest import VIRTUAL_EXPORT
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -233,3 +246,75 @@ def test_unknown_operation_reports_enosys_without_dropping_the_link(link: Link) 
 
     still_working = link.client.call(Op.STAT, path="/project")
     assert still_working["kind"] == "dir", "the connection must still work"
+
+
+def test_a_request_missing_what_it_needs_is_a_bad_request_rather_than_a_dead_link(
+    link: Link,
+) -> None:
+    """A peer that sent nonsense gets an error; the session it sent it on goes on."""
+    with pytest.raises(RemoteOSError) as raised:
+        link.client.call(Op.STAT)
+
+    assert raised.value.errno == errno.EINVAL
+    assert link.client.call(Op.STAT, path=VIRTUAL_EXPORT)["kind"] == "dir"
+
+
+@pytest.mark.timeout(60)
+def test_a_signal_reaches_the_command_it_names(link: Link) -> None:
+    """A turn stopped here is a process stopped there, or the target keeps running it."""
+    ended = threading.Event()
+    done: list[dict[str, Any]] = []
+
+    def over(result: dict[str, Any] | None, _error: object) -> None:
+        done.append(result or {})
+        ended.set()
+
+    running = link.client.start_exec(
+        ["sleep", "60"],
+        cwd=VIRTUAL_EXPORT,
+        env={},
+        on_output=lambda stream, data: None,
+        on_exit=over,
+    )
+    assert not ended.wait(timeout=1)
+
+    running.signal(signal.SIGTERM)
+
+    assert ended.wait(timeout=30)
+    assert done
+
+
+@pytest.mark.timeout(60)
+def test_a_signal_naming_nothing_is_answered_rather_than_ignored(link: Link) -> None:
+    """The client waits on the reply, so a target that said nothing would hang it."""
+    assert link.client.call(Op.SIGNAL, target=999_999, sig=signal.SIGTERM) is not None
+
+
+@pytest.mark.timeout(60)
+def test_a_client_speaking_another_protocol_is_refused_and_the_link_goes_with_it() -> (
+    None
+):
+    """Both ends check, because either may be the older build.
+
+    And the connection goes with the refusal: an untokened session starts out
+    authenticated, so failing the handshake alone would leave every request after it
+    working.
+    """
+    left, right = socket.socketpair()
+    table = ExportTable.parse([f"{VIRTUAL_EXPORT}:/"])
+    server = Server(Channel.from_socket(right), table)
+    thread = threading.Thread(target=server.serve, daemon=True)
+    thread.start()
+    client = RemoteClient(Channel.from_socket(left))
+    client._reader.start()
+    try:
+        with pytest.raises(RemoteOSError) as raised:
+            client.call(Op.HELLO, version=PROTOCOL_VERSION + 1000, token=None)
+
+        assert raised.value.errno == errno.EPROTO
+        thread.join(timeout=10)
+        assert not thread.is_alive(), "the connection must go with the refusal"
+    finally:
+        client.close()
+        left.close()
+        right.close()

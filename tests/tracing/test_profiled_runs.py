@@ -19,6 +19,7 @@ from hmz.runner import Runner
 from hmz.settings import Settings
 from hmz.tracing.collector import collect
 from hmz.tracing.profile import PROFILE, read
+from tests.sampling import sampled
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -26,15 +27,24 @@ if TYPE_CHECKING:
 
 CONFIG = AgentConfig(model="m", effort="high")
 
+#: What the turn runs: a shell running a sleep, which is two programs, and the profile has to
+#: hold both of them.
+#:
+#: A second rather than the tenth of one it takes to say what is being checked. What reads it
+#: is a sampler, taking one every :data:`hmz.tracing.profile.EVERY`, and a program that lives
+#: for a handful of those is one a loaded machine can miss altogether. Twenty samples is the
+#: difference between a test of the profiler and a test of the clock.
+SAID = "sleep 1; echo the-session"
+
 #: A flow whose agent runs a program, which is what a turn mostly is.
-FLOW = """
+FLOW = f"""
 from hmz.agents import AgentBase
 from hmz.flows import flow
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
-    agents[0].new()("sleep 0.2; echo the-session")
+    agents[0].new()("{SAID}")
 """
 
 
@@ -48,6 +58,7 @@ def workspace(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathli
     return tmp_path
 
 
+@sampled
 @pytest.mark.timeout(90)
 def test_a_run_is_profiled_when_the_workspace_asks_for_it(
     workspace: pathlib.Path,
@@ -61,7 +72,10 @@ def test_a_run_is_profiled_when_the_workspace_asks_for_it(
     ran = read(epic / PROFILE)
     assert ran, "the programs the turn ran are not in the run's profile"
     # The turn itself, which is a shell running a sleep: both are programs this run started.
-    assert {"sh", "sleep"} <= {one.name for one in ran}
+    # The shell is named by what it was given rather than by what it is called, one system's
+    # `/bin/sh` being another's `bash`; the sleep is called the same thing everywhere.
+    assert "sleep" in {one.name for one in ran}
+    assert any(one.argv[-2:] == ("-c", SAID) for one in ran)
 
 
 @pytest.mark.timeout(90)
@@ -75,6 +89,7 @@ def test_a_run_nobody_asked_to_profile_is_traced_and_not_profiled(
     assert not (epic / PROFILE).exists()
 
 
+@sampled
 @pytest.mark.timeout(90)
 def test_the_programs_and_the_sessions_are_one_document(
     workspace: pathlib.Path,
@@ -95,8 +110,11 @@ def test_the_programs_and_the_sessions_are_one_document(
     assert int(document["otherData"]["programs"]) >= 2
     events = json.loads(output.read_text())["traceEvents"]
     names = [one["args"]["name"] for one in events if one["name"] == "process_name"]
-    assert any(name.startswith("sh · ") for name in names)
+    assert any(name.startswith("sleep · ") for name in names)
     # And the whole of it is one span of time: the programs are where the turns are, rather
-    # than at some other point on the clock.
+    # than at some other point on the clock. Not a span with anything in it, though -- what
+    # bounds it is a sampler, and a sampler that caught both of these programs in the one
+    # sample gives an instant rather than a stretch, which is a fast machine rather than a
+    # wrong answer.
     began, ended = document["otherData"]["start"], document["otherData"]["end"]
-    assert began < ended
+    assert began <= ended

@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import socketserver
 import subprocess
 import sys
 import threading
@@ -20,6 +21,7 @@ import pytest
 
 from hmz import backends, models, providers
 from hmz.backends import named
+from tests.supervising import traced
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -293,6 +295,7 @@ def test_claude_keeps_the_alias_of_a_custom_model(
     assert environment["ANTHROPIC_CUSTOM_MODEL_OPTION"] == "fable"
 
 
+@traced
 @pytest.mark.parametrize("provider", ["", "subscribed"])
 def test_claude_is_never_asked_about_a_model_humanize_thought_of(
     provider: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -477,6 +480,7 @@ def test_a_catalogue_written_by_something_else_is_no_catalogue(
     assert models.offered("codex") == ()
 
 
+@traced
 def test_two_accounts_of_one_backend_are_two_catalogues(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -496,6 +500,7 @@ def test_two_accounts_of_one_backend_are_two_catalogues(
     assert models.offered("codex", "mine") == ()
 
 
+@traced
 def test_what_an_account_runs_is_kept_with_the_account(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -509,6 +514,7 @@ def test_what_an_account_runs_is_kept_with_the_account(
     assert models.offered("codex", "mine") == ()
 
 
+@traced
 def test_an_account_is_asked_under_its_own_credentials_and_without_anybody_elses(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -656,7 +662,19 @@ def endpoint(
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             """Nothing: a suite is not somewhere a web server keeps a log."""
 
-    running = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    class Serving(ThreadingHTTPServer):
+        """The same, without the reverse lookup it names itself by.
+
+        On a machine whose resolver has nothing to say about `127.0.0.1` that lookup blocks
+        for the resolver's own timeout, which is half a minute.
+        """
+
+        def server_bind(self) -> None:
+            socketserver.TCPServer.server_bind(self)
+            host, port = self.server_address[:2]
+            self.server_name, self.server_port = str(host), int(port)
+
+    running = Serving(("127.0.0.1", 0), Handler)
     reader = threading.Thread(target=running.serve_forever, daemon=True)
     reader.start()
     try:
@@ -717,6 +735,7 @@ def test_an_endpoint_written_with_its_version_is_not_asked_for_a_second_one(
     assert [path for path, _ in asked] == ["/v1/models"]
 
 
+@traced
 def test_an_account_that_names_no_endpoint_is_asked_of_its_cli(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -737,6 +756,7 @@ def test_an_account_that_names_no_endpoint_is_asked_of_its_cli(
         ("<html>somebody else's login page</html>", 200),
     ],
 )
+@traced
 def test_an_endpoint_that_will_not_say_leaves_the_cli_to_answer(
     body: str, status: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -754,6 +774,7 @@ def test_an_endpoint_that_will_not_say_leaves_the_cli_to_answer(
     assert [model.name for model in found] == ["claude-nine", "claude-quick"]
 
 
+@traced
 def test_an_endpoint_nothing_is_listening_at_leaves_the_cli_to_answer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -791,6 +812,7 @@ def test_the_accounts_own_credential_is_sent_and_never_written_down(
     assert "the-secret" not in models.where("claude", "gateway").read_text("utf-8")
 
 
+@traced
 def test_a_backend_whose_ids_are_a_providers_is_never_asked_an_endpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -813,6 +835,7 @@ def test_a_backend_whose_ids_are_a_providers_is_never_asked_an_endpoint(
     assert asked == []
 
 
+@traced
 def test_the_credential_does_not_follow_a_redirect_to_another_host(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

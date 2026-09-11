@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| **Python 3.12 or newer** | 3.12, 3.13 and 3.14 are the ones CI runs the tests on. |
+| **Python 3.12 or newer** | 3.12, 3.13 and 3.14 are the ones CI runs the tests on, on Linux and macOS. |
 | **At least one supported backend** | `agy`, `claude`, `codex`, `cursor-agent`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` or `zcode` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
 | **A project you are willing to have rewritten** | Read [Security](/user/security) first. |
 

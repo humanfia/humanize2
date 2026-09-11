@@ -31,7 +31,7 @@ from hmz.agents import (
 from hmz.agents.watchdog import WATCHDOG, Watchdog, held, silence
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
 CONFIG = AgentConfig(model="m", effort="high")
 
@@ -147,6 +147,28 @@ def _watched(agent: AgentBase) -> list[Event]:
     said: list[Event] = []
     agent.watch(lambda _agent, _session, event: said.append(event))
     return said
+
+
+def _until(what: Callable[[], bool], seconds: float = 20.0) -> bool:
+    """Waits for the watchdog thread to have done a thing, rather than for a length of time.
+
+    One rung is a whole tick apart from the next, so "after this one and before that one" is
+    a window that a loaded machine steps straight over -- and the rung after a look is one
+    that does something, which is the difference between a verdict and none.
+
+    Args:
+      what: The question, asked again until it is yes.
+      seconds: How long to go on asking.
+
+    Returns:
+      Whether it became true in the time it was given.
+    """
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if what():
+            return True
+        time.sleep(0.01)
+    return what()
 
 
 def _steps(said: list[Event]) -> str:
@@ -389,7 +411,10 @@ def test_a_backend_that_crashed_keeps_the_reason_it_crashed() -> None:
     proc.wait()
     watch = Watchdog(session, riding=lambda: proc, window=0.5)
     with watch:
-        time.sleep(2.0)
+        # Left as soon as it has looked, rather than after a length of time: looking is one
+        # rung and the rung after it puts the transport down, which is a thing done and so a
+        # verdict claimed. Sleeping across that boundary is a coin toss.
+        assert _until(lambda: "is gone" in _steps(said))
     assert "is gone" in _steps(said)  # seen, and said at the moment it was seen
     assert watch.wedged() is None  # but nothing was done to it, so nothing is claimed
 

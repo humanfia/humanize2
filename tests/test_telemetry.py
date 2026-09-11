@@ -8,7 +8,7 @@ path of theirs, no key. The rest is the plumbing that lets a report say what was
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -359,3 +359,62 @@ def test_a_workspace_may_be_forgotten_without_forgetting_anything_else(
         Settings(tmp_path).enable_sentry is False
     )  # and so is what is true everywhere
     assert not Settings(tmp_path).forget()  # nothing left to forget
+
+
+def test_every_string_inside_what_a_layer_answered_is_scrubbed_too() -> None:
+    """A layer answers with a structure, and a secret is as easily three levels down."""
+    said = telemetry._plainly(
+        {
+            "flow": "https://user:hunter2@example.com/x",
+            "agents": [
+                {
+                    "backend": "claude",
+                    "key": "the key is sk-ant-api03-abcdefghijklmnop",
+                },
+                "https://x-access-token:ghp_abcdefghijklmnop@github.com/org/repo",
+            ],
+        }
+    )
+
+    written = repr(said)
+    assert "hunter2" not in written
+    assert "sk-ant-api03" not in written
+    assert "ghp_" not in written
+    assert "claude" in written  # and what is not a secret is still there to read
+
+
+def test_the_names_of_what_a_layer_answered_are_scrubbed_as_well_as_the_values() -> (
+    None
+):
+    """A key is as easily the name of a field as the value of one."""
+    said = telemetry._plainly({"https://user:hunter2@example.com/x": "ordinary"})
+
+    assert "hunter2" not in repr(said)
+
+
+def test_what_is_not_a_string_is_left_as_it_is() -> None:
+    """Numbers and flags are what a report is read for; scrubbing them would say nothing."""
+    said = telemetry._plainly(
+        {"turns": 3, "profiled": True, "cost": 1.25, "none": None}
+    )
+
+    assert said == {"turns": 3, "profiled": True, "cost": 1.25, "none": None}
+
+
+def test_a_document_is_scrubbed_value_by_value_rather_than_whole() -> None:
+    """Value by value, not over the document.
+
+    Scrubbed as one string it could be cut in half by the length limit, and half a YAML
+    file is a file nobody can read.
+    """
+    long_enough = "x" * (telemetry._LONG - 10)
+
+    said = cast("list[Any]", telemetry._plainly([long_enough] * 3))
+
+    assert len(said) == 3
+    assert all(one == long_enough for one in said)
+
+
+def test_a_tuple_a_layer_answered_with_is_a_list_by_the_time_it_is_written() -> None:
+    """YAML has no tuple, so one that stayed a tuple would be a document that will not write."""
+    assert telemetry._plainly(("one", "two")) == ["one", "two"]

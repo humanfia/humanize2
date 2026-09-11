@@ -28,7 +28,7 @@ import pytest
 from hmz.agents import AgentConfig, Stopped, Usage
 from hmz.epic import STATE, epics, state
 from hmz.flows import resumes
-from hmz.flows.builtin import ralph_loop, stateful_ralph
+from hmz.flows.builtin import chat, ralph_loop, stateful_ralph
 from hmz.runner import Runner
 from tests.stubs import ShellAgent
 
@@ -42,6 +42,11 @@ CONFIG = AgentConfig(model="m", effort="high")
 
 #: What the agents are set to do, which the stand-in runs as the shell command it is.
 TASK = "echo working"
+#: The conversation, by the name `-f` takes. Imported above as the loops are rather than
+#: written out here: a flow is loaded from its file when it is run, and a module nothing
+#: imported is one coverage never sees run -- so the flow the interface opens on read as
+#: untouched while these tests were driving it.
+CHAT = chat.__name__.rpartition(".")[2]
 
 #: A turn that cannot be taken at all, which is what an account the backend refused looks like
 #: from inside a flow: under `suppress` it answers with nothing and spends nothing, so a budget
@@ -253,7 +258,7 @@ def test_the_loops_can_be_picked_up_and_the_conversation_cannot(
 
     assert resumes("ralph_loop")
     assert resumes("stateful_ralph")
-    assert not resumes("chat")
+    assert not resumes(CHAT)
 
 
 @pytest.mark.timeout(60)
@@ -263,7 +268,7 @@ def test_a_run_of_chat_leaves_nothing_behind_to_pick_up(
     """What was said is the backend's log, and nobody is at the prompt to say more."""
     monkeypatch.chdir(tmp_path)
 
-    Runner("chat", [ShellAgent(CONFIG)]).run(TASK)
+    Runner(CHAT, [ShellAgent(CONFIG)]).run(TASK)
 
     (epic,) = epics()
     assert not (epic / STATE).exists()
@@ -283,7 +288,7 @@ def test_a_chat_whose_opening_turn_cannot_be_taken_says_so(
     monkeypatch.chdir(tmp_path)
 
     with pytest.raises(subprocess.CalledProcessError):
-        Runner("chat", [ShellAgent(CONFIG)]).run(FAILS)
+        Runner(CHAT, [ShellAgent(CONFIG)]).run(FAILS)
 
 
 @pytest.mark.timeout(60)

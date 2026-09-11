@@ -19,7 +19,7 @@ import pytest
 
 from hmz import backends, cli, providers
 from tests.providers.test_login import CLAUDE_LOGIN, stand_in
-from tests.providers.test_redirect import traced
+from tests.supervising import traced
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -317,6 +317,7 @@ def test_signing_in_again_runs_the_way_the_provider_was_made_by(
     assert (provider.at / "home" / ".credentials.json").exists()
 
 
+@traced
 def test_an_account_is_asked_what_it_runs_as_soon_as_it_is_made(
     asking: None,
     tmp_path: Path,

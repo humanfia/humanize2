@@ -24,7 +24,7 @@ from hmz.backends import Model
 from hmz.epic import epics
 from hmz.kept import Runs
 from hmz.tui import Humanize
-from hmz.tui.app import _HELP, _OWN, Editor, _where
+from hmz.tui.app import _HELP, _OWN, _SAID, Editor, _where
 from hmz.tui.pick import (
     Accounts,
     Agent,
@@ -1675,7 +1675,7 @@ def test_the_terminal_theme_names_no_colour_of_its_own() -> None:
 
 @pytest.mark.timeout(60)
 async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
-    """What you said behind `❯`, what the agent said on `●`, and a line closing the turn.
+    """What you said behind `❯`, what the agent said on the bullet, and a line closing it.
 
     Which is Claude Code's own shape, read off its own screen: no bars, no boxes, nothing
     indented -- every line starts where the terminal does.
@@ -1707,10 +1707,10 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
 
     assert "❯ do the thing" in shown  # what you said
     assert "is working" in shown  # which agent has the turn, said as it starts
-    assert (
-        "● Bash(git status)" in shown
-    )  # a tool on the bullet, its argument in brackets
-    assert "● one" in shown
+    # The bullet is the terminal's rather than ours -- one system draws a different glyph --
+    # so it is asked for by the same name the interface draws it under.
+    assert f"{_SAID} Bash(git status)" in shown  # a tool, its argument in brackets
+    assert f"{_SAID} one" in shown
     assert "\n  two" in shown
     assert "✻ Worked for" in shown  # and the line Claude Code closes a turn with
 
