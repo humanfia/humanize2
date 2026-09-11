@@ -49,7 +49,10 @@ def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> N
     under this process, and a suite that runs flows on threads of its own has other shells
     of its own going at the same time.
     """
-    said = "sleep 0.4"
+    # Two commands rather than one, and the second a builtin that starts nothing. A shell
+    # given a single simple command may `exec` it and cease to be a process of its own, which
+    # one of these systems does and the other does not -- and this test is about the shell.
+    said = "sleep 0.4; :"
     held = _ran(tmp_path, "sh", "-c", said)
 
     # By the tail of what it was started with, since the head of it is the platform's: one
@@ -72,11 +75,12 @@ def test_a_program_is_written_down_as_it_goes_rather_than_at_the_end(
     one = Profiler(tmp_path / PROFILE, every=0.01)
     one.start()
     try:
-        subprocess.run(["sh", "-c", "sleep 0.1"], check=False, capture_output=True)
+        said = "sleep 0.1; :"  # two, so the shell does not `exec` the one and vanish
+        subprocess.run(["sh", "-c", said], check=False, capture_output=True)
         time.sleep(0.1)
         # Nothing has stopped it, and the program it saw is already written down --
         # found by what it was given rather than by what this system calls its shell.
-        assert any(each.argv[-2:] == ("-c", "sleep 0.1") for each in read(tmp_path))
+        assert any(each.argv[-2:] == ("-c", said) for each in read(tmp_path))
     finally:
         one.stop()
 
