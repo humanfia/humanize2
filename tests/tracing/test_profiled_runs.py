@@ -19,6 +19,7 @@ from hmz.runner import Runner
 from hmz.settings import Settings
 from hmz.tracing.collector import collect
 from hmz.tracing.profile import PROFILE, read
+from tests.sampling import sampled
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -57,6 +58,7 @@ def workspace(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathli
     return tmp_path
 
 
+@sampled
 @pytest.mark.timeout(90)
 def test_a_run_is_profiled_when_the_workspace_asks_for_it(
     workspace: pathlib.Path,
@@ -87,6 +89,7 @@ def test_a_run_nobody_asked_to_profile_is_traced_and_not_profiled(
     assert not (epic / PROFILE).exists()
 
 
+@sampled
 @pytest.mark.timeout(90)
 def test_the_programs_and_the_sessions_are_one_document(
     workspace: pathlib.Path,

@@ -47,13 +47,11 @@ jobs:
   test:
     name: test (${{ matrix.os }}, python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    # Room for the slowest combination the matrix has. Ubuntu finishes in about thirteen
-    # minutes and macOS on 3.12 and 3.14 in about fourteen; macOS on 3.13 takes three times
-    # that, reproducibly, for reasons that are the interface suite's and not this repository's
-    # to fix. Generous rather than tight on purpose: a job killed at the wall reports nothing
-    # at all about what it was doing, which is the one outcome worth spending minutes to
-    # avoid. What bounds a single test is `timeout` in pyproject.toml, not this.
-    timeout-minutes: 60
+    # Both systems finish in about a quarter of an hour. Twice that, because a job killed at
+    # the wall reports nothing at all about what it was doing -- which is the one outcome
+    # worth spending minutes to avoid, and the one this matrix spent a morning learning.
+    # What bounds a single test is `timeout` in pyproject.toml, not this.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -86,5 +84,5 @@ jobs:
       # and a list of the slowest twenty-five is how that stays visible.
       - name: pytest
         run: >
-          uv run --frozen pytest tests/tracing/test_profile.py -v --timeout-method=thread --timeout=120
-          --no-cov
+          uv run --frozen pytest -q --durations=25 --timeout-method=thread
+          --cov=hmz --cov-report=term-missing --cov-report=xml

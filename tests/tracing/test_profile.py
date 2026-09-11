@@ -17,6 +17,7 @@ import pytest
 
 from hmz.tracing import chrome
 from hmz.tracing.profile import PROFILE, Process, Profiler, Thread, read
+from tests.sampling import sampled
 
 if TYPE_CHECKING:
     import pathlib
@@ -41,6 +42,7 @@ def _ran(at: pathlib.Path, *said: str) -> list[Process]:
     return read(at)
 
 
+@sampled
 @pytest.mark.timeout(60)
 def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> None:
     """Which is the whole of it: what ran, what started it, and how long it took.
@@ -72,6 +74,7 @@ def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> N
     assert [one.name for one in held if one.ppid == shell.pid] == ["sleep"]
 
 
+@sampled
 @pytest.mark.timeout(60)
 def test_a_program_is_written_down_as_it_goes_rather_than_at_the_end(
     tmp_path: pathlib.Path,
@@ -92,6 +95,7 @@ def test_a_program_is_written_down_as_it_goes_rather_than_at_the_end(
         one.stop()
 
 
+@sampled
 @pytest.mark.timeout(60)
 def test_a_profile_holds_the_threads_of_what_it_saw(tmp_path: pathlib.Path) -> None:
     """A track is a thread, so a program with two of them is a process with two tracks."""
