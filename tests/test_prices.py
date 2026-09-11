@@ -8,7 +8,10 @@ spent in tokens without inventing a bill of nothing.
 
 from __future__ import annotations
 
+import http.server
 import json
+import socket
+import threading
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -351,3 +354,167 @@ def test_a_bill_is_written_to_what_can_be_read_at_a_glance(
 ) -> None:
     """And to four places under a cent: a tenth of one is still something spent."""
     assert prices.money(dollars) == said
+
+
+# ------------------------------------------------- the half that speaks to a source
+
+#: What the served document says, so a test can tell a fetched list from a written one.
+_SERVED = "served-over-http"
+
+
+class _Source:
+    """A price list served over HTTP, on a port of this machine's own.
+
+    The one path the rest of this file does not take: `HUMANIZE_PRICES` points at a file
+    everywhere else, which is the same path the real fetch takes *once the bytes are in
+    hand*. Getting the bytes is what this is about -- the conditional request, the answer
+    that says nothing has changed, and the schemes a price list may not come over.
+
+    Nothing here leaves the machine: it is `127.0.0.1` and whichever port the kernel hands
+    out.
+    """
+
+    def __init__(self, body: bytes, etag: str) -> None:
+        self.body = body
+        self.etag = etag
+        #: What each request carried, for a test about the request rather than the answer.
+        self.asked: list[dict[str, str]] = []
+        outer = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                outer.asked.append(dict(self.headers))
+                if outer.etag and self.headers.get("If-None-Match") == outer.etag:
+                    self.send_response(304)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                if outer.etag:
+                    self.send_header("ETag", outer.etag)
+                self.send_header("Content-Length", str(len(outer.body)))
+                self.end_headers()
+                self.wfile.write(outer.body)
+
+            def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+                """Nothing: a suite is not a place for an access log."""
+
+        self._server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    @property
+    def url(self) -> str:
+        host, port = self._server.server_address[:2]
+        return f"http://{host!s}:{port}/prices.json"
+
+    def close(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=10)
+
+
+@pytest.fixture
+def served() -> Any:
+    """A price list served over HTTP, taken down however the test ends."""
+    made: list[_Source] = []
+
+    def one(document: dict[str, Any] | None = None, etag: str = "") -> _Source:
+        held = _Source(
+            json.dumps(document or _listing(_model(_SERVED, input_tokens=1))).encode(),
+            etag,
+        )
+        made.append(held)
+        return held
+
+    yield one
+    for held in made:
+        held.close()
+
+
+@pytest.mark.timeout(60)
+def test_a_list_is_fetched_from_where_it_is_served(
+    served: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = served()
+    monkeypatch.setenv(prices.WHENCE, source.url)
+    prices._tried = 0.0
+
+    assert prices.refresh(wait=True)
+
+    assert prices.price(_SERVED) is not None
+
+
+@pytest.mark.timeout(60)
+def test_what_came_back_is_the_body_and_the_tag_to_ask_with_next_time(
+    served: Any,
+) -> None:
+    source = served(etag='"the-first-one"')
+
+    body, etag = prices._over_http(source.url, "")
+
+    assert json.loads(body)["currency"] == "USD"
+    assert etag == '"the-first-one"'
+
+
+@pytest.mark.timeout(60)
+def test_a_tag_already_here_is_what_the_source_is_asked_with(served: Any) -> None:
+    """Conditional, so that a list nobody has changed is not fetched again every day."""
+    source = served(etag='"the-first-one"')
+
+    with pytest.raises(prices._Unchanged):
+        prices._over_http(source.url, '"the-first-one"')
+
+    assert source.asked[-1]["If-None-Match"] == '"the-first-one"'
+
+
+@pytest.mark.timeout(60)
+def test_a_source_that_has_something_newer_answers_with_it(served: Any) -> None:
+    source = served(etag='"the-second-one"')
+
+    body, etag = prices._over_http(source.url, '"the-first-one"')
+
+    assert body
+    assert etag == '"the-second-one"'
+
+
+@pytest.mark.timeout(60)
+def test_a_source_that_says_nothing_has_changed_leaves_what_was_kept_serving(
+    served: Any, listed: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which is the whole point of asking conditionally: the answer costs nothing."""
+    listed(_model("kept-from-before", input_tokens=2))
+    source = served(etag='"the-first-one"')
+    monkeypatch.setenv(prices.WHENCE, source.url)
+    prices._tried = 0.0
+    assert prices.refresh(wait=True)  # which keeps the etag beside what it fetched
+    prices._tried = 0.0
+
+    assert prices.refresh(wait=True)
+
+    assert prices.price(_SERVED) is not None
+
+
+@pytest.mark.parametrize("whence", ["file:///etc/passwd", "ftp://example.invalid/x"])
+def test_a_price_list_may_not_come_over_anything_but_http(whence: str) -> None:
+    """A source is read out of the environment, and a URL is not only ever a URL."""
+    with pytest.raises(ValueError, match="prices come over http"):
+        prices._over_http(whence, "")
+
+
+@pytest.mark.timeout(60)
+def test_a_source_that_is_not_answering_leaves_what_was_kept_serving(
+    listed: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing here may fail a run: a price list that could stop one is worth less than none."""
+    listed(_model("kept-from-before", input_tokens=2))
+    # A port on the loopback with nothing behind it, which refuses at once rather than hangs.
+    with socket.socket() as spare:
+        spare.bind(("127.0.0.1", 0))
+        nobody = spare.getsockname()[1]
+    monkeypatch.setenv(prices.WHENCE, f"http://127.0.0.1:{nobody}/prices.json")
+    prices._tried = 0.0
+
+    assert not prices.refresh(wait=True)
+
+    assert prices.price("kept-from-before") is not None
