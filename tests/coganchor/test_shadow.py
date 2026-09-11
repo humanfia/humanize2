@@ -191,3 +191,107 @@ def test_prepare_can_be_forced(tmp_path: Path) -> None:
     root.mkdir()
     (root / "stuff.txt").write_text("x")
     prepare_shadow_root(str(root), force=True)
+
+
+def _linked(fixture: Fixture) -> tuple[str, str]:
+    """One placeholder, and a second name for it made on both sides as a hard link is.
+
+    Returns:
+      The two local paths, the first mirrored and the second only just made.
+    """
+    (fixture.target / "one.txt").write_text("real content here")
+    fixture.shadow.ensure_directory(str(fixture.mirror))
+    # The tracee's `link` lands on both: here, and replayed on the target.
+    (fixture.target / "two.txt").hardlink_to(fixture.target / "one.txt")
+    first, second = str(fixture.local("one.txt")), str(fixture.local("two.txt"))
+    Path(second).hardlink_to(first)
+    return first, second
+
+
+def test_a_second_name_for_a_placeholder_reads_the_file_rather_than_its_zeroes(
+    fixture: Fixture,
+) -> None:
+    first, second = _linked(fixture)
+
+    fixture.shadow.duplicate(first, second)
+
+    fixture.shadow.ensure_content(second)
+    assert fixture.local("two.txt").read_text() == "real content here"
+
+
+def test_a_second_name_nobody_recorded_is_the_zeroes_it_holds(fixture: Fixture) -> None:
+    """Which is what `duplicate` is for: a placeholder reached by a name with no record."""
+    _first, second = _linked(fixture)
+
+    fixture.shadow.ensure_content(second)
+
+    assert fixture.local("two.txt").read_bytes() == b"\x00" * len("real content here")
+
+
+def test_a_second_name_for_something_nobody_recorded_records_nothing(
+    fixture: Fixture,
+) -> None:
+    """A hard link between two files the mirror never made is not the mirror's to know."""
+    fixture.shadow.duplicate(
+        str(fixture.local("never-mirrored")), str(fixture.local("nor-this"))
+    )
+
+    assert str(fixture.local("nor-this")) not in fixture.shadow._files
+
+
+def test_what_was_taken_away_is_forgotten_whole(fixture: Fixture) -> None:
+    """A directory dropped takes what was under it, or the next run reads a stale record."""
+    (fixture.target / "box").mkdir()
+    (fixture.target / "box" / "inside.txt").write_text("under it")
+    fixture.shadow.ensure_directory(str(fixture.mirror))
+    fixture.shadow.ensure_directory(str(fixture.local("box")))
+    assert any("inside.txt" in one for one in fixture.shadow._files)
+
+    fixture.shadow.forget(str(fixture.local("box")))
+
+    assert not any("inside.txt" in one for one in fixture.shadow._files)
+    assert not any("box" in one for one in fixture.shadow._dirs)
+
+
+def test_a_write_outside_the_mirror_is_not_the_mirror_s_to_push(
+    fixture: Fixture, tmp_path: Path
+) -> None:
+    """The tracee writes to its own machine as well, and none of that goes to the target."""
+    elsewhere = tmp_path / "elsewhere.txt"
+    elsewhere.write_text("this machine's own")
+
+    fixture.shadow.note_write(str(elsewhere))
+
+    assert fixture.shadow.flush() == 0
+
+
+def test_a_file_that_went_away_before_the_push_is_not_pushed(fixture: Fixture) -> None:
+    """The unlink was replayed already, so there is nothing left here to send."""
+    (fixture.target / "gone.txt").write_text("here for now")
+    fixture.shadow.ensure_directory(str(fixture.mirror))
+    fixture.local("gone.txt").write_text("edited")
+    fixture.shadow.note_write(str(fixture.local("gone.txt")))
+    fixture.local("gone.txt").unlink()
+
+    assert fixture.shadow.flush() == 0
+
+
+def test_something_that_is_not_a_file_is_not_pushed(fixture: Fixture) -> None:
+    """A directory the tracee made is replayed as a mkdir rather than sent as bytes."""
+    made = fixture.local("made")
+    made.mkdir(parents=True)
+
+    fixture.shadow.note_write(str(made))
+
+    assert fixture.shadow.flush() == 0
+
+
+def test_content_is_fetched_through_the_link_that_names_it(fixture: Fixture) -> None:
+    """A tracee opens a symlink and expects the file, so the mirror follows it first."""
+    (fixture.target / "real.txt").write_text("what the link leads to")
+    (fixture.target / "alias").symlink_to("real.txt")
+    fixture.shadow.ensure_directory(str(fixture.mirror))
+
+    fixture.shadow.ensure_content(str(fixture.local("alias")))
+
+    assert fixture.local("real.txt").read_text() == "what the link leads to"
