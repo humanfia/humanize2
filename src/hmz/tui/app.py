@@ -3161,7 +3161,7 @@ class Humanize(App[None]):
         try:
             # `--json` says how a run is written for whoever is at a command line, and there
             # is nobody at one here: the interface draws the same events itself.
-            path, chosen, task, _, container, _ = self.hmz.read(argv)
+            path, chosen, task, _, _ = self.hmz.read(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:
@@ -3176,9 +3176,7 @@ class Humanize(App[None]):
             # through this interface like everything else. How the flow itself is set up
             # goes with them: it is a setting of the flow rather than of any agent, so it
             # is not on the line that says what each of them runs.
-            runner = self.hmz.runner(
-                path, chosen, self._config, resume=resume, container=container
-            )
+            runner = self.hmz.runner(path, chosen, self._config, resume=resume)
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             self.show(f"hmz: {why}", "red")
             return

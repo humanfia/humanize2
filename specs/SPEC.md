@@ -724,6 +724,7 @@ class Runner:
         agents: Sequence[AgentBase],
         config: BaseModel | dict[str, Any] | None = None,
         resume: str | os.PathLike[str] | None = None,
+        container: str = "",
     ): ...
 
     @property
@@ -738,15 +739,13 @@ class Runner:
         """
 
 
-def read_agent(
-    spec: str,
-) -> tuple[Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
+def read_agent(spec: str) -> tuple[str, Profile, str, str, str]:
     """Reads and validates one command-line agent specification."""
 
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str, bool]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]:
     """Reads an `hmz exec` line into a flow, the agents, the task, and the flow's setup."""
 
 
@@ -803,6 +802,22 @@ never have reason to name this module.
   into. It MUST NOT load a flow to answer a `--help`, nor refuse a line for a flow it cannot
   read: what a place suggests about goals is a convenience, and reporting the flow is
   `Runner`'s one job.
+- An `-a` naming several agents MUST be split into them before any one of them is read, so
+  that a line naming three and mistyping one is answered about the one it got wrong rather than
+  about all three. What each agent is MUST be read out of `backends`, an agent being a backend
+  before it is anything else, so that one reading serves every way in and no layer above has a
+  grammar of its own.
+- A line that named the place each agent fills MUST be put in the flow's own order here, before
+  anything runs, and MUST be refused here where the names are not one apiece of the ones the
+  flow declares -- which is the same moment, and for the same reason, as a miscount. It MUST
+  ask the flow what it declares only where the line named a place: a line that named none needs
+  no answer, and a flow that cannot be read MUST be left to `Runner` to report rather than
+  refused twice in two voices.
+- A run given a container MUST start one for the whole of it and MUST take it down however the
+  run ends, and MUST NOT do either where none was named: reading a flow must pull no image, and
+  a run that never starts must leave nothing behind. It is not a thing a command line says --
+  where an agent works is the flow's, said where it declares the place -- so what asks for one
+  is whatever drove the run from Python.
 - What the line says about who is reading the run MUST be read here too, and handed back with
   the rest of it. One grammar reads one line: a flag the command peeled off itself would be a
   flag `hmz exec --help` never listed, and a second reading would be a second way of refusing
@@ -875,8 +890,10 @@ them is handed MUST be settled in one place rather than command by command.
 ## `hmz exec`
 
 ```shell
-hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...]
-         [--container <image>] [--json] <task>
+hmz exec -f|--flow <flow> -a|--agent <spec>[,<spec>...] [-a ...]
+         [-c|--config <config>] [--json] <task>
+
+<spec> := [<name>=]<cli>[@<provider>]/<model>:<effort>
 ```
 
 Runs a flow in the current directory, on the agents it is given.
@@ -886,21 +903,35 @@ Args:
 - `-f`, `--flow <flow>[:<name>]`: The flow: one of the ones humanize ships or a flowverse holds,
   by name, or a file of your own, by path. Required. A file that holds several flows MUST be
   said which, after a colon; a flowverse's own MAY be said which, `<flowverse>/<flow>`.
-- `-a`, `--agent <cli>[@<provider>]/<model>:<effort>`: One agent to drive the flow with. Repeated once for
-  each agent the flow drives, in the order it takes them -- which for a flow that drives none,
-  because the only side it talks to is the person at the prompt, is not at all: the person is
-  handed over rather than chosen. A line short of an agent the flow does drive is caught as
-  every other miscount is, against what the flow declares. It MUST also be
-  accepted written out as `cli=<cli>,model=<model>,effort=<effort>`, in any order, since a
-  model or an effort that holds the punctuation the short form separates on has nowhere else
-  to go. One `-a` MUST be one agent: a list in a single `-a` MUST NOT be split into several.
-- `--container <image>`: Run the whole of it in one container of that image, which is
-  `hmz.flows.contained`. A convenience rather than a second way of saying where an agent works:
-  it is said once, from outside, about all of them.
+- `-a`, `--agent <spec>[,<spec>...]`: The agents to drive the flow with. One `-a` MAY name
+  several, separated by commas, and every `-a` on the line MUST add to the same list in the
+  order they were written: what the line names is one list of agents however it was broken up,
+  so that a flow of four is one option or four and reads the same either way. A flow that
+  drives none -- because the only side it talks to is the person at the prompt -- is named none
+  at all: the person is handed over rather than chosen. A line short of an agent the flow does
+  drive is caught as every other miscount is, against what the flow declares.
+- `-c`, `--config <config>`: A YAML file of what to set the flow up with, one field per line,
+  under the names the flow declared. Only for a flow that says it can be set up, and what is in
+  it is the flow's own model's to check rather than this line's.
 - `--json`: Write the run for a program rather than for a person -- one JSON object on stdout
   for each thing an agent says, as it says it.
 - `<task>`: What the flow is to have the agents do, as the text itself.
 
+- A `<spec>` MAY name the place it fills, before an `=`. The names are the fields of the tuple
+  of agents the flow declares, so `<name>` MUST be a Python identifier, and naming them MUST be
+  all or nothing: either every agent on the line names its place or none does, since an agent
+  that names none fills the flow's next place and there is no next place to count while others
+  are filled by name. A name the flow does not declare, one given twice, a place left unfilled,
+  and a line that names places to a flow that declared a plain tuple MUST each be a usage error
+  before any agent has run, saying what the flow does declare. A line that names none of them
+  fills the places in the order the flow takes them, which is what every line always did.
+- The agent MUST NOT be sayable written out, one `<key>=<value>` to a comma: `=` and `,` are
+  how a line says which place an agent fills, so the two spellings cannot both be read, and one
+  spelling for one agent is what keeps an `-a` a thing that can be read at a glance. A line
+  writing `cli=`, `model=`, `effort=`, `provider=`, `service_tier=` or `config.<key>=` MUST be
+  a usage error saying the written-out form is gone and what to write instead. A latency tier
+  and a backend-native override are still an agent's to carry: they are set where the agent is
+  made -- from the SDK, or by the flow -- rather than on the line that names one.
 - `<cli>` MUST be one of `claude`, `codex` and `kimi`, each of which MUST also answer to the
   longer name it is installed under, and `<model>` and `<effort>` MUST be what that CLI is
   asked for. A model MAY hold slashes of its own -- Kimi Code's and opencode's are written
@@ -908,23 +939,19 @@ Args:
   colon.
 - The CLI MAY be followed by `@<provider>`, which is the account that agent's turns run as: a
   CLI is never spelled with an `@` in it, so the two are told apart wherever an agent is
-  written. `provider=` MUST say the same thing written out, and an `@` naming nothing MUST be
-  a line to correct rather than a line saying nothing.
+  written. An `@` naming nothing MUST be a line to correct rather than a line saying nothing.
 - What an agent may do and whether it may search the web MUST NOT be sayable here. They are
   things about the work rather than about the agent, so the flow declares them where it
   declares the place, and a line that writes `permission=` or `web_search=` MUST be a usage
   error saying where it is said instead -- refused outright rather than parsed and applied,
   the way a config a flow does not take is refused. An agent is what a line names: a CLI, an
-  account, a model at an effort and how quickly it is served.
+  account, a model at an effort, and which of the flow's places it fills.
 - Two agents of one spelling MUST be two agents, so that a flow of an actor and a reviewer at
   one configuration is what it says it is.
 - A flow that is not there, has no entry point, does not say how many agents it drives, or
   drives a different number than were given MUST be reported as a usage error, before any
   agent has run. Whatever else a flow does as it is imported is the flow's own, and MUST fail
   as it would anywhere.
-- A run put in a container MUST start one container for the whole of it and MUST take it down
-  however the run ends, and MUST NOT do either where none was asked for: reading a flow must
-  pull no image, and a run that never starts must leave nothing behind.
 - What a run looks like while it happens MUST be drawn from the agents' own event stream --
   the one the interface draws from -- rather than left to each backend teeing its raw progress
   to stderr: one run must read as one run, whichever CLIs it was given. Watching an agent is

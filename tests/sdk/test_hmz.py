@@ -103,10 +103,10 @@ def test_a_run_is_started_and_waited_for(
     written = tmp_path / "one.py"
     written.write_text(FLOW, encoding="utf-8")
     held = Hmz()
-    flow, agents, task, config, container, _ = held.read(
+    flow, agents, task, config, _ = held.read(
         ["-f", str(written), "-a", "claude/model:high", "go"]
     )
-    running = held.run(flow, agents, task, config, container=container)
+    running = held.run(flow, agents, task, config)
 
     assert not running.running
     running.start()

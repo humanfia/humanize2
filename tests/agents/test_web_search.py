@@ -183,11 +183,11 @@ def test_an_agent_that_may_not_search_is_another_agent_at_the_same_model() -> No
 def test_the_flow_says_it_and_a_line_that_says_it_is_refused() -> None:
     """A run whose answers have to be the same tomorrow is a thing about the work."""
     with pytest.raises(ValueError, match="web_search is the flow's to say"):
-        backends.read("cli=claude,model=m,effort=high,web_search=off")
+        backends.read("web_search=off")
     with pytest.raises(ValueError, match="web_search is the flow's to say"):
-        backends.read("cli=claude,model=m,effort=high,web_search=on")
+        backends.read("web_search=on")
     # And the line that says nothing is the ordinary one: a CLI, a model and an effort.
-    assert backends.read("claude/m:high")[0].name == "claude"
+    assert backends.read("claude/m:high")[1].name == "claude"
 
 
 def test_what_a_flow_declares_reaches_the_agent(tmp_path: Path) -> None:

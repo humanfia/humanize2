@@ -81,15 +81,16 @@ hmz -f official/humanize1:rlcr -c setup.yaml
 Runs a [flow](/reference/flows) in the current directory, on the agents it is given.
 
 ```
-hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--container <image>] [--json] <task>
+hmz exec -f|--flow <flow> -a|--agent <spec>[,<spec>...] [-a ...] [-c|--config <path>] [--json] <task>
+
+<spec> := [<name>=]<cli>[@<provider>]/<model>:<effort>
 ```
 
 | Argument | |
 | --- | --- |
 | `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<where>/<flow>` for one any other place holds — a [flowverse](/reference/flows#flowverses), or `local`/`user` for your own — or the path to a flow anywhere else. A file that holds [several flows](/reference/flows#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows#where-flows-live). |
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
-| `--container <image>` | Run the whole of it in one container of that image: every agent's turns land there, the project directory is mounted at the path it already has, and the flow reaches it through `hmz.flows.container()`. A place the flow itself declared `Isolated` keeps the container the flow named. See [Containers](/user/containers#the-whole-run-in-one-container). |
-| `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
+| `-a`, `--agent <spec>[,<spec>...]` | **One for each agent the flow drives** — several to an option, separated by commas, and the option repeated as often as suits. Unnamed they fill the flow's places in the order it takes them; `<name>=` fills the place the flow calls that. None at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `--json` | Write the run for a program: one JSON object on stdout per thing an agent says, as it says it. See [Watching a run](#watching-a-run). |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
@@ -153,16 +154,14 @@ stray line cannot break the stream.
 
 ```
 claude/claude-opus-4-8:high
-cli=claude,model=claude-opus-4-8,effort=high
 claude@deepseek/claude-opus-4-8:high
-cli=claude,model=claude-opus-4-8,effort=high,provider=deepseek
-cli=claude,model=claude-opus-4-8,effort=high,service_tier=fast
-cli=codex,model=gpt-5.6-sol,effort=max,config.model_context_window=1000000,config.model_auto_compact_token_limit=900000
+builder=claude/claude-opus-4-8:high
+claude/claude-opus-4-8:high,codex/gpt-5.6-sol:max
 ```
 
-The first two spellings mean the same thing. The written-out form exists because a model or an
-effort may hold the punctuation the short form separates on, and is also where settings with no
-unambiguous short spelling go.
+One `-a` is one agent or a list of them separated by commas, and every `-a` on the line adds to
+the same list in the order they were written — so a flow of four agents is one option or four,
+whichever reads better.
 
 - `<cli>` is `agy`, `claude`, `codex`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`
   or `zcode` — or any CLI of your own [added at `/providers`](/reference/agents#a-cli-of-your-own).
@@ -175,21 +174,31 @@ unambiguous short spelling go.
   mimocode and ZCode name every model as `provider/id` — so the CLI is read from the front and
   the effort from after the last colon.
 - An `@` after the CLI names the [provider](/reference/providers) that agent's turns run as — the
-  account, not the model: `claude@deepseek`. Written out, it is `provider=`. A CLI is never
-  spelled with an `@` in it, so the two are told apart wherever an agent is written. An agent
-  that names none runs its CLI as you already run it.
+  account, not the model: `claude@deepseek`. A CLI is never spelled with an `@` in it, so the
+  two are told apart wherever an agent is written. An agent that names none runs its CLI as you
+  already run it.
+- A `<name>=` before the CLI says which of the flow's agents this one is — the field name from
+  the [named tuple](/weaver/writing-a-flow#the-contract-in-three-rules) the flow declares, so
+  `builder=claude/claude-opus-4-8:high`. Name every agent on the line or none of them: an agent
+  with no name fills the flow's next place, which cannot be counted while the others are filled
+  by name. A name the flow has not got, one given twice, a place left unnamed, and a name given
+  to a flow that declared a plain `tuple` are each refused before anything runs, saying what the
+  flow does declare.
 - `permission=` and `web_search=` are **not** settings of `-a`. What an agent may do and
   whether it may read the internet are the flow's, declared beside the agent it drives, and a
   line that writes one is refused before anything runs, saying where it is said instead. See
   [Permissions](/user/permissions) and
   [Writing a flow](/weaver/writing-a-flow#say-what-each-agent-is-allowed).
-- `config.KEY=VALUE` names a Codex app-server `-c` override for **that agent**. Only
-  `model_context_window` and `model_auto_compact_token_limit` are taken, both as a positive
-  integer, and only on `cli=codex`. This is not `hmz exec -c`, which is the flow's YAML.
+- `cli=`, `model=`, `effort=`, `provider=`, `service_tier=` and `config.KEY=` are **gone**. `=`
+  and `,` say which place an agent fills now, so the two spellings cannot both be read, and a
+  line that writes one of those is refused saying so. A latency tier and a backend-native
+  override are still an agent's to carry — they are set where the agent is made, from the
+  [SDK](/reference/sdk) or by the flow, rather than on the line that names one.
 
-**One `-a` is one agent.** A list inside a single `-a` is not split into several. Two agents of
-one spelling are two agents, which is what makes a flow of an actor and a reviewer at one
-configuration what it says it is.
+**Names beat position.** A line that names its agents is put in the flow's order whatever order
+you wrote them in; a line that names none fills the places in the order the flow takes them.
+Two agents of one spelling are two agents either way, which is what makes a flow of an actor and
+a reviewer at one configuration what it says it is.
 
 ### What is refused before anything runs
 
@@ -210,7 +219,8 @@ Whatever else a flow does as it is imported is the flow's own, and fails as it w
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f official/flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
 hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
-hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,service_tier=fast "$(cat TASK.md)"
+hmz exec -f official/rlar -a claude/claude-opus-4-8:high,codex/gpt-5.6-sol:high "$(cat TASK.md)"
+hmz exec -f official/rlar -a actor=claude/claude-opus-4-8:high -a reviewer=codex/gpt-5.6-sol:high "$(cat TASK.md)"
 hmz exec -f official/flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 hmz exec -f ./flows/mine -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
