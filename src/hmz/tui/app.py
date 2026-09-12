@@ -133,15 +133,6 @@ _OWN = (
     "exit",
 )
 
-#: What the box this opens with says about how to begin. The model of the thing rather than
-#: the keys: what a key does right now is on the status line, and is only worth saying in one
-#: place -- so these are the nouns instead, which are the ones a flow is written in.
-_HELP = (
-    "Say what to do, and the flow starts on it.",
-    "/flow chooses the loop and what drives it.",
-    "/providers holds the accounts they run as.",
-)
-
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
 
@@ -1124,8 +1115,6 @@ class Humanize(App[None]):
                     Text(self._banner(), style="blue", no_wrap=True),
                     Text(""),
                     Text(str(metadata("hmz")["Summary"] or "")),
-                    Text(""),
-                    *(Text(line, style="dim") for line in _HELP),
                 ),
                 # Room around it, above and below and at both ends: the name drawn large is
                 # the first thing on the screen and reads as cramped without any.

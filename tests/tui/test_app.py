@@ -24,7 +24,7 @@ from hmz.backends import Model
 from hmz.epic import epics
 from hmz.kept import Runs
 from hmz.tui import Humanize
-from hmz.tui.app import _HELP, _OWN, _SAID, Editor, _where
+from hmz.tui.app import _OWN, _SAID, Editor, _where
 from hmz.tui.pick import (
     Accounts,
     Agent,
@@ -2420,8 +2420,6 @@ async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
         opened = _transcript(app)
         assert "humanize v" in opened
         assert str(metadata("hmz")["Summary"]) in opened  # what it was published as
-        for line in _HELP:
-            assert line in opened
         assert "claude/claude-opus-5" not in opened
         assert (
             _where() not in opened
