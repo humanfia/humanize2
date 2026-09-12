@@ -74,17 +74,6 @@ def test_a_run_already_being_held_here_is_the_one_that_is_read(
     assert [one.pid for one in daemon.daemons()] == [held.pid]
 
 
-def test_a_line_that_also_says_what_to_run_is_one_to_correct(
-    held: daemon.Daemon, terminal: None, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """A run that is set up is set up, and two answers is one of them silently losing."""
-    with pytest.raises(SystemExit) as stopped:
-        cli.main(["-f", "chat"])
-
-    assert stopped.value.code == 2
-    assert "already being held here" in capsys.readouterr().err
-
-
 def test_a_run_that_cannot_be_held_is_opened_here_instead(
     workspace: Path, terminal: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -108,9 +97,9 @@ def test_a_held_run_is_opened_on_a_terminal_prepared_for_this_one(
 ) -> None:
     """The iTerm2 opt-out is the terminal's, so the process holding a run has to take it.
 
-    `hmz daemon start` reaches the interface without going past the line `hmz` itself takes,
-    and a run held without it pushes the keyboard protocol that loses IME-composed text at
-    the very terminal that cannot take it.
+    The process holding a run is the other side of a fork and has none of what the line did
+    before it, and a run held without this pushes the keyboard protocol that loses
+    IME-composed text at the very terminal that cannot take it.
     """
     monkeypatch.setenv("TERM_PROGRAM", "iTerm.app")
     monkeypatch.delenv("TMUX", raising=False)

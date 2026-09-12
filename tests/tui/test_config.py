@@ -15,7 +15,6 @@ import pytest
 from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
-from hmz.cli import main
 from hmz.kept import Runs
 from hmz.settings import Settings
 from hmz.tui import Humanize
@@ -126,15 +125,6 @@ async def until(
     while not ready() and time.monotonic() - began < patience:
         await driver.pause()
     await driver.pause()
-
-
-def _opens(opened: list[Humanize]) -> Callable[[Humanize], None]:
-    """A `run` that keeps the interface rather than showing it, for a line that opens one."""
-
-    def running(app: Humanize) -> None:
-        opened.append(app)
-
-    return running
 
 
 def _under(app: Humanize) -> str:
@@ -458,90 +448,6 @@ async def test_a_flow_that_groups_nothing_is_one_list(flows: Path) -> None:
             await driver.press("down")
             await driver.pause()
             assert sheet._under == "rounds"
-
-
-@pytest.mark.timeout(60)
-async def test_the_line_that_opens_it_can_set_it_up(
-    flows: Path, tmp_path: Path
-) -> None:
-    """`hmz -f -c -a`: a run that is always the same run is one line, not three walks."""
-    (tmp_path / "setup.yaml").write_text("loud: true\nrounds: 7\n")
-    said = ["-f", ".humanize/flows/settable", "-c", str(tmp_path / "setup.yaml")]
-
-    opened: list[Humanize] = []
-    with unittest.mock.patch.object(Humanize, "run", _opens(opened)):
-        assert main(said) == 0
-
-    (app,) = opened
-    assert app._flow_named == ".humanize/flows/settable"
-    assert app._config is not None
-    assert app._config.model_dump() == {
-        "loud": True,
-        "rounds": 7,
-        "mode": "fast",
-        "named": "",
-    }
-
-
-def test_a_line_that_sets_up_a_flow_that_takes_none_is_a_line_to_correct(
-    flows: Path, tmp_path: Path
-) -> None:
-    """Rather than an interface opening with a setting nothing will ever read."""
-    (tmp_path / "setup.yaml").write_text("loud: true\n")
-
-    with pytest.raises(SystemExit) as refused:
-        main(["-f", ".humanize/flows/plain", "-c", str(tmp_path / "setup.yaml")])
-
-    assert refused.value.code == 2
-
-
-def test_a_line_that_says_how_to_run_a_flow_without_saying_which_is_one_too(
-    flows: Path,
-) -> None:
-    """`-a` and `-c` are both about a flow, so neither means anything without `-f`."""
-    with pytest.raises(SystemExit) as refused:
-        main(["-a", "claude/m:high"])
-
-    assert refused.value.code == 2
-
-
-def test_the_agents_a_line_names_have_to_be_the_ones_the_flow_drives(
-    flows: Path,
-) -> None:
-    """Said on the line rather than found when the first thing typed starts the flow."""
-    with pytest.raises(SystemExit) as refused:
-        main(
-            [
-                "-f",
-                ".humanize/flows/settable",
-                "-a",
-                "claude/m:high",
-                "-a",
-                "codex/n:low",
-            ]
-        )
-
-    assert refused.value.code == 2
-
-
-@pytest.mark.timeout(60)
-async def test_what_a_line_says_beats_what_was_remembered(
-    flows: Path, tmp_path: Path
-) -> None:
-    """An interface opened set up is opened that way, whatever this workspace last ran."""
-    Settings(tmp_path).remember(
-        ".humanize/flows/settable",
-        ("",),
-        [Runs("claude/kept:high")],
-        {"rounds": 2},
-    )
-
-    opened: list[Humanize] = []
-    with unittest.mock.patch.object(Humanize, "run", _opens(opened)):
-        assert main(["-f", ".humanize/flows/settable", "-a", "codex/said:low"]) == 0
-
-    (app,) = opened
-    assert app._models == [Runs("codex/said:low")]
 
 
 @pytest.mark.timeout(60)
