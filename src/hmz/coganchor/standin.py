@@ -24,13 +24,14 @@ from __future__ import annotations
 
 import contextlib
 import errno
+import functools
 import logging
 import os
 import signal
 from typing import TYPE_CHECKING
 
 from hmz.coganchor.linux import procfs, ptrace
-from hmz.coganchor.linux.syscalls import NR
+from hmz.coganchor.linux.syscalls import ARCH, NR
 
 if TYPE_CHECKING:
     from hmz.coganchor.linux.ptrace import Registers
@@ -39,11 +40,10 @@ __all__ = ["STUB_PROGRAM", "park"]
 
 log = logging.getLogger(__name__)
 
-#: ``AT_FDCWD`` as an unsigned word, for redirecting ``execveat``.
-_AT_FDCWD = 0xFFFFFFFFFFFFFF9C
-
-#: Scratch space in the tracee's stack red zone, which the exec discards anyway.
-_RED_ZONE_OFFSET = 512
+#: ``AT_FDCWD``, for redirecting ``execveat``.  Widened to an unsigned word on the way into
+#: the register, and the same number on every Linux architecture: it comes from
+#: <linux/fcntl.h>, which no architecture overrides, rather than from an ``asm/`` header.
+_AT_FDCWD = -100
 
 #: Syscall stops to walk through before giving up on finding an entry stop.
 _MAX_STEPS_TO_ENTRY = 4
@@ -54,7 +54,12 @@ def _choose_stub() -> str:
 
     It is caught at ``PTRACE_EVENT_EXEC``, before its first instruction, so
     only the kernel's image load ever happens.  ``/proc/self/exe`` is the
-    fallback because it always exists and is always executable.
+    fallback because it always exists and is always executable -- and it is
+    resolved in the tracee, so what it names there is whatever that process is
+    already running, which the kernel will certainly load again.
+
+    Nothing here is architecture-specific: the image the kernel loads is this
+    machine's own, whatever this machine is.
     """
     for candidate in ("/bin/true", "/usr/bin/true"):
         if os.access(candidate, os.X_OK):
@@ -101,9 +106,9 @@ def park(pid: int, registers: Registers) -> bool:
 
 
 def _plant_stub_path(pid: int, registers: Registers) -> int | None:
-    """Write the stub's path into the tracee's stack red zone, and verify it."""
+    """Write the stub's path into the tracee's stack scratch space, and verify it."""
     blob = STUB_PROGRAM.encode() + b"\0"
-    address = registers.stack_pointer - _RED_ZONE_OFFSET
+    address = registers.scratch(len(blob))
     try:
         procfs.write_bytes(pid, address, blob)
         if procfs.read_bytes(pid, address, len(blob)) != blob:
@@ -123,15 +128,49 @@ def _step_to_syscall_entry(pid: int) -> bool:
 
     Syscall stops come in entry/exit pairs, and an exec event can leave the
     completing ``execve``'s exit stop still pending, so stepping once is not
-    enough.  On entry the kernel parks ``-ENOSYS`` in the result register,
-    which identifies the stop exactly.
+    enough.
     """
     for _ in range(_MAX_STEPS_TO_ENTRY):
         if not _step(pid):
             return False
-        if ptrace.getregs(pid).result == -errno.ENOSYS:
+        if _at_syscall_entry(pid):
             return True
     return False
+
+
+def _at_syscall_entry(pid: int) -> bool:
+    """Whether a stopped tracee is on its way into a syscall rather than out of one.
+
+    The kernel will say outright, and is asked first.  Where it will not -- the request
+    arrived in Linux 5.3 -- an x86-64 kernel has parked ``-ENOSYS`` in the result register,
+    which identifies an entry exactly; an aarch64 one parks it only for a process that
+    really asked for syscall number -1, and leaves the first argument sitting in ``x0``
+    otherwise, so there is nothing there to read and the stand-in is given up on instead.
+    """
+    kind = ptrace.syscall_stop_kind(pid)
+    if kind is not None:
+        return kind in (ptrace.SYSCALL_STOP_ENTRY, ptrace.SYSCALL_STOP_SECCOMP)
+    if not ARCH.entry_plants_enosys:
+        _blame_the_kernel()
+        return False
+    return ptrace.getregs(pid).result == -errno.ENOSYS
+
+
+@functools.cache
+def _blame_the_kernel() -> None:
+    """Say what is really wrong when neither way of finding an entry stop is open.
+
+    Once rather than per command, and at error level: without this the only thing said is
+    that control of one stand-in was lost, which reads like a race and sends whoever met it
+    looking at this process rather than at the kernel it is running on.
+    """
+    log.error(
+        "this kernel does not answer PTRACE_GET_SYSCALL_INFO, which arrived in Linux 5.3, "
+        "and on %s there is no -ENOSYS parked in the result register to read instead -- so "
+        "no command can be stood in for here, and every one of them will fail. Run the "
+        "agent on Linux 5.3 or newer.",
+        ARCH.name,
+    )
 
 
 def _step(pid: int) -> bool:

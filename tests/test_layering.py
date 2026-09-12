@@ -9,9 +9,9 @@ it; `runner` is what reads a command line into one and writes the run down as `e
 ways, which is checked here too.
 
 And the target half runs on the target, which may be any architecture, while
-:mod:`hmz.coganchor.linux` picks a register map at import time and refuses anything but
-x86-64 -- so the serving half must not reach the agent half, nor may anything a caller imports
-to configure one.
+:mod:`hmz.coganchor.linux` picks a register map at import time and refuses any architecture it
+has not got one for -- so the serving half must not reach the agent half, nor may anything a
+caller imports to configure one.
 
 The rules are on the layers alone. Above them sits the command line, which joins them and so
 may name any of them -- and which is checked instead by what a run of it actually loads.

@@ -360,10 +360,17 @@ agent](/reference/tracing#what-counts-as-one-agent).
 
 ## Remote execution
 
-### `humanize supports x86_64 only; this host reports 'aarch64'`
+### `humanize has a register map for aarch64, x86_64; this host reports …`
 
-The half that runs *beside the agent* needs an architecture-specific register map. The
-**target** may be any architecture. Only this end is restricted.
+The half that runs *beside the agent* needs an architecture-specific register map, and there
+is one for those two. The **target** may be any architecture, so a machine this refuses can
+still be anchored *to* from one that it does not.
+
+### `humanize intercepts syscalls with a Linux seccomp filter and a ptrace supervisor …`
+
+Said on a Mac, or on anything else that is not Linux. Run the agent inside a Linux virtual
+machine — Docker Desktop, colima and lima each give you one, on Intel Macs and on Apple
+silicon alike. Serving a target from a Mac needs none of this and is unaffected.
 
 ### `unsupported target '…'`
 

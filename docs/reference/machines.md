@@ -129,8 +129,8 @@ does not cross, is in [Remote execution](/reference/remote-execution).
 Nothing is brought up and nothing is taken down: the machine is somebody else's, and all this
 says is that the agent's turns land there rather than here.
 
-**Requirements:** Linux on x86-64 here; a POSIX system with a recent `python3` there. No root,
-no compiler, no kernel module, nothing installed on the far end.
+**Requirements:** Linux on x86-64 or aarch64 here; a POSIX system with a recent `python3`
+there. No root, no compiler, no kernel module, nothing installed on the far end.
 
 ## A container of the agent's own
 
