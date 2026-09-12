@@ -406,6 +406,40 @@ hmz exec: error: pursuing: worker is run under a goal, which pi has no feature f
 and the agents page of `/flow` offers only the CLIs that would work for that place, so it cannot
 be chosen wrong there at all.
 
+**And anything else only some backends serve, the same way.** `Needs` beside the place names
+what the backend filling it has to serve, by the names
+[`catalogue()`](#checking-a-flow) already goes by:
+
+```python
+from typing import Annotated, NamedTuple
+
+from hmz.flows import Agent, Needs
+
+class Agents(NamedTuple):
+    """The one it drives, which has to take a word mid-turn and be held to a shape."""
+
+    builder: Annotated[Agent, Needs("steer", "shape")]
+```
+
+| Name | What the place is built on |
+| --- | --- |
+| `goal` | the backend's own goal feature — the same thing `Goal` asks for |
+| `steer` | a word put into the turn already running, `session.interject(said)` |
+| `shape` | a turn *held* to a schema rather than asked to keep to one |
+| `tools` | the flow's own callbacks put in front of the agent, `session.offers([...])` |
+| `fork` | one conversation carried into a second going its own way |
+| `search` / `swarm` / `resume` | facts about the CLI itself, out of its own profile |
+| `moment:<name>` | a moment only some backends reach, written out rather than as the enum |
+
+Read off the driver class and off what is written down about the CLI, so nothing has to have
+run for the answer to be there — which is also how the picker rules a CLI out before it can be
+chosen:
+
+```console
+$ hmz exec -f steering -a dsh/deepseek-chat:high "fix the build"
+hmz exec: error: steering: builder has to serve steer, which dsh does not
+```
+
 ## What each agent may do
 
 What an agent is allowed to do, whether it keeps itself going and whether it may read the
@@ -493,13 +527,55 @@ line and starts nothing. No `-a` spells a machine, so what runs into these is an
 A place may say more than one thing — `Annotated[Agent, Moment.STOP, Remote]` is a place that
 must run that moment *and* may be moved. Several arguments, read one by one, in any order.
 
+### What the machine has to come to
+
+A flow whose work has to happen somewhere in particular says that with the same `Needs`, under
+`where=`:
+
+```python
+from typing import Annotated, NamedTuple
+
+from hmz.flows import Agent, Isolated, Needs, Remote
+
+class Agents(NamedTuple):
+    """One that must land on another machine, one that must land on Linux."""
+
+    builder: Annotated[Agent, Remote, Needs(where=("remote",))]
+    tester: Annotated[Agent, Isolated("python:3.12"), Needs(where=("isolated", "linux"))]
+```
+
+The names are [what a place comes to](/reference/machines#what-a-place-comes-to) — `remote`,
+`isolated`, `managed`, `linux`, `darwin` — and they are asked of that machine's **settings**,
+which answer without starting anything. So a place that will not do is refused before an image
+has been pulled:
+
+```text
+onbox: tester has to work somewhere that comes to isolated, which the machine it works on does not
+```
+
+An agent pointed nowhere works on this machine, which comes to nothing at all — so a place that
+needs anything of where it works needs a machine first, and says so the same way:
+
+```text
+onbox: builder has to work somewhere that comes to remote, which this machine does not
+```
+
+A whole run [put in a container](#running-one) from outside counts as where that run's work
+lands, even though nothing is pointed at it until the run starts.
+
+What only a live handshake can settle is not asked here, and the `anchor:` names — how a turn's
+own commands are reached — are not among these yet: no machine's settings answer for one. The
+platform of a machine that was already running is read from the handshake, and a machine that
+turns out not to be what its settings promised
+[fails as it starts](/reference/machines#what-a-place-comes-to).
+
 What the flow declared is readable without driving it:
 
 ```python
 from hmz.flows import wanted
 
 wanted("official/rlar")   # one Place per agent somebody has to choose:
-                          # .name, .moments, .goal, .where,
+                          # .name, .moments, .goal, .where, .needs,
                           # .permission, .goals, .web_search
 ```
 
