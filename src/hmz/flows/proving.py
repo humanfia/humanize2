@@ -454,11 +454,12 @@ def _crewed(
     for them.
 
     The stubs claim every capability there is -- every moment, a goal feature, shapes,
-    tools -- because what is being proved is the flow and not the agents: a flow legal on
-    the widest backend is refused for a narrower one where the agents are chosen, which is
-    `driving.py`'s job and not this one's. Everything else is the real base classes, so
-    the hooks a flow hangs fire exactly as they would under a real backend -- a `Stop`
-    hook that refuses sends a stub on again, and that continuation is a counted turn.
+    tools, a turn that takes a word put into it -- because what is being proved is the flow
+    and not the agents: a flow legal on the widest backend is refused for a narrower one
+    where the agents are chosen, which is `driving.py`'s job and not this one's. Everything
+    else is the real base classes, so the hooks a flow hangs fire exactly as they would
+    under a real backend -- a `Stop` hook that refuses sends a stub on again, and that
+    continuation is a counted turn.
 
     Args:
       places: What the flow declared.
@@ -484,6 +485,14 @@ def _crewed(
 
         shapes: ClassVar[bool] = True
         takes_tools: ClassVar[bool] = True
+        steers: ClassVar[bool] = True
+
+        def interject(self, text: str) -> None:
+            # Taken rather than refused, as every capability here is claimed: a stub's turn
+            # lands the moment it starts, so the word is written down and taken back off in
+            # one -- a flow that asks whether it may steer is answered the way the backends
+            # it will really run on answer.
+            self.took(self.steering(text))
 
         def _stream(
             self, prompt: str, *, schema: type[BaseModel] | None = None

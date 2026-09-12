@@ -315,10 +315,21 @@ What a flow drives, written as interfaces and nothing else.
   lines are one side's alone MUST be sayable, and the other side MUST be refused where it
   writes. What that comes to is `hmz.agents.board`.
 - What is true of a backend rather than of one agent -- which moments it runs, whether it has
-  a goal feature, whether it can be held to a shape -- MUST be declared on the class. It is
-  read off the class where a flow is checked against the agents it was given, before any of
-  them has been made, so anything answering to this MUST say it the same way, annotation and
-  all.
+  a goal feature, whether it can be held to a shape, whether a turn of it can be talked to
+  while it runs -- MUST be declared on the class. It is read off the class where a flow is
+  checked against the agents it was given, before any of them has been made, so anything
+  answering to this MUST say it the same way, annotation and all.
+- Whether a turn already running can be steered MUST be one of those, as `Session.steers`, so
+  that a flow meaning to put a word in asks rather than catching the refusal a backend handed
+  its whole prompt up front raises. It is the same arrangement `fork` has and for the same
+  reason: what a backend cannot do MUST be knowable before an hour of a run has been spent
+  finding out.
+- One vocabulary MUST name the capabilities, so that a flow author, the catalogue and a
+  compiler ask for one under one word wherever they ask: `goal`, `steer`, `shape`, `tools`,
+  `fork`, `search`, `swarm`, `resume` and `moment:<name>` of an agent; `remote`, `isolated`,
+  `managed`, `linux` and `darwin` of where its turns land; and `anchor:<how>` of the way a
+  turn's own commands are reached there. A second word for a capability that already has one
+  is a generated flow asking for what nothing answers to.
 
 ## `driving.py`
 
