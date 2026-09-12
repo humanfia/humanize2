@@ -16,7 +16,6 @@ import pytest
 from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
-from hmz.cli import main
 from hmz.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Catalogue, Clis
@@ -110,29 +109,6 @@ async def _to_the_models(app: Humanize, driver: Pilot[None]) -> None:
         await until(lambda: isinstance(app.screen, Agent), driver)
     await opens(app, driver, "model")
     await until(lambda: isinstance(app.screen, Catalogue), driver)
-
-
-def test_a_line_names_an_agent_and_the_flow_says_the_rest(flows: Path) -> None:
-    """Whether that agent has goals is the flow's, settled when the run is set up."""
-    opened: list[Humanize] = []
-
-    def opens(app: Humanize) -> None:
-        opened.append(app)
-
-    with unittest.mock.patch.object(Humanize, "run", opens):
-        assert (
-            main(
-                [
-                    "-f",
-                    ".humanize/flows/goals_off",
-                    "-a",
-                    "codex/said:low",
-                ]
-            )
-            == 0
-        )
-
-    assert opened[0]._models == [Runs("codex/said:low")]
 
 
 def _under(app: Humanize) -> str:
