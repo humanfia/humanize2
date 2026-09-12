@@ -38,7 +38,7 @@ def anchor(argv: list[str]) -> int:
     parser = line.parser()
     args = parser.parse_args(argv)
 
-    from hmz.coganchor.anchor import check, connect
+    from hmz.coganchor.anchor import NotInstalled, check, connect
     from hmz.coganchor.proto import ProtocolError
 
     # stderr, the one stream a session never speaks the protocol on.
@@ -68,6 +68,15 @@ def anchor(argv: list[str]) -> int:
         print(f"workspace   {found['workspace']} ({found['entries']} entries)")
     except KeyboardInterrupt:
         return 130
+    except NotInstalled as exc:
+        # The one failure that means *install this there*, and so the one that exits with the
+        # status a shell uses for a command it could not find -- which is what every backend
+        # here already reads as a CLI that is not installed, so whatever spawned this has the
+        # line that installs it filled in by the layer that knows which line that is. Its own
+        # kind rather than every missing file: a workspace the target has not got, or an `ssh`
+        # this machine has not got, is a different thing gone wrong and is answered below.
+        print(f"hmz: {exc.strerror or exc}", file=sys.stderr)
+        return 127
     except (ConnectionError, ProtocolError, OSError, ValueError) as exc:
         print(f"hmz: {exc}", file=sys.stderr)
         return 1

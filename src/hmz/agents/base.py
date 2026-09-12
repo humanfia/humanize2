@@ -3710,6 +3710,15 @@ class AgentBase(ABC):
         process has one tracer, so the anchor is told which paths to answer rather than being
         wrapped in something that would answer them for it.
 
+        An anchor that drives the CLI already on the target is the other arrangement, and
+        almost everything above is turned around by it. The CLI is the target's rather than
+        this machine's, so it is not looked for here. The account is the turn's business
+        wherever the turn runs, so what a provider sets crosses instead of being kept back,
+        and what it hushes is taken off *there* -- where the environment is composed -- rather
+        than merely left out of what is sent. And its credential files, which a supervisor
+        would answer a path with, are put on the target instead, there being no tracer there
+        to answer anything.
+
         Args:
           argv: The backend's own command for this turn.
           cwd: Where the session it is a turn of works, as the machine it lands on names it,
@@ -3723,53 +3732,170 @@ class AgentBase(ABC):
         """
         from hmz.backends import elsewhere
 
+        provider = self.provider
+        anchor = self.anchor
+        native = anchor is not None and anchor.native
         # A command this machine's PATH does not name is run by the path it is installed at
         # instead: a flow started by something with a PATH of its own -- a notebook kernel, a
         # service, the launcher of a runtime platform -- would otherwise fail to start an
         # agent that is installed here. Everything else is spawned exactly as it was written,
         # so a name PATH answers to is still the name that runs, and one nothing answers to
         # still fails saying what could not be found.
-        if (found := elsewhere(argv[0])) is not None:
+        # Not for a turn taken by the target's own CLI: where that is installed is a fact
+        # about that machine, and this machine's answer would be a path it has never had.
+        if not native and (found := elsewhere(argv[0])) is not None:
             argv = [found, *argv[1:]]
-        provider = self.provider
         if provider is not None and provider.args:
             argv = [*argv, *provider.args]
+        if anchor is None:
+            return provider.command(argv) if provider is not None else argv
+        if native:
+            return self._reaching(anchor, provider).command(argv, chdir=cwd)
         swaps = provider.swaps() if provider is not None else ()
         # What the provider hands the agent as variables is the agent's own, and the target
         # is not to be given it: everything the agent exports is inherited by every command
         # it runs there, and a key crossing to another machine is a key on that machine.
         private = tuple(provider.env) if provider is not None else ()
-        anchor = self.anchor
-        if anchor is not None:
-            return self._reaching(anchor).command(
-                argv, swaps=swaps, private=private, chdir=cwd
-            )
-        return provider.command(argv) if provider is not None else argv
+        return self._reaching(anchor, provider).command(
+            argv, swaps=swaps, private=private, chdir=cwd
+        )
 
-    def _reaching(self, anchor: AnchorConfig) -> AnchorConfig:
-        """The anchor, plus whatever a turn under it has to be able to reach on this machine.
+    def _reaching(
+        self, anchor: AnchorConfig, provider: Provider | None = None
+    ) -> AnchorConfig:
+        """The anchor, plus whatever a turn under it has to be able to reach where it runs.
 
-        Which is the bridge to the flow's own callbacks, for an agent that is offering any:
-        the socket it carries lines to is in *this* process, so the program that carries them
-        has to run here. Everything a CLI spawns under an anchor goes to the target unless it
-        is named, and a bridge started there would find no socket and no humanize.
+        Under a supervisor that is the bridge to the flow's own callbacks, for an agent that
+        is offering any: the socket it carries lines to is in *this* process, so the program
+        that carries them has to run here. Everything a CLI spawns under an anchor goes to the
+        target unless it is named, and a bridge started there would find no socket and no
+        humanize.
+
+        Under an anchor driving the target's own CLI it is three other things, each of which a
+        mirror and a tracer would otherwise have done: the variables a provider's account must
+        not be run beside, the credential files that account keeps, and the skills the flow
+        carries. The bridge is not among them, and cannot be: it is a program on this machine
+        speaking to a socket in this process, and the CLI that would spawn it is elsewhere.
 
         Args:
           anchor: Where this agent's turns land.
+          provider: Which account they run as, or None for the one this machine is signed in
+            with -- whose credentials are the CLI's own and are wherever the CLI runs already.
 
         Returns:
-          It, or a copy naming the bridge as a program that runs here. The socket itself needs
-          no naming: it is outside the workspace, and what is outside the workspace is this
-          machine's already.
+          It, or a copy saying what this turn has to be given.
         """
         from dataclasses import replace
 
+        if anchor.native:
+            from hmz.agents.skills import carried
+            from hmz.backends import installing
+            from hmz.coganchor.transport import Target
+
+            if (
+                not self._toolbox.empty()
+                and Target.parse(anchor.target).scheme != "local"
+            ):
+                # Refused rather than dropped. The bridge is a program on this machine that
+                # speaks to a socket in this process, and the CLI that would start it is on
+                # another one: a turn taken anyway would be one whose model was never told
+                # about the flow's callbacks, which reads as a model that would not use them.
+                # A `local` target is the exception and not a special case -- the CLI runs
+                # here, so the bridge, the socket and humanize are all where they always were.
+                raise ValueError(
+                    f"{self.backend}: a turn driven on {anchor.target} cannot be offered "
+                    "the flow's own callbacks -- the bridge that carries them is a program "
+                    "on this machine, and the CLI that would start it is on that one"
+                )
+            return replace(
+                anchor,
+                hushes=tuple(sorted(self.hushed())),
+                projects=self._projecting(provider),
+                carries=carried(self.backend, self._loads),
+                installs=installing(self.backend),
+            )
         if self._toolbox.empty():
             return anchor
         held = self._toolbox.command()[0]
         if held in anchor.local_execs:
             return anchor
         return replace(anchor, local_execs=(*anchor.local_execs, held))
+
+    def _projecting(self, provider: Provider | None) -> tuple[tuple[str, str], ...]:
+        """The credential files this turn's account keeps, and what to call each on the target.
+
+        A turn under a provider reads its account out of that provider's own copies of the
+        CLI's credential files. Under a supervisor the paths are answered one syscall at a
+        time and nothing moves; there is no tracer on the target, so the only way a CLI there
+        reads them is to be pointed at them by a variable -- and the only variables that will
+        do are the ones that move *the backend's own* directories, which is what
+        :meth:`hmz.backends.Profile.credentials` already writes each root down under.
+
+        Which is why the third root does not cross. A credential the CLI reads at `~/...` can
+        only be pointed at by replacing `HOME`, and a replaced home is not a projected account:
+        it is a different machine. The target's git identity, its ssh keys, its caches and the
+        CLI's own sessions all live under that name, and a turn given a near-empty directory
+        instead is a turn whose commands behave nothing like the target's -- and whose next
+        turn cannot resume the conversation this one opened, the transcript having gone with
+        the directory. So those are left where they are and the account is carried by what can
+        carry it.
+
+        Args:
+          provider: Which account the turn runs as, or None for the one this machine is signed
+            in with -- whose credentials are the CLI's own, wherever that CLI runs.
+
+        Returns:
+          One `(variable, the directory on this machine)` pair per root that has anything in it
+          and a variable that moves it. Nothing at all for an account that is only variables --
+          which is every key and every gateway, and which is why most turns project nothing.
+
+        Raises:
+          ValueError: If this account keeps a credential that cannot cross and has no other
+            way of reaching the turn. Refused rather than skipped: the CLI would then read the
+            one file left on the target, which is a turn taken as whoever that machine is
+            signed in as -- the one failure this must not have.
+        """
+        from hmz import telemetry
+        from hmz.backends import named
+
+        if provider is None or not provider.name:
+            return ()
+        profile = named(self.backend)
+        if profile is None:
+            return ()
+        held: list[tuple[str, str]] = []
+        stranded: list[str] = []
+        for under, variable in (
+            # Where the backend keeps its own state, which its own variable moves -- but only
+            # where that variable names the directory outright: one that names a parent with
+            # the backend's directory inside it would land these a level out of place.
+            ("home", "" if profile.home_in else profile.home_var),
+            # Where every program that follows it keeps its configuration, which is a
+            # directory of the backend's inside a directory one variable moves.
+            ("config", "XDG_CONFIG_HOME"),
+            # And the user's own home, which nothing but `HOME` moves -- see above.
+            ("user", ""),
+        ):
+            root = provider.at / under
+            if not any(path.is_file() for path in root.rglob("*")):
+                continue
+            if variable:
+                held.append((variable, str(root)))
+            else:
+                stranded.append(str(root))
+        if stranded and not held and not provider.env:
+            raise ValueError(
+                f"{self.backend}: the {provider.name} account is kept only in "
+                f"{', '.join(stranded)}, which nothing can point a CLI "
+                "on another machine at without replacing its home -- so a turn driven there "
+                "would be taken as whatever account that machine is signed into"
+            )
+        if stranded:
+            # It happened and the turn still runs as this account, which is what the variables
+            # and the projected roots are carrying. Said and not raised for that reason, and
+            # said without the path: which accounts somebody keeps do not leave the machine.
+            telemetry.snag("native-credential-stays-here")
+        return tuple(held)
 
     @property
     def sessions(self) -> list[SessionBase]:
