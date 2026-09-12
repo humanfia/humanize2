@@ -35,6 +35,7 @@ from ._inputs import snapshot
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Usage
+from .preload import preloaded
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -401,19 +402,23 @@ class QwenCodeSession(StreamSessionBase):
         And where the CLI's compiled bundle is kept between processes, unless whoever started
         the flow has said where themselves: a session a turn is a Node process a turn, and
         eight of them starting at once compile the same bundle eight times.
+
+        And the preload, for an agent something is listening to: Qwen Code is a Node program,
+        so what a turn of it actually runs, reads, writes and opens can be read from inside the
+        process it runs in. :mod:`hmz.agents.preload` is what decides whether one is wanted.
         """
         held = {**super()._environment(), _SETTINGS: str(_thinking(self.effort))}
         # Whoever said where, said it: the provider's own variables are in `held` and the
         # flow's are in this process's environment, and either outranks a cache of ours.
         # And not for an anchored turn: it runs on another machine, where a path named from
         # this one is a directory that is either absent there or somebody else's.
-        if (
+        if not (
             held.get(_COMPILED)
             or os.environ.get(_COMPILED)
             or self._agent.anchor is not None
         ):
-            return held
-        return {**held, _COMPILED: str(home().joinpath(*_CACHE))}
+            held[_COMPILED] = str(home().joinpath(*_CACHE))
+        return preloaded(self._agent, held)
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
         """Reads one record Qwen Code wrote, as the things it says the agent did.

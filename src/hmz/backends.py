@@ -1150,6 +1150,9 @@ PROFILES = (
         # One daemon per agent serves every conversation with it, as Codex's app server does.
         shares=True,
         installs="npm i -g @moonshot-ai/kimi-code",
+        # Installed as a Node script with a `node` shebang, so the runtime it starts on is one
+        # `NODE_OPTIONS` is read by -- the daemon included, which is what a turn of it runs in.
+        preloads="NODE_OPTIONS",
         aliases=("kimi", "kimi-code"),
         # `kimi fork`, which cuts a second session from one already on disk. The command
         # rather than its daemon's route for the same thing: that one is dispatched to a
@@ -1218,6 +1221,9 @@ PROFILES = (
     Profile(
         name="pi",
         installs="npm i -g @earendil-works/pi-coding-agent",
+        # A Node script under a `node` shebang, bundle and all, so `NODE_OPTIONS` is read
+        # before it starts.
+        preloads="NODE_OPTIONS",
         aliases=("pi",),
         # `--fork`, which takes the session to carry in and opens the new one on top of it.
         forks=True,
@@ -1274,6 +1280,10 @@ PROFILES = (
     Profile(
         name="qwen",
         installs="npm i -g @qwen-code/qwen-code",
+        # A Node script rather than a binary with a runtime inside it. Its entry point starts a
+        # second `node` on its own bundle -- whichever copy of itself its updater has newest --
+        # and the turn is taken in that one, which is the same program either way.
+        preloads="NODE_OPTIONS",
         # `web_search` and `web_fetch` are what Qwen Code calls the two, and
         # `--exclude-tools` is what it takes a tool away with.
         searches=True,
@@ -1415,6 +1425,11 @@ PROFILES = (
     Profile(
         name="mimo",
         installs="npm i -g @mimo-ai/cli",
+        # The one place mimocode differs from opencode in a way that matters here: what it is
+        # installed as is a Node script, where opencode is a single-file Bun executable with
+        # its runtime compiled in, which reads none of this. That script starts the same kind
+        # of binary, though, so what a preload reaches of mimocode is its launcher.
+        preloads="NODE_OPTIONS",
         # mimocode is opencode's, permission table and all.
         searches=True,
         # And its `--fork` too: the same program under another name.

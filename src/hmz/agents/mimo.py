@@ -19,6 +19,7 @@ from typing import ClassVar
 
 from .config import AgentConfig
 from .opencode import OpencodeAgent, OpencodeSession
+from .preload import preloaded
 
 
 class MimoCodeSession(OpencodeSession):
@@ -26,6 +27,18 @@ class MimoCodeSession(OpencodeSession):
 
     command: ClassVar[str] = "mimo"
     permits: ClassVar[str] = "MIMOCODE_PERMISSION"
+
+    def _environment(self) -> dict[str, str]:
+        """What opencode's driver runs a turn with, plus the preload where one is wanted.
+
+        The one place the two part company: what mimocode is installed as is a Node script,
+        where opencode is a single-file executable with its runtime compiled in and reads none
+        of this. What that script starts is a binary of the same kind, so what is watched here
+        is the launcher and the one spawn it makes -- which is the whole of what a runtime can
+        be asked about a program that has none. :mod:`hmz.agents.preload` decides whether one
+        is wanted at all.
+        """
+        return preloaded(self._agent, super()._environment())
 
     def _unattended(self) -> list[str]:
         """What tells mimocode that nobody is there to answer it.
