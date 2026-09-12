@@ -56,14 +56,32 @@ the one the screen is showing anyway. See [Many conversations at once](/user/con
 
 ## What each backend does with it
 
+Four of them take a word mid-turn — Claude Code, Codex, Kimi Code and pi. The rest were handed
+the whole prompt up front and have nowhere to put a second one, so what they do with a line is
+answer it as the turn after. **`type(session).steers` says which before anything is said**, so a
+flow that means to steer asks beforehand rather than catching a `NotImplementedError` out of a
+turn already an hour in.
+
 | Backend | What a mid-turn line does |
 | --- | --- |
 | **Claude Code** | Answered within the same turn. The turn is over once the agent has answered everything it was told, not when it first stops. |
 | **Codex** | A steer on the turn its app server is running. |
 | **Kimi Code** | Queued, then steered into the turn already running. |
 | **pi** | A steer on the run it is making, taken into it rather than answered after it. |
+| **Antigravity CLI** | Nothing: its native protocol hands back no receipt for a word, and a word that cannot be named again cannot be told apart from one that never landed. |
+| **Cursor** | Nothing: one run of the CLI per turn, given the whole of its prompt on the command line that starts it. |
+| **DeepSeek Harness** | Nothing: `session/prompt` on its SDK is a `followup`, which leaves the word in the `next-turn` inbox to be answered on its own once this turn is over rather than putting it into this one. |
+| **Grok Build** | Nothing: a second `session/prompt` is a second turn, answered on its own once this one is over. |
+| **Qwen Code** | Nothing: Qwen cannot yet acknowledge delivery, and a word nothing acknowledged cannot be told apart from one that never landed. |
 | **opencode**, **mimocode** | Nothing: a run per turn has ended by the time there is anything to say to it. |
 | **ZCode** | Nothing: its app server refuses a second prompt while one is running, and the channel its own terminal steers with is that terminal's. |
+| **A CLI of your own** over [ACP](/reference/agents#a-cli-of-your-own) | Nothing: steering is an extension each agent spells its own way, so a client guessing at one would be talking to itself. |
+
+**DeepSeek Harness is the near miss, and the one worth planning around.** Its runtime has a
+`steer` that does reach the turn under way; it is simply not on the surface of the SDK humanize
+drives it through, where the only thing to send is the `followup` that becomes the next turn. So
+a word said to a `dsh` agent while it works is a word answered after it has stopped — which is
+the thing you were trying not to do.
 
 An [anchored](/user/remote-execution) Claude ends its process with each turn so its work
 reaches the target before the turn says it landed. It hears you during a turn as any Claude
@@ -85,6 +103,7 @@ session.interject("actually, use pathlib")
 ```
 
 - On a backend that takes a turn's whole prompt up front, this raises `NotImplementedError`.
+  `type(session).steers` is `False` for it, and is what to ask instead of finding out this way.
 - On a backend that can be talked to, it raises `RuntimeError` when nothing is running to hear
   it.
 

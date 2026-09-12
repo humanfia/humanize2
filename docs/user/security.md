@@ -33,8 +33,10 @@ workspace into it.
 
 ## A flow is Python, and reading one means running it
 
-`-f` takes a flow. humanize runs the flow's `__init__.py` to find the `@flow` in it. Listing
-what a [flowverse](/weaver/flowverses) holds imports **every** file in its `flows/`.
+Choosing a flow is running it: humanize runs the flow's `__init__.py` to find the `@flow` in
+it, whether the flow was chosen at [`/flow`](/reference/tui#choosing-a-flow) or named on an
+`hmz exec -f` line. Listing what a [flowverse](/weaver/flowverses) holds imports **every** file
+in its `flows/`.
 
 So adding a flowverse trusts that git repository with this machine, exactly as installing a
 package does. Add the ones you would clone and run.
@@ -72,9 +74,10 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
   CLI to its own provider.
 - **No transcript of its own.** The backends write their own logs. An
   [epic](/user/concepts#epic) records only which sessions belonged to which agent.
-- **No values from a provider.** `hmz providers show` and `list` name the variables an account
-  sets. They never print what those variables are. A secret you type at the prompt appears as
-  bullets and never shows again.
+- **No values from a provider.** [`/providers`](/reference/tui#the-accounts-themselves) draws
+  every account under the CLI it is for, with the way it was made by and the names of the
+  variables it sets. It never draws what those variables are. A secret you type at the prompt
+  appears as bullets and never shows again.
 
 Provider credentials are copies of the CLI's own credential files. humanize keeps them at
 `0600` in a directory at `0700` under `~/.humanize/providers/`. A turn under a provider runs

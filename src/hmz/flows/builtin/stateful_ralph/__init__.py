@@ -2,8 +2,8 @@
 
 hmz exec -f stateful_ralph -a kimi/PROVIDER/MODEL:high "$(cat TASK.md)"
 
-Add `-c budget.yaml` to hold it to something other than the budget it comes with, and
-`hmz -f stateful_ralph -c budget.yaml` opens the interface on the same setup.
+Add `-c budget.yaml` to hold it to something other than the budget it comes with; at the
+prompt, `/flow` asks the same thing on the sheet that opens as the flow is chosen.
 
 The session is what this flow is, and it is the one thing a run picked up again cannot have
 back: a session is opened rather than reopened, so running this again is a conversation of its

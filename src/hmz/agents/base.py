@@ -3550,8 +3550,8 @@ class AgentBase(ABC):
         one when it did is the agent that needs somewhere else to go.
 
         A chain may begin at the account this machine is signed into, which is where an agent
-        nobody gave an account starts: `hmz providers falls-back claude/ spare` is what says
-        so, and until somebody does it is a chain of one, tried once.
+        nobody gave an account starts: `/providers`, enter on that account, and `falls back
+        to` is what says so, and until somebody does it is a chain of one, tried once.
 
         Returns:
           One per account, the one it is on first. From wherever it is now rather than from

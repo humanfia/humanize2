@@ -170,8 +170,8 @@ is every flow of the run, oldest first, each saying how `deep` it is and what it
 ## Afterwards
 
 `/monitor` is the run in progress. Once it is over, the same shape — and far more of it — is
-[`hmz trace collect`](/user/tracing): one process per agent, one track per row of its
-sessions, one slice per thing the agent did.
+[a trace](/user/tracing), gathered from that run on `/epics`: one process per agent, one track
+per row of its sessions, one slice per thing the agent did.
 
 ## See also
 

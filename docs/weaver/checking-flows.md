@@ -6,34 +6,48 @@ driven by stubs through the worlds worth asking of a loop. Together they catch w
 surfaces hours in: the loop nothing can end, the field read off an answer that failed, the name
 the interface does not answer to.
 
-## One line
+## One call
 
-```sh
-hmz check official/rlar
+```python
+from hmz.sdk import Hmz
+
+for one in Hmz().flows.check("official/rlar"):
+    print(f"{one.where}:{one.line}: {one.severity}: {one.code}: {one.said}")
 ```
 
-```
+```text
 …/rlar/__init__.py:125: warning: unbounded-loop: every way out of this loop waits for an
 agent to say so, and an agent may never say it -- give the loop a bound of its own: a budget
 read off spent(), a cap on the rounds, a range
-hmz check: 0 errors, 1 warning
 ```
 
 A flow is named the way `-f` names one — `chat`, `official/rlar`, a path of your own — and
-everything wrong is said at once, one finding a line. The full table of codes is in the
-[reference](/reference/flows#checking-a-flow).
+everything wrong comes back at once, one finding per thing found rather than the first of them
+raised. The full table of codes is in the [reference](/reference/flows#checking-a-flow).
+
+**There is nothing to type for this, and no sheet to open.** Checking a flow belongs to the
+hours you are writing one — in an editor, in a test, in the repository's own CI — and in all
+three of those Python is already what you are holding, so a call is the whole of the interface.
+What `hmz exec` refuses before a run is the smaller question of whether *this* flow can take
+*these* agents, and that is [answered there](/reference/cli#what-is-refused-before-anything-runs).
+
+What comes back is a tuple of findings, each one saying what was found and where:
+
+| A finding | |
+| --- | --- |
+| `code` | which rule found it, as one hyphenated word — `dead-loop`, `unknown-ask` |
+| `severity` | `"error"` or `"warning"` |
+| `where` | the file it is in, as a `Path` |
+| `line` | the line, 1-based, or `0` for a finding about the whole file |
+| `said` | what is wrong, said the way `NotAFlow` says it |
 
 ## What an error is, and what a warning is
 
-An **error** is a flow no run survives: it cannot run, cannot be answered, or cannot end.
-`hmz check` exits `1` on any of those. A **warning** is a flow that runs, and a run of it that
-may be regretted — rlar's warning above is real and documented: its loop is ended by its
-reviewer alone, which is the flow's own shape. Warnings print and pass. `--strict` holds a flow
-to the whole bar, which is the right setting for a flowverse's CI:
-
-```sh
-hmz check --strict local/mine
-```
+An **error** is a flow no run survives: it cannot run, cannot be answered, or cannot end. A
+**warning** is a flow that runs, and a run of it that may be regretted — rlar's warning above
+is real and documented: its loop is ended by its reviewer alone, which is the flow's own shape.
+Which of the two is worth stopping a build for is the caller's to say, since the caller is the
+one holding them. See [In a script](#in-a-script).
 
 ## The reading that runs nothing
 
@@ -41,16 +55,17 @@ Pure `ast` over every file the flow holds. Nothing is imported and nothing is ex
 is safe to point at a flow nobody has read — one an agent just wrote, one fetched off the
 internet, one about to be forked:
 
-```sh
-hmz check --static somebody-elses/flow
+```python
+Hmz().flows.check("somebody-elses/flow", static=True)
 ```
 
 ## The reading that loads it, and the one that drives it
 
-Without `--static` the flow is also loaded — in a subprocess held to a clock, never in your
-process — and its live config model is read. That is what the command does. Driving the flow
-against the worlds worth asking of a loop is the same machinery as a library, and is a call of
-your own:
+Without `static=True` the flow is also loaded — in a subprocess held to a clock, never in your
+process — and its live config model is read. It is left out where the first reading already
+found an error: a flow that cannot run is not one to run to find out more about. Driving the
+flow against the worlds worth asking of a loop is the same machinery a step further, and is a
+call of your own:
 
 ```python
 from hmz.flows import NEVER_DONE, SILENT, proved
@@ -68,27 +83,46 @@ reads a field off an unguarded answer falls over here rather than at hour three.
 
 ## An atlas is read more strictly
 
-A flow marked [`@atlas`](/weaver/atlas) gets the stricter of the two readings automatically:
-its body is a declaration rather than a program, so `hmz check` compiles it and holds every
-edge, every branch and every shape to what a graph can be held to. `--prophecy` prints the
-graph it compiled; `--ship` writes it beside the flow for runs of it to walk.
+A flow marked [`@atlas`](/weaver/atlas) gets the stricter of the two static readings
+automatically: its body is a declaration rather than a program, so it is compiled and every
+edge, every branch and every shape held to what a graph can be held to. What it compiled to is
+`prophecy`, and `foretell` writes that beside the flow for every run of it to walk from then
+on:
 
-```sh
-hmz check --prophecy local/mine
+```python
+from hmz.flows import canonical
+from hmz.sdk import Hmz
+
+hmz = Hmz()
+print(canonical(hmz.flows.prophecy("local/mine")))    # the graph, one line of JSON
+hmz.flows.foretell("local/mine")                      # writes prophecy.pkl beside the flow
 ```
+
+`prophecy` answers `None` for a flow that is not an atlas or does not compile, and `check` is
+where the reasons are.
 
 ## In a script
 
-`--json` says the same findings one JSON object a line, and the exit status is the answer: `0`
-with nothing blocking, `1` with something, `2` for a line to correct.
+Nothing is printed and nothing has to be parsed: the findings are objects, so what a build does
+about them is written rather than read back off a stream. A CI job holding a flowverse's flows
+to the whole bar is the whole of it:
 
-```sh
-hmz check --json local/mine | jq -r .code
+```python
+from hmz.sdk import Hmz
+
+hmz = Hmz()
+found = [one for name in ("yours/review", "yours/nightly") for one in hmz.flows.check(name)]
+for one in found:
+    print(f"{one.where}:{one.line}: {one.severity}: {one.code}: {one.said}")
+raise SystemExit(1 if found else 0)
 ```
+
+Keep only `one.severity == "error"` for the looser bar — the one that lets a flow's own shape
+through, which is what a flowverse holding something like `rlar` has to do.
 
 ## See also
 
-- [`hmz check`](/reference/cli#hmz-check) — the command and its flags
 - [Checking a flow](/reference/flows#checking-a-flow) — the library API and the rule table
+- [SDK reference](/reference/sdk#flows) — `check`, `prophecy` and `foretell` beside the rest
 - [Testing a flow](/weaver/testing-flows) — driving a flow with stand-ins of your own
 - [Writing a flow](/weaver/writing-a-flow)

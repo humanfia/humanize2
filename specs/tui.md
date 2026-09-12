@@ -280,8 +280,9 @@ line, with what the flow is doing beside the transcript.
   run points at that log by a link rather than holding it. A bundle sent to whoever is being
   asked to fix something MUST therefore follow every one of those links and carry what is
   behind it, since a link is worth nothing on any machine but the one that made it. It is
-  `hmz.exporting`, which is also what `hmz export` asks: one archive, made one way, whichever
-  way somebody reached it.
+  `hmz.exporting`, which is also what a run exported from `/epics` and
+  :meth:`hmz.sdk.Hmz.epics.bundled` ask: one archive, made one way, whichever way somebody
+  reached it.
 - The transcript that goes in MUST be the text the transcript was written as rather than the
   rows it was drawn as, for the reason a selection gives back that text: a file of lines
   broken where the terminal ran out of room is one nothing reads back.
@@ -495,8 +496,8 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - `/flowverses` MUST list every place there is, saying where each came from and which have
   not been fetched, and MUST be the four things there are to do with one: what it holds, one
   added, one fetched again, one taken away. It MUST be the same store `/flow` reads the flows
-  out of and the same one `hmz flowverses` walks -- one place a thing is kept is one place it
-  is kept, whichever way somebody reached it.
+  out of and the same one :attr:`hmz.sdk.Hmz.verses` walks -- one place a thing is kept is
+  one place it is kept, whichever way somebody reached it.
 - Enter MUST say what one holds, which MUST be read only of the flowverse it was asked of: a
   flow is read by running it, so what a place holds is the one question about it with no cheap
   answer. `a` MUST add one; `r` MUST fetch one again; `d` twice MUST take one away.
@@ -505,7 +506,7 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   rather than raised at whoever opened it, and MUST NOT stop the interface redrawing while it
   runs.
 - Where a flowverse came from MUST be shown with whatever was signed into the URL taken out,
-  for the reason `hmz flowverses` shows it that way: a private one is added as
+  for the reason :attr:`hmz.sdk.Hmz.verses` gives it back that way: a private one is added as
   `https://x-access-token:$TOKEN@...`, git keeps that verbatim, and a token on a screen is a
   token in a photograph. It MUST be taken out in one place, which both ways of showing it ask.
 
@@ -599,8 +600,9 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - A trace gathered here MUST be a trace of that run: the sessions it opened and no others,
   asked for by the ids it wrote down rather than by the directory it ran in. A trace of what
   a directory holds whoever opened it MUST NOT be offered here at all -- this is a list of
-  runs, and a trace that is of none of them has nothing here to hang on; `hmz trace collect
-  --all` is where it is asked for.
+  runs, and a trace that is of none of them has nothing here to hang on. There is no way in
+  that asks for one: :meth:`hmz.sdk.Hmz.epics.trace` with no sessions named gathers every
+  session of the workspace, and nothing typed and nothing drawn calls it that way.
 - A run MUST also be exportable from here, beside gathering its trace: both are reading one
   back afterwards, and a report about something that went wrong last week is written about a
   run out of this list rather than about the one on the screen. What is written MUST be the

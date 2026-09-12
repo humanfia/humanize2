@@ -195,10 +195,18 @@ The same for every kind:
 ## The whole run on one machine
 
 The setting above is per agent, which is what a flow says when one place needs a machine of its
-own. A run that wants **all** of them in one container says so from outside instead:
+own. A run that wants **all** of them in one container says so from outside instead — and
+says it from Python, since it is a thing about the run rather than about any agent named on
+a line:
 
-```sh
-hmz exec -f ralph_loop --container python:3.12 -a claude/claude-opus-5:max "get the suite green"
+```python
+from hmz.sdk import Hmz
+
+hmz = Hmz()
+path, agents, task, config, _ = hmz.read(
+    ["-f", "ralph_loop", "-a", "claude/claude-opus-5:max", "get the suite green"]
+)
+hmz.run(path, agents, task, config, container="python:3.12").run()
 ```
 
 One container is started as the run starts and taken down as it ends, and every agent is

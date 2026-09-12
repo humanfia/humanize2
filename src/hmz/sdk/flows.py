@@ -278,8 +278,8 @@ class Flows:
 
         What lands is `prophecy.pkl`, which every run of that flow from then on walks
         instead of compiling the atlas again: a repository that has been through the
-        compiling once has an answer worth shipping. `hmz check` says when the file and the
-        source it came from have drifted apart.
+        compiling once has an answer worth shipping. :meth:`check` says when the file and
+        the source it came from have drifted apart.
 
         Args:
           named: The flow, by the name `-f` takes or by a path.
@@ -298,7 +298,10 @@ class Flows:
 
         held = self.prophecy(named)
         if held is None:
-            raise NotAFlow(f"{named}: not an atlas that compiles -- hmz check says why")
+            raise NotAFlow(
+                f"{named}: not an atlas that compiles -- "
+                f"Hmz().flows.check({named!r}) says why"
+            )
         # "" for a flow that is a single file, which has no directory of its own: what is
         # beside such a flow is the other flows, and none of it came with this one.
         beside = at(str(named))

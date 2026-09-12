@@ -3,8 +3,8 @@
 A frame is a kind and some bytes, and there are six kinds. Five of them are a terminal: the
 one that says a terminal has arrived and how big it is, the two that carry the keys one way
 and the screen the other, the one that says it has been resized, and the one that says the
-run has let go. The sixth is a line asking the run a question about itself, which is what
-`hmz daemon` sends and closes.
+run has let go. The sixth is a line asking the run a question about itself, which is what a
+terminal reaching for a held run sends and closes before deciding whether to attach.
 
 Framed rather than a raw pipe both ways, because the two directions are not only bytes: a
 terminal that has been resized has to say so, and a run that is letting go has to say that

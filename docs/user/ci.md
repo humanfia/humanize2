@@ -71,18 +71,33 @@ And give the job a `timeout-minutes` as the outermost bound.
 ## Get a credential into the runner
 
 humanize holds no API key. It drives the CLI you already logged in, so the question is how that
-CLI is signed in on a machine nobody is sitting at. Use a [provider](/user/providers), made
-non-interactively from a secret with `-s`:
+CLI is signed in on a machine nobody is sitting at. Use a [provider](/user/providers) — and make
+it from Python, since the way accounts are made is a walk at the prompt and a runner has no
+prompt to walk:
 
-```sh
-hmz providers add claude/ci -w token -s CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN"
+```python
+# ci/account.py
+import os
+
+from hmz.sdk import Hmz
+
+accounts = Hmz().accounts
+accounts.make(
+    "claude",
+    "ci",
+    accounts.way("claude", "token"),
+    {"CLAUDE_CODE_OAUTH_TOKEN": os.environ["CLAUDE_TOKEN"]},
+)
 ```
 
-```sh
-hmz providers add codex/ci -w key -s OPENAI_API_KEY="$OPENAI_API_KEY"
-```
+`accounts.way(cli, name)` is the way in that backend offers under that name, and
+`accounts.ways(cli)` is all of them — each says which variables it has to be told, so a runner
+answers them out of its secrets rather than out of a terminal. Codex is the same script with
+`("codex", "ci", accounts.way("codex", "key"), {"OPENAI_API_KEY": os.environ["OPENAI_API_KEY"]})`.
+Writing the account down is all it does: a way with a login command of its own would want a
+browser, and a token or a key is exactly the way in that does not.
 
-Then name the account on the agent:
+Then name the account on the agent, with `@` in front of it:
 
 ```sh
 hmz exec -f nightly -a claude@ci/claude-opus-5:high "$(cat TASK.md)"
@@ -105,15 +120,10 @@ class Agents(NamedTuple):
     worker: Annotated[Agent, AgentDefaults(permission="workspace-write")]
 ```
 
-```sh
-hmz exec -f nightly \
-    -a cli=claude,model=claude-opus-5,effort=high,provider=ci \
-    "$(cat TASK.md)"
-```
-
-A place that says nothing declares `bypass`, the loosest rung, and so settles nothing. On a
-runner, `workspace-write` costs you nothing
-and bounds the blast radius to the checkout. See [Permissions](/user/permissions).
+The line that runs it is the same line either way — an agent is a CLI, an account, a model and
+an effort, and nothing on it says what the agent may do. A place that says nothing declares
+`bypass`, the loosest rung, and so settles nothing. On a runner, `workspace-write` costs you
+nothing and bounds the blast radius to the checkout. See [Permissions](/user/permissions).
 
 ## Write the workflow
 
@@ -143,22 +153,19 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Install humanize
-        run: uv tool install git+https://github.com/humanfia/humanize2.git
+        run: uv pip install --system git+https://github.com/humanfia/humanize2.git
 
       - name: Sign the CLI in as an account of its own
         env:
           CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: hmz providers add claude/ci -w token -s CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN"
+        run: python ci/account.py
 
       - name: Run the loop
-        run: |
-          hmz exec -f nightly \
-            -a cli=claude,model=claude-opus-5,effort=high,provider=ci \
-            "$(cat TASK.md)"
+        run: hmz exec -f nightly -a claude@ci/claude-opus-5:high "$(cat TASK.md)"
 
       - name: Collect the trace
         if: always()
-        run: hmz trace collect --output trace.json
+        run: python ci/trace.py
 
       - uses: actions/upload-artifact@v5
         if: always()
@@ -175,12 +182,29 @@ jobs:
 
 ## Read what happened
 
-`hmz trace collect` with `if: always()` is the point of the whole exercise: the trace is on the
+Gathering the trace with `if: always()` is the point of the whole exercise: it is on the
 artifacts whether the run finished, failed, or hit the timeout.
 
-`--output` is what puts it there. Left alone, a trace goes with the run it is a trace of —
-`traces/` inside `~/.humanize/epics/<workspace>/<run>/`, which is outside the checkout and
+At a terminal a trace is gathered from [`/epics`](/reference/tui#the-runs-that-have-already-happened),
+which is a list nobody is there to read on a runner. The same thing from Python is four lines:
+
+```python
+# ci/trace.py
+from hmz.sdk import Hmz
+
+hmz = Hmz()
+runs = hmz.epics.all()          # every run of this directory, oldest first
+if runs:
+    hmz.epics.traced(runs[-1], output="trace.json")
+```
+
+`output` is what puts it in the checkout. Left alone, a trace goes with the run it is a trace
+of — `traces/` inside `~/.humanize/epics/<workspace>/<run>/`, which is outside the checkout and
 named after a run the YAML has never heard of.
+
+`traced` takes **one run**, which is why the last one is picked out rather than the directory
+handed over whole: a runner that has been round this loop fifty times has fifty runs in that
+directory, and a trace holding all of them is a trace of nothing anybody asked about.
 
 Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev): one process per agent,
 one track per row of its sessions, one slice per thing it did, with the prompts and the tool
@@ -233,13 +257,11 @@ mode: careful
 hmz exec -f nightly -c ci/nightly.yaml -a claude@ci/claude-opus-5:high "$(cat TASK.md)"
 ```
 
-Now the same line runs on your own machine. To look at that setup before you commit to it:
-
-```sh
-hmz -f nightly -c ci/nightly.yaml
-```
-
-This opens the interface already set up, and starts nothing.
+Now the same line runs on your own machine, and the file in the repository is what both of
+them were set up from. `-c` is `hmz exec`'s: at a terminal the same answers are given on the
+sheet [`/flow` puts up as the flow is chosen](/reference/tui#setting-a-flow-up), and what you
+answer there is what the next `hmz` in that directory opens on. The file is the version that
+can be reviewed in a pull request, which is why it is the one CI reads.
 
 ## Things that bite
 

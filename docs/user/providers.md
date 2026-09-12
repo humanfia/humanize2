@@ -11,42 +11,26 @@ directory.
 
 ## Try it
 
-1. Make one account from your existing subscription.
+Accounts are made at `/providers`, which is a page of the terminal interface: `hmz` in the
+project, then `/providers` at the prompt.
 
-```sh
-hmz providers add claude/anthropic -w login
-```
+1. **Make one from your existing subscription.** **a** asks which CLI — Claude Code here — and
+   then how to sign in, which is that backend's own list of ways. Choose `login`, call the
+   account `anthropic`, and `claude auth login` runs on this terminal with the paths pointed at
+   that account's own directory. The CLI's own login owns the screen until it is done, and what
+   it writes lands under `~/.humanize/providers/claude/anthropic/`.
 
-This runs `claude auth login` here, with the paths pointed at the provider's own directory. The
-CLI's own login owns the terminal until it is done, and what it writes lands under
-`~/.humanize/providers/claude/anthropic/`.
+2. **Make a second from somebody else's endpoint.** **a** again, Claude Code again, and this
+   time `gateway`, which asks where the endpoint is and then for the token. A secret is drawn
+   as bullets and never shown back.
 
-2. Make a second account from somebody else's endpoint.
+3. **Read what you made.** One line each, under a heading per CLI: the account, the way it was
+   made by, and the variables it sets. Names, never values.
 
-```sh
-hmz providers add claude/deepseek -w gateway \
-    -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
-```
+![making an account at /providers: a, which backend, how that backend signs in, and what the
+list says about the account afterwards](/demo/accounts.gif)
 
-`-s` answers one of the way's questions on the line rather than being asked. The rest is asked
-at the terminal, and a secret — here, the token — is not echoed.
-
-3. Check what you made.
-
-```sh
-hmz providers list
-```
-
-```console
-claude/anthropic  login      -
-claude/deepseek  gateway    ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
-codex/personal  key        -
-```
-
-One line each: the account, the way it was made by, and the variables it sets. `-` marks a way
-that sets none.
-
-4. Run one flow as both accounts at the same time.
+4. **Run one flow as both accounts at the same time.**
 
 ```sh
 hmz exec -f official/flame_chase \
@@ -61,14 +45,14 @@ the token you typed. Neither can read the other's credential file, and neither c
 
 ## Naming one on an agent
 
-Two spellings name the same agent:
+An `@` after the CLI names the account an agent's turns run as:
 
 ```
 claude@deepseek/claude-opus-5:max
-cli=claude,model=claude-opus-5,effort=max,provider=deepseek
 ```
 
-A CLI is never spelled with an `@` in it, so the CLI and the account are told apart wherever an
+It is the account and never the model, whatever comes after the slash. A CLI is never spelled
+with an `@` in it, so the CLI and the account are told apart wherever an
 agent is written. An `@` with nothing after it is refused: it was typed to name an account, and
 running as whoever is at this machine is not that.
 
@@ -135,8 +119,8 @@ unless *this* provider set it.
 
 ## The ways in
 
-A **way** is one kind of account. `hmz providers ways <cli>` prints the list on this machine,
-and this machine is the one to trust.
+A **way** is one kind of account. **a** at `/providers`, once it has been told which CLI, offers
+that backend's ways as they are on this machine, and this machine is the one to trust.
 
 | CLI | Ways |
 | --- | --- |
@@ -155,35 +139,34 @@ in the CLI's. A way that is only answers keeps them as the variables the backend
 under. What each way asks for is in [Providers › The ways
 in](/reference/providers#the-ways-in).
 
-## The commands
+## Never the values
 
-```sh
-hmz providers list [<cli>]           # what there is
-hmz providers ways <cli>             # how that backend can be signed into
-hmz providers add <cli>/<name>       # make one: -w <way>, -s VAR=VALUE, --no-login, --also
-hmz providers login <cli>/<name>     # sign an existing one in again
-hmz providers show <cli>/<name>      # what it holds — never what the values are
-hmz providers falls-back <cli>/<name> [<name>]   # which account a failed turn carries on under
-hmz providers remove <cli>/<name>    # take it away, credentials and all
+**What is drawn of an account is the names of the variables it sets**, never what they are. A
+secret typed at the prompt is bullets and is never shown back — it is on its way into a
+credential store — and correcting an account starts its secrets blank for the same reason: you
+type one again, or you leave it as it was.
+
+::: tip With nobody at a terminal
+Every question the walk asks is a call on `Hmz().accounts`, which is the object the walk itself
+goes through:
+
+```python
+from hmz.sdk import Hmz
+
+accounts = Hmz().accounts
+way = accounts.way("claude", "gateway")
+accounts.make("claude", "deepseek", way, {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": token,
+})
 ```
 
-::: tip Non-interactive
-A line with nobody at a terminal has to answer everything itself:
-
-```sh
-hmz providers add claude/deepseek -w gateway \
-    -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
-    -s ANTHROPIC_AUTH_TOKEN="$TOKEN"
-```
-
-`--no-login` writes one down without running the backend's own way in at all.
+`make` writes one down out of what its way was answered with; `sign_in` is what runs the
+backend's own way in for a way that has one, so a script may do either without doing both. See
+[SDK › Accounts](/reference/sdk#accounts).
 :::
 
-**Values are never printed.** `show` and `list` say which variables a provider sets, not what
-they are. A secret typed at the prompt is drawn as bullets and never shown back.
-
-![hmz providers ways, add, list and show — naming variables and never their
-values](/demo/providers.gif)
+## Which models it may name
 
 The models an account can run belong to that account, so it is asked as soon as one is made:
 which models a turn may name depends on which subscription, key or gateway it runs under.
@@ -210,7 +193,7 @@ redirect off the address you gave is refused rather than followed, since the hea
 with it. An endpoint that is down, that refuses, or that answers something other than a model
 list leaves the CLI to answer as before.
 
-## In the interface
+## Every account there is
 
 `/providers` lists all of them, grouped by CLI, with the way each was made by and the variables
 it sets:
@@ -232,28 +215,29 @@ it sets:
 | **a** | Make one: which CLI, then how to sign in, then what that way asks |
 | **d** **d** | Take it away, credentials and all |
 
-**enter** opens a menu of four rather than one letter apiece on the list:
+**enter** opens a menu of three rather than one letter apiece on the list:
 
 | | | |
 | --- | --- | --- |
 | **correct what it holds** | the answers its way in was made with, asked again | held until saved |
 | **sign in again** | its own way in, run again; it owns the terminal while it does | at once |
 | **falls back to** | which account a turn carries on under when this one fails | held until saved |
-| **how it is tried again** | how many tries, which wait, and how long in all | held until saved |
 
-![what enter opens on claude/gateway: correct what it holds, sign it in again, what it falls
-back to and how it is tried again, under a line saying which of them wait for the menu to be
-saved](/demo/account-does.png)
+How many times over a failed turn is taken again is not one of them: that is a thing about the
+place a turn runs at rather than about the credentials it runs with, and
+[`/fallback`](/user/fallback) is the menu it is said on. An account written down before it moved
+there says so under the list — the tries it still holds are no longer read, and the line names
+where they are said now.
 
 Making an account and signing one in happen as they are asked for, because a login owns the
 terminal while its browser or its device code has it, and something that has already happened
-is not a draft. The other three are held with the removals until the menu is saved, as on every
+is not a draft. The other two are held with the removals until the menu is saved, as on every
 other menu.
 
-The account this machine is already signed into is `as local`, last under each CLI, and it is
-offered only the bottom two. The line under them says why rather than leaving two rows that do
-nothing: humanize did not make that account and keeps no credentials for it, so there is
-nothing to correct and nothing to sign in.
+The account this machine is already signed into is `as local`, last under each CLI, and the one
+thing it is offered is where it falls back to. The line under that says why rather than leaving
+rows that do nothing: humanize did not make that account and keeps no credentials for it, so
+there is nothing to correct and nothing to sign in.
 
 **a** asks which CLI first, because a backend's ways in are its own and the second question is
 only answerable once the first has been. The last row of that list is not a backend at all: [a
@@ -296,25 +280,28 @@ on, and written over the copies that are **ticked**.
 What is ticked is the backends **installed here**, and it does not read which backends already
 hold a copy. A copy on a CLI that is not on this machine is therefore one still holding the old
 key, and nothing marks it as one. Which is worth a look before a rotation is trusted, a copy
-left behind being an account that is still there and still works: `hmz providers list` is where
-the copies are, the same name under another backend, and ticking one is what writes the new key
-over it.
+left behind being an account that is still there and still works: `/providers` is where the
+copies are, the same name under another backend's heading, and ticking one is what writes the
+new key over it.
 
 **What travels is variables.** An account that is a subscription signed into travels nowhere —
 it is the CLI's own credential store in that CLI's own format, and nothing else can read it.
 Neither does one holding a credential the other backend has no name for: every variable has to
 land somewhere, or that backend is not offered the account at all.
 
-On a command line it is a flag on `add`, and `show` says what else an account could run:
+From Python it is two calls — what else this account could run, and writing it down there:
 
-```sh
-hmz providers add claude/shared -w key --also pi,opencode   # or --also all
-hmz providers show claude/shared                            # `also runs` names the rest
+```python
+accounts = Hmz().accounts
+
+one = accounts.find("claude", "shared")
+accounts.serves(one)              # ('pi', 'opencode', 'mimo', 'zcode')
+accounts.copies(one, "pi")        # pi/shared, the same key under the name pi reads it under
 ```
 
-A line that did not ask for it is told it could have, which is how anyone finds out this
-exists. Full detail in [Providers › One account, several
-CLIs](/reference/providers#one-account-several-clis).
+`serves` answers what an account **could** be copied to rather than what it has been copied to,
+a backend already holding a copy reading the same as one holding none. Full detail in
+[Providers › One account, several CLIs](/reference/providers#one-account-several-clis).
 
 ## Failing loudly
 
@@ -332,26 +319,30 @@ the flow is started, before any turn has run.
 
 ## When one goes down
 
-An account says what happens when it is the one that fails. Both halves are written down beside
-it rather than on any agent: it is the account that goes down, and whichever agent was running
+An account says one thing about failing, and that one thing is written down beside the account
+rather than on any agent: it is the account that goes down, and whichever agent was running
 under one then is the agent that needs somewhere else to run.
 
-**Tried again first.** How many times a failed turn is taken again is a thing about the place
-the turn runs at rather than about the credentials it runs with, so it is said in
-[`/fallback`](/user/fallback) rather than on the account. Nothing is retried by default.
+**Tried again first, though not from here.** How many times a failed turn is taken again is a
+thing about the place the turn runs at rather than about the credentials it runs with, so it is
+said against the place, on [`/fallback`](/user/fallback), and never on the account. Nothing is
+retried unless you say so.
 
-**Then the chain.** Each account names the one to carry on under, and that one names the next:
+**Then the chain.** Each account names the one to carry on under, and that one names the next.
+It is *falls back to* on the menu **enter** opens, which offers that backend's other accounts;
+from Python it is one call apiece:
 
-```sh
-hmz providers falls-back claude/subscription key
-hmz providers falls-back claude/key gateway
+```python
+accounts.points("claude", "subscription", "key")
+accounts.points("claude", "key", "gateway")
 ```
 
-The account this machine is already signed into is one of them: `claude/`, a backend and no
-name at all. It is where the chain of an agent nobody gave an account begins:
+The account this machine is already signed into is one of them — last under each CLI's heading,
+and `""` from Python, a backend and no name at all. It is where the chain of an agent nobody
+gave an account begins:
 
-```sh
-hmz providers falls-back claude/ subscription
+```python
+accounts.points("claude", "", "subscription")
 ```
 
 So a flow you never configured an account for still has somewhere to go. Nothing may fall back
@@ -365,6 +356,7 @@ down](/reference/agents#when-an-account-goes-down).
 ## See also
 
 - [Providers reference](/reference/providers)
-- [CLI › `hmz providers`](/reference/cli#hmz-providers)
+- [TUI › The accounts themselves](/reference/tui#the-accounts-themselves) — the page itself
+- [SDK › Accounts](/reference/sdk#accounts) — the same accounts as one object
 - [Publish a flowverse](/weaver/flowverses)
 - [A container of its own](/user/containers)

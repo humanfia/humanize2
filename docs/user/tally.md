@@ -196,8 +196,9 @@ be halved by the accounting.
 ## Two backends that report nothing
 
 opencode and mimocode keep a session in a database rather than in a log file. So the interface
-has nothing to read a running cost out of, and [`hmz trace collect`](/user/tracing) has nothing
-to gather. What their turns cost still reaches a flow: each says it as the turn lands.
+has nothing to read a running cost out of, and [gathering a run's trace](/user/tracing) —
+**enter** on it in `/epics` — has nothing to gather. What their turns cost still reaches a flow:
+each says it as the turn lands.
 
 ## See also
 
