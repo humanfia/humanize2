@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     # Named for the type only: a flow that runs its agents here is the common one, and it
     # should not pay to import the half of coganchor that runs a session, nor the docker
     # client behind a container.
@@ -21,6 +23,7 @@ __all__ = [
     "Budget",
     "Goal",
     "Isolated",
+    "Needs",
     "Remote",
     "anchored",
     "isolated",
@@ -269,6 +272,84 @@ class Isolated:
     """
 
     image: str = "python:3.12"
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class Needs:
+    """What a flow writes beside an agent to say what filling the place takes.
+
+    Most of what a flow builds on, every backend here serves and every machine holds. Some of
+    it only some of them do -- a turn that can be talked to while it is still running, a turn
+    held to a shape rather than asked to keep to one, a moment only some CLIs reach, a place
+    whose tools are an image's rather than this machine's -- and a flow built on one of those
+    is not a flow any agent can drive on any machine. Finding that out from the call that
+    reached for it is finding it out hours in, so the flow says what the place takes where it
+    declares the place::
+
+        class Agents(NamedTuple):
+            builder: Annotated[AgentBase, Needs("goal", "steer")]
+            tester: Annotated[AgentBase, Remote, Needs(where=("remote", "isolated"))]
+
+    and an agent whose backend serves none of it, or a machine whose settings do not come to
+    it, is refused before the first turn. By name rather than by feature, and by the names
+    everything else here already goes under: `hmz.flows.checking.catalogue` is where they are
+    written down, together with which backends serve each.
+
+    Attributes:
+      of_agent: What the backend filling the place has to serve, out of the agent vocabulary
+        -- `goal`, `steer`, `shape`, `tools`, `fork`, `search`, `swarm`, `resume`, and a
+        moment only some backends reach as `moment:<its own name>`, those being the ones a
+        place has any reason to ask for. What every backend here serves counts as served, so
+        a place that names one of those is filled by anything rather than by nothing. Read
+        off the driver class and off the facts written down about the CLI, neither of which
+        needs an agent to have run, so a flow that cannot be driven by what it was given says
+        so before it opens anything.
+      where: What the machine its turns land on has to come to, out of the place vocabulary
+        -- `remote`, `isolated`, `managed`, `linux`, `darwin`. Read off that machine's own
+        settings, :attr:`~hmz.machines.MachineConfig.capabilities`, so that a place which
+        will not do is refused before an image has been pulled; a place asked for nothing in
+        particular may be filled by an agent that was pointed nowhere, whose machine comes to
+        nothing at all. Only what a setting promises is asked here, which is why the
+        `anchor:` names -- how a turn's own commands are reached, a fact about the road
+        rather than about the machine -- are not among them yet: no machine's settings answer
+        for one, and asking for what nothing can answer is asking for a run that never starts.
+
+    Raises:
+      TypeError: If `where` was written as one name rather than as a sequence of them.
+        `Needs(where="remote")` is five capabilities spelled a letter each, and it is the one
+        slip here a type checker cannot see -- a string being a sequence of strings -- so it
+        is said as the flow is read rather than reached down in a refusal that names letters.
+    """
+
+    of_agent: frozenset[str]
+    where: frozenset[str]
+
+    def __init__(self, *of_agent: str, where: Sequence[str] = ()) -> None:
+        """Initializes what a place takes, as the flow wrote it.
+
+        Written out rather than generated, because what the flow writes is two different
+        kinds of thing: what the agent has to serve reads as a list of words and is taken as
+        one, and what the machine has to come to is said apart from it so that neither is
+        ever read as the other.
+
+        Args:
+          *of_agent: What the backend filling the place has to serve.
+          where: What the machine its turns land on has to come to.
+
+        Raises:
+          TypeError: If `where` was written as one name rather than as a sequence of them.
+        """
+        # A string is a sequence of strings, so this one slip is the one that would not be
+        # caught anywhere: `where="remote"` is five capabilities spelled a letter each, and
+        # the refusal it earns names letters. Everything else written wrong here is a type
+        # error where the flow wrote it.
+        if isinstance(where, str):
+            raise TypeError(
+                f"where must be a sequence of names rather than one name: "
+                f"Needs(where=({where!r},))"
+            )
+        object.__setattr__(self, "of_agent", frozenset(of_agent))
+        object.__setattr__(self, "where", frozenset(where))
 
 
 @dataclass(frozen=True, kw_only=True)

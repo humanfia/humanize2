@@ -58,6 +58,7 @@ if TYPE_CHECKING:
         AgentDefaults,
         Isolated,
         Moment,
+        Needs,
         Remote,
     )
     from hmz.agents.base import Journal
@@ -74,6 +75,7 @@ __all__ = [
     "Place",
     "Running",
     "carries",
+    "comes_to",
     "configures",
     "contained",
     "container",
@@ -88,6 +90,7 @@ __all__ = [
     "resumes",
     "running",
     "runs_at",
+    "serves",
     "set_up",
     "wanted",
 ]
@@ -417,6 +420,11 @@ class Place(NamedTuple):
       goals: Whether the backend's own goal feature is available to it, said the same way.
         A place run under a `Goal` has them, whatever else it wrote.
       web_search: Whether it may search the web, said the same way.
+      needs: What filling this place takes, which the flow said by writing
+        `Annotated[Agent, Needs("steer", where=("isolated",))]` where it declared it -- what
+        the backend has to serve, and what the machine its turns land on has to come to.
+        None for a place the flow said nothing about, which is most of them: what every
+        backend serves and every machine holds is nothing a flow has to ask for.
     """
 
     name: str
@@ -427,6 +435,7 @@ class Place(NamedTuple):
     permission: str = "bypass"
     goals: bool = True
     web_search: bool = True
+    needs: Needs | None = None
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -1520,8 +1529,9 @@ def _handed(
 
     Raises:
       NotAFlow: If that is the wrong number of them, if one of them cannot run a moment the
-        flow says that place has to, if one is somewhere the flow does not put it, or if
-        `drives` names something the flow does not drive.
+        flow says that place has to, if one of them does not serve what the flow says that
+        place needs, if one is somewhere the flow does not put it, or if `drives` names
+        something the flow does not drive.
     """
     from hmz.agents import HumanAgent
 
@@ -1559,6 +1569,7 @@ def _handed(
                 f"{flow}: {place.name or 'the agent'} is run under a goal, but goals "
                 "were switched off for it"
             )
+        serves(flow, agent, place)
         lands(flow, agent, place)
     return make(driven)
 
@@ -1687,7 +1698,74 @@ def _holding(under: Epic | None, named: str) -> dict[str, Any]:
     return under.state(named, state(at, named) if at is not None else None)
 
 
-def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
+def serves(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
+    """Refuses an agent whose backend does not serve what the flow says its place takes.
+
+    Before the first turn, for the reason a moment the place hangs a hook on is checked
+    before it: a flow built on a turn that can be talked to while it runs, or on one held to
+    a shape, finds out from the call that reached for it otherwise -- hours into a loop,
+    rather than from the line that chose the agent. So it is asked of the driver class and of
+    what is written down about the CLI, neither of which needs an agent to have opened
+    anything, and a flow that cannot be driven by what it was handed says so at once.
+
+    Args:
+      flow: The flow, for what a refusal says.
+      agent: The agent filling the place.
+      place: What the flow declared.
+
+    Raises:
+      NotAFlow: If the backend does not serve something the place says it has to.
+    """
+    if place.needs is None or not place.needs.of_agent:
+        return
+    if short := place.needs.of_agent - comes_to(agent.backend):
+        raise NotAFlow(
+            f"{flow}: {place.name or 'the agent'} has to serve "
+            f"{', '.join(sorted(short))}, which {agent.backend} does not"
+        )
+
+
+def comes_to(backend: str) -> frozenset[str]:
+    """What one backend serves, by the names a flow asks for it under.
+
+    Read out of the one catalogue rather than off the driver classes again: what a flow may
+    build on -- the shape a turn can be held to, the tools it may be offered, the word put
+    into a turn already running, the goal feature, the fork, each moment outside the ones
+    every backend reaches -- is already read off those classes there, and a second reading
+    here would be a second place for it to be wrong. What the catalogue leaves to the
+    backend's own facts is read where those are written down, which is the same profile it
+    reads.
+
+    By name rather than by agent, so that whoever is *choosing* an agent can ask before there
+    is one: the picker rules a CLI out for a place it could not fill, and a run refuses one
+    that was handed over anyway, and both are asking this one question.
+
+    Args:
+      backend: The coding agent, named as a command line names it.
+
+    Returns:
+      The names it serves. What every backend here serves is in it too: the catalogue names
+      no backend against those because they are true of all of them, and a place that asked
+      for one would otherwise be refused every agent there is.
+    """
+    from hmz.backends import named
+
+    from .checking import catalogue
+
+    comes = {
+        one.name for one in catalogue() if not one.backends or backend in one.backends
+    }
+    profile = named(backend)
+    return frozenset(comes if profile is None else comes | profile.tags())
+
+
+def lands(
+    flow: str | os.PathLike[str],
+    agent: Agent,
+    place: Place,
+    *,
+    container: str = "",
+) -> None:
     """Settles where one agent's turns land, and refuses a machine the flow did not allow.
 
     Where an agent works is the flow's to say and not a setting anybody may reach for: a flow
@@ -1708,10 +1786,17 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
       flow: The flow, for what a refusal says.
       agent: The agent filling the place.
       place: What the flow declared.
+      container: The image the whole run works in, for a run put in one from outside, or ""
+        for a run on this machine. Named rather than read off the agent because the container
+        is started where the run starts and nothing is pointed at it until then: a place that
+        needs somewhere remote would otherwise be refused at the top of a run that is about
+        to put every agent of it somewhere remote, and allowed inside that same run when a
+        flow called another. It is one question, so it is asked of one answer.
 
     Raises:
-      NotAFlow: If the agent was configured to work somewhere the flow does not put it, or if
-        it has already opened a session, which is a conversation that cannot be moved.
+      NotAFlow: If the agent was configured to work somewhere the flow does not put it, if
+        where it works does not come to what the flow says that place needs, or if it has
+        already opened a session, which is a conversation that cannot be moved.
     """
     from hmz.agents import Isolated, isolated
 
@@ -1722,8 +1807,13 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
                 f"{flow}: {called} works in a container of this flow's own, so there is "
                 "nothing to point it at"
             )
+        # Against the container this flow named, and before the agent is put in it: a call
+        # that is refused must leave the flow which made it driving the agents it had, and
+        # one whose place had already been moved would hand back an agent pointed somewhere.
+        box = isolated(place.where.image)
+        _somewhere(flow, called, box, place)
         try:
-            _settles(agent).runs_on(isolated(place.where.image))
+            _settles(agent).runs_on(box)
         except RuntimeError as opened:
             raise NotAFlow(f"{flow}: {called} {opened}") from opened
         return
@@ -1735,6 +1825,63 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
         raise NotAFlow(
             f"{flow}: {called} runs on this machine -- this flow does not say it works "
             "anywhere else, so it cannot be pointed at one"
+        )
+    _somewhere(flow, called, agent.config.machine or _run_in(container), place)
+
+
+def _run_in(image: str) -> MachineConfig | None:
+    """The machine a run put in a container from outside will be working in.
+
+    Built rather than started: what a container comes to is its settings' to answer, and
+    reading a flow must not pull an image.
+
+    Args:
+      image: The image the whole run works in, or "" for a run on this machine.
+
+    Returns:
+      The settings every agent of that run will be pointed at, or None for a run here.
+    """
+    from hmz.agents import isolated
+
+    return isolated(image) if image else None
+
+
+def _somewhere(
+    flow: str | os.PathLike[str],
+    called: str,
+    machine: MachineConfig | None,
+    place: Place,
+) -> None:
+    """Refuses a place whose machine does not come to what the flow says the work takes.
+
+    Asked of the machine's settings and never of a machine, which is the whole reason those
+    settings answer it: a flow whose work has to happen somewhere isolated must be refusable
+    before an image has been pulled, and one whose work has to happen on Linux before a
+    connection has been made. What only the machine itself can settle it does not claim --
+    the platform of somebody else's machine is read from the handshake, and a machine that
+    turns out not to be what its settings promised fails as it starts -- so nothing here
+    waits on anything being up.
+
+    Args:
+      flow: The flow, for what a refusal says.
+      called: What the flow calls the place.
+      machine: The settings the work would land under, or None for this machine.
+      place: What the flow declared.
+
+    Raises:
+      NotAFlow: If those settings do not come to something the place says it needs. An agent
+        pointed nowhere works on this machine, which comes to nothing at all, so a place that
+        needs anything of where it works needs a machine first.
+    """
+    if place.needs is None or not place.needs.where:
+        return
+    at: frozenset[str] = machine.capabilities if machine is not None else frozenset()
+    if short := place.needs.where - at:
+        raise NotAFlow(
+            f"{flow}: {called} has to work somewhere that comes to "
+            f"{', '.join(sorted(short))}, which "
+            f"{'the machine it works on' if machine is not None else 'this machine'} "
+            "does not"
         )
 
 
@@ -1967,6 +2114,7 @@ def _place(name: str, kind: object) -> Place:
     where = _where(kind)
     goal = _goal(kind)
     runs = _runs(kind)
+    needs = _needs(kind)
     if get_origin(kind) is Annotated:
         kind = get_args(kind)[0]
     return Place(
@@ -1981,6 +2129,7 @@ def _place(name: str, kind: object) -> Place:
         # checker says so about rather than one that quietly does neither.
         goals=True if goal else runs.goals,
         web_search=runs.web_search,
+        needs=needs,
     )
 
 
@@ -2000,6 +2149,26 @@ def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
         return None
     for said in get_args(kind)[1:]:
         if said is Remote or isinstance(said, (Remote, Isolated)):
+            return said
+    return None
+
+
+def _needs(kind: object) -> Needs | None:
+    """What a flow said filling a place takes, of the agent and of where it works.
+
+    Args:
+      kind: What the flow annotated the place with.
+
+    Returns:
+      The `Needs` it wrote beside the type, and None for a place it wrote none beside --
+      which is one any backend may fill, working wherever the rest of the annotation allows.
+    """
+    from hmz.agents import Needs
+
+    if get_origin(kind) is not Annotated:
+        return None
+    for said in get_args(kind)[1:]:
+        if isinstance(said, Needs):
             return said
     return None
 

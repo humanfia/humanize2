@@ -126,6 +126,7 @@ class Runner:
             lands,
             readies,
             runs_at,
+            serves,
             set_up,
         )
 
@@ -160,7 +161,11 @@ class Runner:
                     f"{flow}: {place.name or 'the agent'} is run under a goal, but goals "
                     "were switched off for it"
                 )
-            lands(flow, agent, place)
+            serves(flow, agent, place)
+            # Told what the whole run will be put in, because nothing is pointed at that
+            # container until the run starts: a place needing somewhere remote must not be
+            # refused here and then allowed when a flow called another inside the same run.
+            lands(flow, agent, place, container=container)
             # And what the flow says this one may do, whether it has goals and whether it
             # reads the internet -- over whatever it was made with, because those three are
             # the flow's and nobody else's: whoever chose the agent chose a CLI, a model, an
