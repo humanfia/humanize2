@@ -1718,10 +1718,20 @@ def serves(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
     """
     if place.needs is None or not place.needs.of_agent:
         return
-    if short := place.needs.of_agent - comes_to(agent.backend):
+    from .checking import INSIDE
+
+    served = comes_to(agent.backend)
+    if agent.config.machine is not None:
+        # Reaching inside the CLI is something humanize does to a process it started here,
+        # and a turn whose process is on another machine is one none of that reached. The
+        # drivers each switch it off for that reason, so a place that asked for it is refused
+        # here rather than given the weaker thing without a word.
+        served -= INSIDE
+    if short := place.needs.of_agent - served:
+        where = " where its turns land" if short & INSIDE else ""
         raise NotAFlow(
             f"{flow}: {place.name or 'the agent'} has to serve "
-            f"{', '.join(sorted(short))}, which {agent.backend} does not"
+            f"{', '.join(sorted(short))}, which {agent.backend} does not{where}"
         )
 
 

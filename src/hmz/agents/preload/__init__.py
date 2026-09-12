@@ -232,7 +232,12 @@ class Watch:
           hooks: What is hung on the agent's moments, which is where a report goes and what
             says which agent it happened to.
         """
-        self._hooks = hooks
+        # Weakly, for the reason `hmz.agents.hooks.Gate` holds its own weakly: this object is
+        # held strongly by the `weakref.finalize` that closes it, so holding the hooks back
+        # would reach through them to whatever a flow's own hook captured -- the agent, most
+        # often -- and an agent reachable from that registry is one that is never collected,
+        # so the finalizer never fires and the socket, the directory and the thread all stay.
+        self._hooks = weakref.ref(hooks)
         self._lock = threading.Lock()
         self._at = ""
         self._sock: socket.socket | None = None
@@ -344,11 +349,14 @@ class Watch:
         # A hook is the flow's own code, and one that raises has said nothing -- including the
         # stop `fire` lets through, which has nowhere to go on a thread of this one's: there is
         # no turn here to end, the turn being in another process entirely.
+        hooks = self._hooks()
+        if hooks is None:
+            return
         with contextlib.suppress(Exception):
-            self._hooks.fire(
+            hooks.fire(
                 Occasion(
                     moment=Moment.PRE_TOOL_USE,
-                    agent=self._hooks.agent,
+                    agent=hooks.agent,
                     tool=did,
                     about=what,
                 )

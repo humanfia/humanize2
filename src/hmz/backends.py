@@ -523,8 +523,16 @@ class Profile:
         Returns:
           The names, out of the agent vocabulary -- `swarm`, `search`, `fork`, `resume` -- and
           out of the anchors, for a CLI that can be reached through one: `anchor:hooked` for
-          one that takes a hook table of its own, `anchor:preloaded` for one whose runtime
-          takes a preload, `anchor:patched` for one with a bundle to patch.
+          one that takes a hook table of its own, and `anchor:preloaded` for one whose
+          runtime takes a preload.
+
+          `bundles` names no capability, though `hmz.agents.patching` reads it. What a
+          fingerprint says is that a patch *could* be found in what this CLI shipped, which
+          is not the same as a turn being reached that way: the bytes on this machine decide
+          it, and they are read back rather than written down -- the way a machine's platform
+          is read off the handshake rather than promised by its settings. Until a turn takes
+          that road, a name here would be a promise a flow could ask for and be given
+          nothing.
         """
         held = {
             "swarm": self.swarms,
@@ -533,7 +541,6 @@ class Profile:
             "resume": self.resumes,
             "anchor:hooked": self.hooks is not None,
             "anchor:preloaded": bool(self.preloads),
-            "anchor:patched": bool(self.bundles),
         }
         return frozenset(name for name, serves in held.items() if serves)
 

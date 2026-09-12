@@ -2100,6 +2100,16 @@ _PLACES = {
 #: traces. The rest are read off the backends' own facts, under the same name.
 _REACHED = ("anchor:native-cli", "anchor:supervised")
 
+#: The reach names humanize can only serve where the turn runs on this machine. Each of them
+#: is humanize putting something inside the process it started -- a hook table written for
+#: one run, a variable the runtime reads before it starts, a patched copy of what the CLI
+#: ships -- and a turn whose process is somewhere else is a process none of that reached. The
+#: drivers each switch themselves off under an anchor for exactly that reason, so a place that
+#: asked for one MUST be refused where it is declared rather than quietly given the weaker
+#: thing: a flow that believes it is gating tools and is only watching them is the failure
+#: asking beforehand exists to prevent.
+INSIDE = frozenset({"anchor:hooked", "anchor:preloaded"})
+
 #: How a turn's own commands are reached, which is what an anchor is made of, by the name a
 #: flow and a compiler ask for each under -- and what the ask looks like.
 _ANCHORS = {
@@ -2113,9 +2123,6 @@ _ANCHORS = {
     "anchor:preloaded": "a turn reached from inside the process, by what its runtime is told "
     "to load before it starts -- backends.named(<backend>).preloads names the variable that "
     "carries it",
-    "anchor:patched": "a turn reached by patching what the CLI ships, held to the "
-    "fingerprints backends.named(<backend>).bundles carries -- a file that does not answer "
-    "to one is left alone",
 }
 
 

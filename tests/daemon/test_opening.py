@@ -115,7 +115,7 @@ def test_a_held_run_is_opened_on_a_terminal_prepared_for_this_one(
     monkeypatch.delenv("TEXTUAL_DISABLE_KITTY_KEY", raising=False)
 
     with unittest.mock.patch("hmz.tui.Humanize") as opened:
-        cli.apart("", (), None, unittest.mock.Mock(spec=daemon.Held))
+        cli.apart(unittest.mock.Mock(spec=daemon.Held))
 
     assert opened.called
     assert os.environ["TEXTUAL_DISABLE_KITTY_KEY"] == "1"
@@ -133,7 +133,9 @@ def test_the_interface_is_handed_what_is_holding_the_run(workspace: Path) -> Non
             return None
 
     with unittest.mock.patch("hmz.tui.Humanize", Stands):
-        cli.apart("chat", (), None, unittest.mock.Mock(spec=daemon.Held))
+        cli.apart(unittest.mock.Mock(spec=daemon.Held))
 
-    assert made["flow"] == "chat"
     assert made["session"] is not None
+    assert set(made) == {
+        "session"
+    }  # and nothing else: a line cannot name any of the rest

@@ -32,10 +32,7 @@ if TYPE_CHECKING:
     from argparse import ArgumentParser
     from collections.abc import MutableMapping
 
-    from pydantic import BaseModel
-
     from hmz.daemon import Held
-    from hmz.kept import Runs
 
 __all__ = ["APART", "COMMANDS", "apart", "main", "many", "opens"]
 
@@ -255,8 +252,6 @@ def opens() -> int:
     if not (_apart_is_wanted() and _at_a_terminal()):
         return _here()
 
-    import functools
-
     from hmz import daemon
 
     found = daemon.running()
@@ -271,9 +266,8 @@ def opens() -> int:
         )
     # Opened on nothing in particular, which is what the interface then reads out of what
     # this directory was last left running.
-    opening = functools.partial(apart, "", (), None)
     try:
-        found = daemon.start(opening)
+        found = daemon.start(apart)
     except OSError as why:
         # A machine that will not fork, a home directory that cannot be written, a socket
         # that will not bind: none of those is a reason not to open the interface. What is
@@ -295,18 +289,14 @@ def _here() -> int:
     return 0
 
 
-def apart(
-    flow: str,
-    agents: tuple[Runs, ...],
-    config: BaseModel | None,
-    session: Held,
-) -> None:
+def apart(session: Held) -> None:
     """Opens the interface inside the process holding the run, and returns when it closes.
 
+    What is holding the run is the whole of what it is told. Which flow is open, what drives
+    it and what it is set up with are the interface's own to read back out of this directory,
+    and were only ever arguments here while a line could name them.
+
     Args:
-      flow: The flow to open on.
-      agents: What each of that flow's agents runs.
-      config: What that flow is set up with.
       session: What is holding the run, which is what `/detach` lets go of and what draws
         the screen again for a terminal that has just arrived.
     """
@@ -319,7 +309,7 @@ def apart(
     from hmz.sdk import Hmz
     from hmz.tui import Humanize
 
-    app = Humanize(flow=flow, agents=list(agents), config=config, session=session)
+    app = Humanize(session=session)
     # Each of these is called from a thread of whatever is holding the run, so each hands the
     # work to the interface's own thread and waits there rather than here.
     session.redrawn(lambda: app.call_from_thread(app.reattached))

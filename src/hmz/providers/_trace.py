@@ -51,16 +51,6 @@ _AT_FDCWD = -100
 _OPEN_HOW_RESOLVE = 16
 _RESOLVE_CONFINED = 0x08 | 0x10
 
-#: What a rewritten path is kept clear of: the red zone, which a leaf function of the tracee
-#: may be using this moment, and which is the only part of the stack below the pointer that is
-#: anybody's. Everything below it is stack the process has not reached.
-#:
-#: Only as many bytes as the paths themselves take, and no more: a thread with a stack of its
-#: own -- a Node worker, a Rust pool -- may have only a page or two left below the pointer,
-#: and a fixed few kilobytes would be written past the end of it, into whatever the allocator
-#: happened to put there.
-_RED_ZONE = 128
-
 #: What a path has to hold for the kernel to read it as something other than what it says: a
 #: doubled separator, a `.` or a `..` of its own, or a separator on the end. A path with none
 #: of them is already the path that will be resolved, so it can be held against the table as
@@ -429,7 +419,7 @@ class Tracing:
         # As the tracee named it: a path is bytes, and one that is not valid text came back
         # through the surrogates `read_cstring` escapes it with.
         blob = os.fsencode(path) + b"\0"
-        where = registers.stack_pointer - _RED_ZONE - taken - len(blob)
+        where = registers.scratch(taken + len(blob))
         try:
             procfs.write_bytes(pid, where, blob)
             if procfs.read_bytes(pid, where, len(blob)) != blob:
