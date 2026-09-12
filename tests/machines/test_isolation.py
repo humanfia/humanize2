@@ -20,16 +20,13 @@ from hmz.agents import AgentConfig
 from hmz.coganchor import check
 from hmz.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
 from hmz.runner import Runner
+from tests.machines.conftest import IMAGE
 from tests.stubs import HereAnchor, ShellAgent, written
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from hmz.coganchor import AnchorConfig
-
-#: Small, and has the `python3` a target needs. Pulled by hand rather than by the test, so a
-#: machine without it skips instead of spending a minute on a download.
-IMAGE = "python:3.12-slim"
 
 
 class _StubMachine(MachineBase):
@@ -106,19 +103,6 @@ def _inspect(container: str, field: str) -> str:
         check=False,
     )
     return found.stdout.strip() if found.returncode == 0 else ""
-
-
-@pytest.fixture
-def daemon() -> None:
-    """A docker daemon holding the image, or a skip: this test runs a container for real."""
-    try:
-        ready = subprocess.run(
-            ["docker", "image", "inspect", IMAGE], capture_output=True, check=False
-        )
-    except OSError as reason:
-        pytest.skip(f"needs the docker command: {reason}")
-    if ready.returncode != 0:
-        pytest.skip(f"needs a docker daemon holding {IMAGE}")
 
 
 def test_the_container_holds_the_workspace_as_this_user(
