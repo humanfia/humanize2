@@ -181,11 +181,13 @@ def test_the_names_a_backend_serves_are_derived_from_its_own_facts() -> None:
 
 
 def test_no_backend_has_been_given_a_layer_that_is_not_written_yet() -> None:
-    """The schema the anchors are read out of is laid down empty, and is still empty."""
+    """The schema the anchors are read out of is filled in exactly as far as it is built."""
     for one in PROFILES:
-        assert one.hooks is None, one.name
         assert not one.preloads, one.name
         assert not one.bundles, one.name
+    # The hooked layer is the one that is built, and it names the CLIs that take a hook table
+    # meant for a single run rather than every CLI that happens to have hooks at all.
+    assert {one.name for one in PROFILES if one.hooks is not None} == {"claude", "qwen"}
 
 
 def test_the_catalogue_names_where_an_agents_turns_may_land() -> None:
@@ -200,8 +202,11 @@ def test_the_catalogue_names_where_an_agents_turns_may_land() -> None:
 def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -> None:
     told = {one.name: one for one in catalogue() if one.name.startswith("anchor:")}
     # An empty backend set means every backend here, so a way in that has not been built
-    # must not be listed at all. These two are: every backend is a command line spawned
-    # here, and what a spawned turn runs is what an anchor traces.
-    assert set(told) == {"anchor:native-cli", "anchor:supervised"}
-    for one in told.values():
-        assert one.backends == frozenset()
+    # must not be listed at all. These three are: every backend is a command line spawned
+    # here, what a spawned turn runs is what an anchor traces, and two of them take a hook
+    # table written for one run. A preload and a patched bundle are not, so neither is here.
+    assert set(told) == {"anchor:native-cli", "anchor:supervised", "anchor:hooked"}
+    for name in ("anchor:native-cli", "anchor:supervised"):
+        assert told[name].backends == frozenset(), name
+    # And the one only some of them serve says which, since saying nothing would say all.
+    assert told["anchor:hooked"].backends == frozenset({"claude", "qwen"})

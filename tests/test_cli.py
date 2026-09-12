@@ -188,7 +188,7 @@ def test_the_help_lists_every_command(
     assert not any(spawned in shown for spawned in cli._SPAWNED)
 
 
-@pytest.mark.parametrize("spawned", ["anchor", "cred", "tools"])
+@pytest.mark.parametrize("spawned", ["anchor", "cred", "hook", "tools"])
 def test_what_humanize_spawns_for_itself_is_carried_out_but_not_listed(
     spawned: str,
 ) -> None:

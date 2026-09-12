@@ -1039,3 +1039,25 @@ process's standard input into the flow's socket, and the flow's answers back out
   has closed its input must not leave this process reading a socket nobody will write to.
 - A socket that is not there MUST be a status rather than a crash: it is a flow that has ended,
   and a CLI reads it as its tools being unavailable rather than as a turn that failed.
+
+## `hmz hook`
+
+```shell
+hmz hook --at <socket>
+```
+
+Carries one call of a coding agent's own hook table to the flow whose moment it is, and the
+verdict back again. It is what makes a refusal at `PreToolUse` stop the tool rather than
+describe one that has already run, and what it serves is specified in `agents.md`.
+
+- It MUST be a command of its own for the reason `hmz tools` is: a CLI takes a hook by starting
+  a program and waiting for what it says, so there has to be a program. It MUST NOT be one of
+  the commands a listing shows and MUST NOT be documented as a way in.
+- It MUST do nothing but carry the one call. The hook belongs in the process the flow is in,
+  and anything decided here would be a verdict the flow never gave.
+- It MUST exit zero whatever the flow said, and MUST NOT exit with the status these CLIs read
+  as the hook itself having refused: a relay that could not reach anybody would otherwise be
+  refusing on a flow's behalf without having asked it.
+- A socket that is not there MUST let the tool through, saying so where a person sees it: it is
+  a flow that has ended, and every one of these CLIs shows a hook's error and goes on with the
+  turn.

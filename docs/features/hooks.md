@@ -51,6 +51,36 @@ Everything hung on one moment is asked, and the answers come back as one verdict
 any of them refused, with the first reason there was, and adding everything any of them added,
 in the order they were hung.
 
+## Refusing a tool, and where the refusal lands
+
+`PreToolUse` is the moment a flow most wants to refuse, and it is the one that cannot be read
+off the stream a turn is read from: a CLI says what it reached for and *then* reaches for it, so
+a refusal read there would be describing a tool that had already run.
+
+So on the backends whose CLI takes a hook table meant for a single run — Claude Code among them
+— humanize puts the moment in that table instead, pointed at a relay that carries it straight
+back to the hooks hung on the agent. The CLI stops and waits for the answer, and a refusal means
+the tool **does not run**:
+
+```python
+def no_shell(occasion: Occasion) -> Verdict | None:
+    if occasion.tool == "Bash":
+        return Verdict(refused=True, because="this flow does not shell out")
+    return None
+
+with agent.hooks.on(Moment.PRE_TOOL_USE, no_shell):
+    agent(task)
+```
+
+Nothing of your own configuration is read, written or replaced to do it. The table reaches the
+CLI on its own command line, or through a settings file this run alone is pointed at, for the
+length of the run — your own hooks stay yours, and a flow that ends leaves the machine as it
+found it.
+
+On a backend with no such seam, and on a turn whose work lands on [another
+machine](/features/anchor) — where the relay is not — the moment is still told to every hook
+hung on it, and a refusal there is a flow watching a tool rather than stopping one.
+
 ## Hung on the agent, not on the session
 
 A hook hung on an agent is on every conversation that agent holds — and hanging one is
@@ -63,9 +93,14 @@ says.
 
 ## A hook is a word in the turn, not a note about it
 
-It is called on the thread the turn is running on, and that thread waits for it. A hook that
-takes a while is a turn that takes a while — which is what lets it decide something, and also
-what makes a slow one expensive.
+It is called on the thread the turn is running on — or, for the moment the CLI itself asks
+about, on the thread serving that question, which is the CLI's own turn waiting at the other
+end of a socket. Either way, whatever called it waits. A hook that takes a while is a turn that
+takes a while — which is what lets it decide something, and also what makes a slow one
+expensive.
+
+One agent's hooks run **one at a time** whichever way they arrive, so a CLI that reaches for
+three tools at once still puts them to your hook one after another.
 
 A hook that raises has **said nothing**, the way a watcher that raises has: a flow must not
 fail because something hung off it did. The one exception is a run ended by hand, which is

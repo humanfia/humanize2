@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage
-from .hooks import EVERYWHERE, SUBAGENTS, Moment
+from .hooks import EVERYWHERE, SUBAGENTS, WAITING, Moment, about
 
 if TYPE_CHECKING:
     import os
@@ -94,25 +94,6 @@ _AS_IT_GOES = {
     "cache_read": "cache_read_input_tokens",
     "cache_write": "cache_creation_input_tokens",
 }
-
-
-def _about(called: dict[str, Any]) -> str:
-    """What a tool was called with, as the one line a row of a transcript has room for.
-
-    Args:
-      called: The tool's input, as Claude sent it.
-
-    Returns:
-      The first thing in it that is words -- the path, the command, the query -- or "".
-    """
-    return next(
-        (
-            str(value)
-            for value in called.values()
-            if isinstance(value, str) and value.strip()
-        ),
-        "",
-    )
 
 
 def _result_failure(said: dict[str, Any]) -> str | None:
@@ -281,10 +262,7 @@ class ClaudeCodeSession(StreamSessionBase):
                 else []
             ),
             "--settings",
-            json.dumps(
-                {"fastMode": self._agent.config.service_tier == "fast"},
-                separators=(",", ":"),
-            ),
+            json.dumps(self._settings(), separators=(",", ":")),
             "--model",
             self._agent.config.model,
             "--effort",
@@ -324,6 +302,44 @@ class ClaudeCodeSession(StreamSessionBase):
                 json.dumps(self._agent.toolbox.config(), separators=(",", ":")),
             ]
         return argv
+
+    def _settings(self) -> dict[str, Any]:
+        """What this process is to run under, as the settings named on its own command line.
+
+        A JSON literal rather than a path, and never a file: `--settings` is how Claude Code
+        is told something for the length of one run, and what is said here is this flow's for
+        the length of this one. Nothing of the user's own settings is read, written or
+        replaced -- what they have configured goes on being theirs, and what is here is added
+        to it in the way Claude adds a command line to a file.
+
+        The hook table is the part that matters. Every other moment of a turn is read off the
+        stream this session is already reading, and read there a `PreToolUse` arrives after
+        Claude has announced the tool and is about to run it: a flow refusing one would be
+        describing what already happened. Claude's own table is the one place it stops and
+        waits to be told, so that is where humanize puts the moment -- pointed at
+        `hmz hook --at <socket>`, which carries it back to the hooks hung on this agent.
+
+        Said whether or not anything is hung on that moment, and not made conditional on it:
+        a hook goes up and comes down while the agent runs, and a table that depended on what
+        was hung when the process started would be a table that had to restart the process --
+        so the socket is always there, and what is hung is asked at the moment it fires.
+
+        Not for an anchored turn, whose Claude runs on another machine: the relay is a program
+        on this one talking to a socket on this one, and a table naming it over there would be
+        a hook that failed to start before every tool call and a moment that then fired
+        nowhere at all. Those turns go on reading `PreToolUse` off the stream, which is
+        watching a tool rather than gating it, and which is what every backend did before.
+
+        Returns:
+          The settings, as the mapping the flag takes.
+        """
+        settings: dict[str, Any] = {
+            "fastMode": self._agent.config.service_tier == "fast"
+        }
+        if self._agent.anchor is None:
+            # Seconds, which is the unit Claude Code reads this number in.
+            settings["hooks"] = self._agent.hooks.gate().table(WAITING)
+        return settings
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the user message Claude reads it as.
@@ -555,7 +571,7 @@ class ClaudeCodeSession(StreamSessionBase):
                     # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
                     called: dict[str, Any] = part.get("input") or {}
                     named = str(part.get("name") or "tool")
-                    said_as = f"{named} {_about(called)}".strip()[:120]
+                    said_as = f"{named} {about(called)}".strip()[:120]
                     if named in _FLEET:
                         marked = str(part.get("id") or "")
                         self._fleet[marked] = said_as
@@ -580,8 +596,10 @@ class ClaudeCodeSession(StreamSessionBase):
         `manual` and asks before every tool that would change something, every one of those
         asks lands here, which is humanize taking the deciding rather than skipping it. A flow
         watches its agent rather than gating it, so those are allowed with the input they came
-        with, unless something hung on `PermissionRequest` says otherwise: that is the one
-        moment a refusal actually stops the agent, because it is the one the backend waits on.
+        with, unless something hung on `PermissionRequest` says otherwise -- a moment a refusal
+        actually stops the agent at, because it is one the backend waits on. It is the second
+        of the two here: Claude runs its own hook table first, which is where `PreToolUse` is
+        served from and where a refusal means this is never asked at all.
         What the account itself will not allow at all -- the hard `deny` list an organisation
         ships -- the CLI refuses before it ever asks, so a yes here is a yes to what the
         account leaves decidable and nothing more. A question nobody is there to answer is
@@ -603,7 +621,7 @@ class ClaudeCodeSession(StreamSessionBase):
             asking = self._fire(
                 Moment.PERMISSION_REQUEST,
                 tool=tool,
-                about=_about(called),
+                about=about(called),
                 called=called,
             )
             if self._agent.config.permission == "read-only":

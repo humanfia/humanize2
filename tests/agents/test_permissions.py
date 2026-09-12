@@ -130,7 +130,9 @@ def test_claude_maps_the_common_service_tier_to_fast_mode(
     ).new()
     argv = session._command()
     settings = json.loads(argv[argv.index("--settings") + 1])
-    assert settings == {"fastMode": fast_mode}
+    # The one key this is about. The same flag carries the hook table a `PreToolUse` is
+    # refused through, which is `tests/agents/test_hooks_gate.py`'s to say.
+    assert settings["fastMode"] is fast_mode
 
 
 def test_service_tier_is_closed() -> None:
@@ -182,7 +184,7 @@ def test_a_tier_a_backend_can_send_is_taken_by_reconfigure() -> None:
 
     assert agent.config.service_tier == "fast"
     argv = agent.new()._command()
-    assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
+    assert json.loads(argv[argv.index("--settings") + 1])["fastMode"] is True
 
 
 @pytest.mark.parametrize(
