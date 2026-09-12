@@ -47,7 +47,9 @@ hmz anchor --target ssh://build-box claude
 
 The agent runs here while its commands run on the build box. Inside the workspace it sees the
 target: the same file names, contents, sizes, modes and timestamps, at the same paths. A
-failure answers with the target's own error, not a local approximation of it.
+failure answers with the target's own error, not a local approximation of it. Where the target
+spells a path two ways — a Mac reaches `/tmp` and `/var` through `/private`, and ignores case —
+either spelling reaches the same file.
 
 Everything after the agent's name is the agent's own:
 

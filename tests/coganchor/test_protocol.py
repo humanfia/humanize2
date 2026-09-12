@@ -17,6 +17,9 @@ from hmz.coganchor.proto import (
     ProtocolError,
     RemoteOSError,
     Stream,
+    path_key,
+    path_spellings,
+    path_within,
     rewrite_path_prefix,
 )
 
@@ -135,3 +138,81 @@ def test_prefix_rewriting_respects_token_boundaries(text: str, expected: str) ->
 
 def test_prefix_rewriting_is_a_noop_for_identity() -> None:
     assert rewrite_path_prefix("cat /w/f", "/w", "/w") == "cat /w/f"
+
+
+def test_prefix_rewriting_ignores_case_only_when_it_is_told_to() -> None:
+    """A Mac's filesystem reads `/W/f` as `/w/f`; a Linux one reads it as somewhere else."""
+    assert rewrite_path_prefix("cat /W/f", "/w", "/real") == "cat /W/f"
+    assert (
+        rewrite_path_prefix("cat /W/f", "/w", "/real", insensitive=True)
+        == "cat /real/f"
+    )
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/private/var/folders/x", "/var/folders/x"),
+        ("/private/tmp", "/tmp"),
+        ("/private/etc/hosts", "/etc/hosts"),
+        # Only the three a Mac aliases, and only as whole segments.
+        ("/private/opt/tools", "/private/opt/tools"),
+        ("/private/vary/x", "/private/vary/x"),
+        ("/privateer/tmp", "/privateer/tmp"),
+        ("/var/private/tmp", "/var/private/tmp"),
+    ],
+)
+def test_the_directories_a_mac_reaches_through_private_fold_to_one_name(
+    path: str, expected: str
+) -> None:
+    assert path_key(path) == expected
+
+
+def test_a_folded_case_is_a_key_and_the_uncased_fold_is_a_path() -> None:
+    """One is for comparing, the other for acting on, and the difference is the point."""
+    assert path_key("/private/tmp/Mirror") == "/tmp/Mirror"
+    assert path_key("/private/tmp/Mirror", fold_case=True) == "/tmp/mirror"
+
+
+@pytest.mark.parametrize(
+    ("path", "root", "expected"),
+    [
+        ("/tmp/m/src/a.py", "/tmp/m", "src/a.py"),
+        ("/private/tmp/m/src/a.py", "/tmp/m", "src/a.py"),
+        ("/tmp/m/src/a.py", "/private/tmp/m", "src/a.py"),
+        # The root itself, which a caller must tell apart from lying outside it.
+        ("/private/tmp/m", "/tmp/m", ""),
+        ("/", "/", ""),
+        ("/tmp/m/x", "/", "tmp/m/x"),
+        # Neighbours that merely start with the same characters.
+        ("/tmp/mirror/x", "/tmp/m", None),
+        ("/tmp/M/x", "/tmp/m", None),
+    ],
+)
+def test_a_path_is_placed_against_a_root_both_machines_can_spell(
+    path: str, root: str, expected: str | None
+) -> None:
+    assert path_within(path, root) == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/tmp/m", ("/tmp/m", "/private/tmp/m")),
+        ("/private/var/f", ("/private/var/f", "/var/f")),
+        ("/home/me/w", ("/home/me/w",)),
+    ],
+)
+def test_a_directory_answers_to_every_name_it_has(
+    path: str, expected: tuple[str, ...]
+) -> None:
+    """Text is matched by its characters, so translating it needs both names."""
+    assert path_spellings(path) == expected
+
+
+def test_what_lies_below_a_root_keeps_the_case_it_was_named_with() -> None:
+    """The suffix is a name on a filesystem, so folding it would answer with another file."""
+    assert path_within("/Users/ME/w/Src/A.py", "/users/me/w", fold_case=True) == (
+        "Src/A.py"
+    )
+    assert path_within("/Users/ME/w/Src/A.py", "/users/me/w") is None
