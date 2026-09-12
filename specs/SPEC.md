@@ -827,7 +827,7 @@ never have reason to name this module.
 ## Commands
 
 ```shell
-hmz [--no-daemon] [<command> [<args>...]]
+hmz [<command> [<args>...]]
 ```
 
 - There MUST be one command anybody is offered -- `hmz exec`, which runs a flow in a
@@ -855,10 +855,12 @@ hmz [--no-daemon] [<command> [<args>...]]
   line naming no command MUST read whichever run is already being held in this directory, and
   MUST start one where none is.
 - With no terminal on both ends -- output going to a file, a suite driving the interface
-  itself -- it MUST be opened in this process exactly as it always was, and `--no-daemon` MUST
-  say so outright. An environment variable MUST say the same thing for a whole machine without
-  writing anything down, as it does for whether humanize reports its own failures: a scripted
-  install and this suite are one variable rather than a flag each of them has to remember.
+  itself -- it MUST be opened in this process exactly as it always was. That MUST be read off
+  the terminal rather than asked for: holding a run is what makes closing the terminal
+  survivable, so it is not a preference anybody expresses on the line. An environment variable
+  MUST say the same thing for a whole machine without writing anything down, as it does for
+  whether humanize reports its own failures: a scripted install and this suite are one variable
+  rather than a flag each of them would have to remember.
   Anything at all that stops a run being held MUST be said and then done without: what is lost
   is being able to walk away from it, which is not a reason to refuse to open.
 - `__main__.py` MUST run this same command line, so that `python -m hmz` is `hmz`.

@@ -1,7 +1,6 @@
 """``hmz`` -- the whole command line, over layers that have none of their own.
 
     hmz
-    hmz --no-daemon
     hmz exec -f ralph_loop -a claude/MODEL:high "$(cat TASK.md)"
 
 There is one command anybody types, and everything else humanize keeps is walked at the
@@ -183,30 +182,23 @@ def _tools(argv: list[str]) -> int:
 def _line() -> ArgumentParser:
     """The line `hmz` itself takes, which is how the interface is opened.
 
-    Built here rather than where it is parsed because it is read in two places: the line that
-    opens the interface is parsed with it, and the help asks it what `hmz` takes. A second
-    copy of that flag would be one to keep in step, and the one somebody typing `hmz --help`
-    was shown would be the one that drifted.
+    It takes nothing at all now: which flow runs and what drives it are chosen at the prompt,
+    and whether the run is held apart from this terminal is read off the terminal rather than
+    asked for -- a run nobody can walk away from is not a thing to want. What is left is a
+    parser that names the program and refuses anything else, built here rather than where it
+    is parsed because the help asks it what `hmz` takes.
 
     Returns:
       The parser, without the commands: whoever wants those adds them.
     """
     import argparse
 
-    parser = argparse.ArgumentParser(
+    return argparse.ArgumentParser(
         prog="hmz",
         description="Orchestrate, execute, and observe agent flows. Naming no command opens "
         "the terminal interface, as this directory left it.",
         epilog="Run `hmz COMMAND --help` for what a command takes.",
     )
-    parser.add_argument(
-        "--no-daemon",
-        dest="daemon",
-        action="store_false",
-        help="open the interface in this terminal rather than holding the run apart from it, "
-        "which is what makes closing the terminal close the run",
-    )
-    return parser
 
 
 def _tui(argv: list[str]) -> int:
@@ -227,10 +219,11 @@ def _tui(argv: list[str]) -> int:
     # reaching the lazily imported interface below.
     _prepare_textual_terminal()
 
-    return opens(held=_line().parse_args(argv).daemon)
+    _line().parse_args(argv)
+    return opens()
 
 
-def opens(*, held: bool = True) -> int:
+def opens() -> int:
     """Opens the interface, on this terminal or on one a run of its own is being held on.
 
     A run of a flow outlives the terminal it was started from, which is what makes `/detach`
@@ -242,13 +235,10 @@ def opens(*, held: bool = True) -> int:
     file, a test driving the interface itself -- the interface is opened here, in this
     process, exactly as it always was.
 
-    Args:
-      held: Whether the run may be held apart from this terminal at all.
-
     Returns:
       Zero, once the interface has been closed or this terminal has been let go of.
     """
-    if not (held and _apart_is_wanted() and _at_a_terminal()):
+    if not (_apart_is_wanted() and _at_a_terminal()):
         return _here()
 
     import functools

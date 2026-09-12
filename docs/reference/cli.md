@@ -36,7 +36,6 @@ Every command is written twice over: for somebody at a terminal, and for a progr
 
 ```
 hmz                  # opens the terminal interface
-hmz --no-daemon      # opens it in this terminal, with the run going when the terminal does
 hmz --version        # prints the installed version
 hmz --help           # lists the commands
 ```
@@ -45,7 +44,7 @@ There is no command that opens the interface. Naming nothing at all is how it op
 
 It opens on a run [held apart from this terminal](/reference/daemon), so that closing the
 terminal is not what ends a day's work: a line naming no command reads whichever run is already
-being held in this directory and starts one where none is. `--no-daemon` opens it in this
+being held in this directory and starts one where none is. It opens it in this
 process instead, which is also what happens with no terminal to hand over to — output going to
 a file, a suite driving the interface itself — and what happens if a run cannot be held at all,
 which is said on stderr and then done without.
@@ -308,7 +307,7 @@ than as a turn that failed.
 | `HUMANIZE_TARGET` | `hmz anchor` | Default for `--target`. |
 | `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
-| `HUMANIZE_DAEMON` | `hmz` with no command | `off`, `0` or `no` opens the interface in this terminal rather than [holding the run apart from it](/reference/daemon), which is what `--no-daemon` says on the line. Anything else — including empty — is silence, and silence holds the run. |
+| `HUMANIZE_DAEMON` | `hmz` with no command | `off`, `0` or `no` opens the interface in this terminal rather than [holding the run apart from it](/reference/daemon). Anything else — including empty — is silence, and silence holds the run. |
 | `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/user/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `HUMANIZE_WATCHDOG` | everything that runs a turn | How long a turn may say nothing before [the watchdog looks at it](/reference/agents#when-a-cli-stops-answering), in seconds, overriding each backend's own. `0` turns it off. |
 | `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
