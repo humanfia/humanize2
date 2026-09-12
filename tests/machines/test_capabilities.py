@@ -80,8 +80,10 @@ def test_a_setting_says_what_its_place_comes_to_without_starting_anything() -> N
     # `remote` because the work lands through an anchor, and the road that anchor names with
     # it: a flow asking for the CLI the target already has is asking about this machine.
     assert anchored.capabilities == frozenset({"remote", "anchor:supervised"})
+    # And the road it will build: Docker.start makes a supervised anchor every time, so the
+    # setting says so rather than leaving a flow to ask for what only the anchor could name.
     assert DockerConfig(image=IMAGE).capabilities == frozenset(
-        {"isolated", "linux", "managed", "remote"}
+        {"anchor:supervised", "isolated", "linux", "managed", "remote"}
     )
     # And a machine that says nothing comes to nothing, rather than being read as coming to
     # everything it never got round to denying.
@@ -161,7 +163,7 @@ def test_a_container_confirms_the_platform_its_setting_promised(
         machine.start()
 
         assert machine.capabilities == frozenset(
-            {"isolated", "linux", "managed", "remote"}
+            {"anchor:supervised", "isolated", "linux", "managed", "remote"}
         )
         # And the platform among them came off the wire rather than out of the settings.
         assert machine._seen == frozenset({"linux"})
