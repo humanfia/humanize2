@@ -37,16 +37,24 @@ Nothing here caps a fan-out. What does is the coding agent underneath it, and th
 in: one held open for the life of a session pays for starting once, and one run again for every
 turn pays for starting on every turn. So the number of conversations that still go at speed on a
 given machine is a fact about the backend rather than about this library, and it is measured
-rather than guessed: [the concurrency
-benchmark](https://github.com/humanfia/humanize2/blob/main/bench/cli-concurrency/MOCK-RESULTS.md)
-reports, per backend, how many conversations still run at **half the speed each of them runs
-alone** — every turn still doing its own real work, with its own files changed, its own command
-executed and its own thread of the conversation recalled.
+rather than guessed: the concurrency benchmark reports, per backend, how many conversations
+still run at **half the speed each of them runs alone** — every turn still doing its own real
+work, with its own files changed, its own command executed and its own thread of the
+conversation recalled.
 
-Those are four CPUs against a **loopback model that answers instantly**, so what they measure is
-the CLI's own overhead rather than how many conversations a real provider will keep fed; the
-[real-provider record](https://github.com/humanfia/humanize2/blob/main/bench/cli-concurrency/RESULTS.md)
-is separate and establishes no global maximum.
+That benchmark is not carried in this repository. Its harness and the per-turn evidence it
+retains change on every run and outweigh the source they measure, so **they stay on disk where
+they are run**, and what is written down here is what they established rather than the readings
+themselves.
+
+What they establish is a width per backend, and **not a global maximum**. Those are four CPUs
+against a **loopback model that answers instantly**, so what they measure is the CLI's own
+overhead rather than how many conversations a real provider will keep fed; the real-provider
+record is separate, and blocked in places by access rather than by concurrency. The width moves
+with how those four cores are fenced — a quota shared with a neighbour and four cores held
+exclusively are different questions, and so is a container asked for four of them — so a figure
+means nothing apart from the conditions it was taken under, which is why the record keeps the
+two together.
 
 One of those ceilings is not about speed at all. **opencode keeps every conversation of every
 workspace in one database**, and several of its processes opening one at the same moment can
