@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import errno
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from hmz.coganchor.proto import path_key
 from tests.coganchor.tasks import SMOKE_TASKS, SmokeTask
 from tests.supervising import WITHOUT_BINDINGS
 
@@ -18,8 +21,6 @@ if (
 from hmz.coganchor import standin
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from tests.coganchor.conftest import Anchorage
 
 
@@ -85,6 +86,63 @@ def test_agent_state_directory_is_not_mirrored(
         "bash", "-c", f"cat {private}/token", local_paths=(str(private),)
     )
     assert "local secret" in result.stdout
+
+
+def aliased(path: Path) -> str:
+    """The same directory under the name a Mac would hand back for it.
+
+    Only for the three directories a Mac keeps under `/private`. A mirror somewhere else --
+    a `TMPDIR` pointing outside `/tmp`, which is how this runs on some machines -- has no
+    second name, and there is nothing to prove about it.
+    """
+    if path_key(f"/private{path}") != str(path):
+        pytest.skip(f"{path} is not one of the directories a Mac spells two ways")
+    return f"/private{path}"
+
+
+def test_a_path_spelled_as_a_mac_spells_it_reaches_the_mirror(
+    anchorage: Anchorage,
+) -> None:
+    """A target that says `/private/tmp/...` is naming the directory the mirror is at.
+
+    The agent here is the interpreter, so the `openat` is trapped and answered from the
+    mirror rather than forwarded as a command -- which is the path that has to settle the
+    spelling, because the mirror is built at whatever name reaches it.
+    """
+    anchorage.seed({"notes.txt": "the secret is halibut\n"})
+    path = f"{aliased(anchorage.mirror)}/notes.txt"
+
+    result = anchorage.run("python3", "-c", f"print(open({path!r}).read())")
+
+    assert "the secret is halibut" in result.stdout, result.stderr
+    assert not Path(f"/private{anchorage.mirror}").exists(), (
+        "the mirror was built under /private instead of at its own root"
+    )
+
+
+def test_a_private_path_that_is_not_the_mirror_is_simply_not_there(
+    anchorage: Anchorage,
+) -> None:
+    """The regression that folding at comparison time caused, proved absent.
+
+    Claiming such a path for the target has this machine try to build a mirror under
+    `/private`, which is `EACCES` for anyone who is not root and a tree in the wrong place
+    for anyone who is. It is not the mirror, so it is this machine's own: `ENOENT`.
+    """
+    outside = f"{aliased(anchorage.mirror)}-elsewhere/notes.txt"
+    script = (
+        f"\ntry:\n    open({outside!r})\nexcept OSError as exc:\n    print(exc.errno)\n"
+    )
+
+    result = anchorage.run("python3", "-c", script)
+
+    assert result.stdout.strip() == str(errno.ENOENT), (
+        f"expected ENOENT, got {result.stdout.strip()!r}\n{result.stderr}"
+    )
+    assert (
+        not Path("/private").exists()
+        or not Path(f"/private{anchorage.mirror}-elsewhere").exists()
+    )
 
 
 def test_exit_status_survives_a_signal(anchorage: Anchorage) -> None:
