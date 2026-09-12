@@ -12,9 +12,10 @@ For `specs/*.md`:
 - MUST NOT modify any SPEC UNLESS explicitly instructed to do so.
 - MUST keep code minimal while strictly adhering to the SPEC.
 
-For commits:
+For version control:
 
 - MUST adhere to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+- MUST NOT create new branches remotely unless explicitly instructed to do so.
 
 For docs:
 
