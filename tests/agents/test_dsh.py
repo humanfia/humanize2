@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 
 import pytest
+import yaml
 from pydantic import BaseModel
 
 from hmz.agents import (
@@ -802,6 +803,51 @@ def test_the_runtime_composition_compacts_before_the_model_refuses_the_turn() ->
     assert "@deepseek-ai/dsh-token-meter" in composed
     assert "@deepseek-ai/dsh-compaction-basic" in composed
     assert "auto: true" in composed
+
+
+def test_the_runtime_composition_is_the_bypass_rung_the_agent_promises() -> None:
+    """`_serves` refuses every rung but bypass, and this is why that is honest.
+
+    The promise is not only that the SDK has no sandbox or approval control to set: it is
+    that the composition humanize pins already runs unconfined, so bypass describes these
+    turns rather than being a tighter setting quietly dropped. Mounting the presets to get
+    another rung is what would introduce the fail-closed Bash, so the absences are the
+    contract and are asserted as one.
+    """
+    cordis = dsh.importlib.resources.files("hmz.agents").joinpath("dsh.cordis.yml")
+    # The `!!js` tags are the runtime's to evaluate and have no constructor here; what is
+    # being asserted is which plugins are mounted, so the tags come off and what was written
+    # behind them stays the text it was written as.
+    composed = cordis.read_text().replace("!!js ", "")
+    mounted = {
+        str(plugin["name"])
+        for plugin in cast("list[dict[str, object]]", yaml.safe_load(composed))
+    }
+
+    assert "@deepseek-ai/dsh-bash-local" in mounted
+    assert "@deepseek-ai/dsh-fs-local" in mounted
+    # Off the mounted names rather than the file's text, because the confined executors are
+    # spelled `dsh-bash-sandbox` and `dsh-fs-sandbox`: a `dsh-sandbox` match would let either
+    # of them be mounted beside the local pair and still call the composition unconfined.
+    assert not [
+        name
+        for name in mounted
+        if any(word in name for word in ("sandbox", "approval", "permission"))
+    ]
+
+
+def test_a_turn_already_running_cannot_be_talked_to() -> None:
+    """A word for the running turn has nowhere to go, so asking must say so.
+
+    The SDK's `session/prompt` is the runtime's `followup`, which queues a turn behind this
+    one rather than putting a word into it, and the `steer` that would reach the turn is not
+    on the SDK's JSON-RPC surface. A flow that was told otherwise would wait for a `took`
+    that this backend can never honestly send.
+    """
+    session = DshAgent(configured()).new()
+
+    with pytest.raises(NotImplementedError, match="cannot be talked to mid-turn"):
+        session.interject("actually, use pathlib")
 
 
 def test_the_runtime_composition_uses_only_plugins_bundled_with_the_sdk() -> None:

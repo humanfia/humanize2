@@ -1354,7 +1354,7 @@ never `0.0`, for a model nobody lists, so a flow steering by money can tell *not
 | | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Driven through | its command line, held open for ordinary turns | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, held open for ordinary turns | its app server | its command line, held open | its command line, held open for ordinary turns | its command line, one run per turn | its app server |
-| [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a second prompt is a second turn | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
+| [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no — its prompt queues a turn behind | no — a second prompt is a second turn | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
 | [`pursue`](#goals) | no | yes | yes | no | yes | no | yes | no | no | no | yes |
 | [`session.fork`](#a-conversation-that-goes-two-ways) | no | `--fork-session` | `thread/fork` | no | no | `--fork-session` | `kimi fork` | `--fork` | `--fork-session` | `run --fork` | no |
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
@@ -1364,9 +1364,22 @@ never `0.0`, for a model nobody lists, so a flow steering by money can tell *not
 | Sub-agents in a trace | no | yes | yes | no | no | no | yes | no | no | no | no |
 
 DeepSeek Harness currently accepts only the `bypass` rung, so a flow that declares another
-cannot be driven by it. Its preview
-SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
-another value is rejected before the runtime starts rather than silently ignored.
+cannot be driven by it, and another value is rejected before the runtime starts rather than
+silently ignored. Two things make bypass the only honest rung, and the second is the one worth
+writing down: its preview SDK exposes neither a per-session sandbox/approval control nor exact
+per-agent skill selection — `initialize` carries the cwd, the provider and the model, and no
+other method the runtime answers could carry one — *and* the composition humanize pins mounts
+`dsh-bash-local` and `dsh-fs-local`, the unconfined executors, and none of the sandbox,
+user-approval or permission-preset plugins. Bypass is therefore what these turns already run
+at rather than a tighter rung being dropped on the way; mounting the presets to get another
+would *introduce* the Bash that fails closed, since local confinement refuses the tool
+outright on a host with neither bwrap nor Landlock.
+
+`interject` is unsupported for the same kind of reason. The SDK's `session/prompt` is the
+runtime's `followup`, which leaves the word in the `next-turn` inbox — a turn queued behind
+this one, answered on its own once it is over — and the `steer` that does reach the turn under
+way is not on the SDK's JSON-RPC surface, which answers `initialize`, `session/prompt` and
+`shutdown` and nothing else.
 
 opencode and mimocode keep a session in a database rather than in a log file, so there is
 nothing for `hmz trace collect` to gather and nothing for the interface to read a running cost out
