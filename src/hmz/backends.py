@@ -2004,102 +2004,78 @@ def _runnable(path: Path) -> bool:
 #: correct rather than a setting quietly ignored. Goals were never sayable here at all.
 _DECLARED = ("permission", "web_search")
 
+#: What an agent used to be sayable as instead, one `key=value` to a comma. `=` and `,` are
+#: how a line names the place each agent fills now -- `reviewer=claude/MODEL:high` -- so
+#: the two spellings cannot both be read, and the short one is the one every agent is written
+#: in. A latency tier and a backend-native override are still an agent's to carry: they are
+#: set where the agent is made, from the SDK or by the flow, rather than on the line naming it.
+_WRITTEN_OUT = ("cli", "model", "effort", "provider", "service_tier")
 
-def read(
-    spec: str,
-) -> tuple[Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
-    """Reads one `-a` into the backend to drive, what to drive it at, and as whom.
+
+def read(spec: str) -> tuple[str, Profile, str, str, str]:
+    """Reads one `-a` into the place it fills, the backend to drive, what at, and as whom.
+
+    One agent, though `-a` takes a list of them: whoever holds the line splits it on the
+    commas and reads each piece here, so that a line naming three agents and mistyping one is
+    answered about the one it got wrong rather than about all three.
 
     Args:
-      spec: `CLI/MODEL:EFFORT`, or `cli=CLI,model=MODEL,effort=EFFORT` written out -- which is
-        where a model or an effort holding the punctuation the short form separates on goes.
-        The CLI may name a provider after an `@`, as `claude@deepseek/MODEL:EFFORT`, which is
-        the account that agent's turns run as; `provider=` says the same thing written out.
-        The written-out form may also name the common provider latency tier as
-        `service_tier=`, and backend-native settings as `config.KEY=VALUE`. Codex accepts
-        app-server overrides and Claude one exact `allowed_tools` rule.
+      spec: `[NAME=]CLI[@PROVIDER]/MODEL:EFFORT`. NAME is the place the agent fills, which is
+        a field of the tuple of agents the flow declares; a line that leaves it off fills the
+        flow's places in the order it takes them. The CLI may name a provider after an `@`, as
+        `claude@deepseek/MODEL:EFFORT`, which is the account that agent's turns run as.
 
     Returns:
-      The backend, model, effort, common service tier, provider -- which is "" for an agent
-      that runs as whoever is at this machine already runs its CLI -- and the `config.KEY`
-      pairs, which is () where none were named.
+      The place it fills -- "" where the line named none -- the backend, the model, the
+      effort, and the provider, which is "" for an agent that runs as whoever is at this
+      machine already runs its CLI.
 
     Raises:
-      ValueError: If it is neither spelling, names no backend there is, or says one of the
-        things the flow says. What it says is what a command line reports after the agent it
-        could not read.
+      ValueError: If it is not that, names no backend there is, says one of the things the
+        flow says, or writes out a part of an agent that used to be sayable that way. What it
+        says is what a command line reports after the agent it could not read.
     """
-    provider = ""
-    service_tier = "default"
-    overrides: list[tuple[str, str]] = []
-    if "=" in spec:
-        given = {
-            key.strip(): value.strip()
-            for key, _, value in (part.partition("=") for part in spec.split(","))
-        }
-        backend, model, effort, service_tier, provider = (
-            given.pop("cli", ""),
-            given.pop("model", ""),
-            given.pop("effort", ""),
-            given.pop("service_tier", "default"),
-            given.pop("provider", ""),
+    name, written, rest = spec.partition("=")
+    name, spec = (name.strip(), rest) if written else ("", spec)
+    # Said before anything else the name could be wrong about, because these two are not
+    # misspelled places: a line that wrote one meant it, and what it meant is a thing about
+    # the work rather than about the agent -- so it is refused by name, pointing at the flow.
+    if name in _DECLARED:
+        raise ValueError(
+            f"{name} is the flow's to say, written beside the agent where the flow "
+            "declares it -- not on the line that runs the flow"
         )
-        # Said before the leftovers are, because these two are not misspellings: a line that
-        # wrote one meant it, and what it meant is a thing about the work rather than about
-        # the agent -- so it is refused by name, pointing at the flow that does say it.
-        for said in _DECLARED:
-            if said in given:
-                raise ValueError(
-                    f"{said} is the flow's to say, written beside the agent where the flow "
-                    "declares it -- not on the line that runs the flow"
-                )
-        for key, value in list(given.items()):
-            if key.startswith("config."):
-                name = key.removeprefix("config.")
-                if not name:
-                    raise ValueError("expected config.KEY=VALUE")
-                overrides.append((name, value))
-                del given[key]
-        if given:
-            raise ValueError(
-                f"{', '.join(sorted(given))} is not cli, model, effort, service_tier, "
-                "provider or config.KEY"
-            )
-    else:
-        # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
-        # opencode's are `provider/id` -- while a CLI and an effort never do.
-        backend, _, rest = spec.partition("/")
-        model, _, effort = rest.rpartition(":")
+    if name in _WRITTEN_OUT or name.startswith("config."):
+        raise ValueError(
+            f"{name}= is gone: an agent is written CLI[@PROVIDER]/MODEL:EFFORT, and `=` "
+            "names the place it fills, as in reviewer=claude/MODEL:EFFORT"
+        )
+    if written and not name.isidentifier():
+        raise ValueError(
+            f"{name!r} is not a place a flow could declare: what is written before `=` is a "
+            "field of the tuple of agents the flow declares, so it is a Python identifier"
+        )
+    # After the name and before anything else: a comma here is a list nobody split, and
+    # reading one would quietly make a model out of every agent after the first. The
+    # written-out form held commas too, which is why it is answered first.
+    if "," in spec:
+        raise ValueError(
+            "expected one agent: a `,` separates several, each read on its own"
+        )
+    # Read from both ends: a model may hold slashes of its own -- Kimi Code's and opencode's
+    # are `provider/id` -- while a CLI and an effort never do.
+    backend, _, said = spec.partition("/")
+    model, _, effort = said.rpartition(":")
     # The account, if one was named: a CLI is never spelled with an `@` in it, so the two are
     # told apart wherever the agent was written -- `-a`, a settings file, an interface. An
     # `@` with nothing after it is a line to correct rather than a line saying nothing: it
     # was typed to name an account, and running as whoever is at this machine is not that.
-    backend, at, said = backend.partition("@")
-    if at and not said.strip():
+    backend, at, provider = backend.partition("@")
+    if at and not provider.strip():
         raise ValueError(
             "expected an account after @, as in claude@deepseek/MODEL:EFFORT"
         )
-    provider = said.strip() if at else provider
     profile = named(backend.strip())
     if profile is None or not model.strip() or not effort.strip():
-        raise ValueError(
-            "expected CLI[@PROVIDER]/MODEL:EFFORT or "
-            "cli=CLI,model=MODEL,effort=EFFORT[,service_tier=SERVICE_TIER]"
-            "[,provider=PROVIDER][,config.KEY=VALUE]"
-        )
-    if not service_tier.strip():
-        raise ValueError("service_tier cannot be empty")
-    if overrides and profile.name not in {"claude", "codex"}:
-        raise ValueError("config.KEY is only for Claude or Codex")
-    if profile.name == "claude" and any(
-        key != "allowed_tools" for key, _value in overrides
-    ):
-        raise ValueError("Claude config only accepts allowed_tools")
-    return (
-        profile,
-        model.strip(),
-        effort.strip(),
-        service_tier.strip(),
-        provider.strip(),
-        tuple(overrides),
-    )
+        raise ValueError("expected [NAME=]CLI[@PROVIDER]/MODEL:EFFORT")
+    return name, profile, model.strip(), effort.strip(), provider.strip()

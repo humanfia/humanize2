@@ -153,7 +153,7 @@ def test_a_line_that_says_what_the_flow_says_does_not_open_the_interface(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A rung is the flow's, so a line that carries one is a line to correct before anything."""
-    spec = "cli=codex,model=m,effort=high,permission=read-only"
+    spec = "permission=read-only"
     with (
         unittest.mock.patch("hmz.tui.Humanize.run") as opened,
         pytest.raises(SystemExit) as stopped,
@@ -165,6 +165,24 @@ def test_a_line_that_says_what_the_flow_says_does_not_open_the_interface(
     error = capsys.readouterr().err
     assert f"bad agent {spec!r}" in error
     assert "is the flow's to say, written beside the agent" in error
+
+
+def test_a_line_that_names_a_place_is_for_exec_rather_than_the_interface(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The interface fills the flow's places itself, and says which agent is which."""
+    spec = "assistant=claude/m:high"
+    with (
+        unittest.mock.patch("hmz.tui.Humanize.run") as opened,
+        pytest.raises(SystemExit) as stopped,
+    ):
+        cli.main(["-f", "chat", "-a", spec])
+
+    assert stopped.value.code == 2
+    assert not opened.called
+    error = capsys.readouterr().err
+    assert f"bad agent {spec!r}" in error
+    assert "assistant= is for `hmz exec`" in error
 
 
 @pytest.mark.parametrize("argv", [["--help"], ["-h"]])

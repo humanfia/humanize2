@@ -20,6 +20,7 @@ from hmz import backends
 
 if TYPE_CHECKING:
     import os
+    from argparse import ArgumentParser
     from collections.abc import Awaitable, Sequence
 
     from pydantic import BaseModel
@@ -293,54 +294,49 @@ class Runner:
             left(started)
 
 
-def read_agent(
-    spec: str,
-) -> tuple[backends.Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
+def read_agent(spec: str) -> tuple[str, backends.Profile, str, str, str]:
     """Reads and validates one command-line agent specification.
 
+    The grammar itself is `hmz.backends.read`, an agent being a backend before it is anything
+    else. This is where the command line and the terminal interface both reach it, so that
+    one agent is read one way wherever it was written.
+
     Args:
-      spec: The short or written-out form accepted by ``-a``.
+      spec: One agent, as `-a` spells one. An `-a` naming several is split into them first.
 
     Returns:
-      The backend, model, effort, common service tier, provider and backend-native
-      ``config.KEY`` pairs. What the agent may do, whether it has goals and whether it may
-      search the web are not among them: those are the flow's, said where it declares the
-      place, and a line that says one is a line to correct.
+      The place the agent fills -- "" for one the line left to fill a place in order -- the
+      backend, model, effort and provider. What the agent may do, whether it has goals and
+      whether it may search the web are not among them: those are the flow's, said where it
+      declares the place, and a line that says one is a line to correct.
 
     Raises:
       ValueError: If the specification is malformed, or says what the flow says.
     """
-    from .agents import SERVICE_TIERS
-
-    profile, model, effort, service_tier, provider, overrides = backends.read(spec)
-    if service_tier not in SERVICE_TIERS:
-        raise ValueError(
-            f"service_tier must be one of {', '.join(SERVICE_TIERS)}, "
-            f"not {service_tier!r}"
-        )
-    return (profile, model, effort, service_tier, provider, overrides)
+    return backends.read(spec)
 
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str, bool]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]:
     """Reads an `hmz exec` line into a flow, the agents to drive it, the task, and its setup.
 
-    A flow says how many agents it drives, and this is where they come from: one for each, in
-    the order the flow takes them, at the model and effort each is to run at.
+    A flow says how many agents it drives and what it calls each of them, and this is where
+    they come from: one for each, at the model and effort each is to run at, in the order the
+    flow takes them or each naming the place it fills.
 
     Args:
       argv: What followed the command name.
 
     Returns:
-      The flow's path, the agents to drive it with, the task, what to set the flow up with --
-      the YAML file `-c` named, read but not yet checked against the flow's own model, or
-      None where the line named none -- the image to run the whole of it in, or "" for a run
-      on this machine, and whether a program is reading the run rather than a person.
+      The flow's path, the agents to drive it with in the order the flow takes them, the task,
+      what to set the flow up with -- the YAML file `-c` named, read but not yet checked
+      against the flow's own model, or None where the line named none -- and whether a program
+      is reading the run rather than a person.
 
     Raises:
-      SystemExit: If the line does not name a flow and an agent apiece, or names a config
-        that cannot be read, as argparse rejects it.
+      SystemExit: If the line does not name a flow and an agent apiece, names a place the flow
+        has not got, or names a config that cannot be read, as argparse rejects it.
     """
     import argparse
 
@@ -359,17 +355,18 @@ def flow_and_agents(
         "-a",
         "--agent",
         action="append",
-        # Once for each agent the flow drives, which for a flow that talks only to the person
+        # One agent for each the flow drives, which for a flow that talks only to the person
         # at the prompt is none: the person is handed over rather than chosen, so a line that
         # named one would be naming what nobody picks. A line short of an agent the flow does
         # need is caught where every other miscount is, by the flow's own declaration.
         default=[],
         dest="agents",
-        metavar="CLI/MODEL:EFFORT",
-        help="one agent, repeated once for each the flow drives, in the order it takes "
-        "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
-        "service_tier=SERVICE_TIER and backend-native config.KEY=VALUE. CLI is one of "
-        f"{', '.join(sorted(one.name for one in backends.profiles()))}",
+        metavar="SPEC[,SPEC...]",
+        help="the agents to drive the flow with, each [NAME=]CLI[@PROVIDER]/MODEL:EFFORT -- "
+        "several to one option, separated by commas, and the option repeated as often as "
+        "suits. Unnamed they fill the flow's places in the order it takes them; NAME fills "
+        "the place the flow calls that, and either every one of them names a place or none "
+        f"does. CLI is one of {', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(
         "-c",
@@ -377,14 +374,6 @@ def flow_and_agents(
         metavar="PATH",
         help="a YAML file of what to set the flow up with, one field per line, as the flow "
         "declares them; only for a flow that says it can be set up",
-    )
-    parser.add_argument(
-        "--container",
-        default="",
-        metavar="IMAGE",
-        help="run the whole of it in a container of this image: every agent's turns land "
-        "there, the project directory is mounted at the path it already has, and the flow "
-        "reaches it through hmz.flows.container()",
     )
     parser.add_argument(
         "--json",
@@ -410,28 +399,100 @@ def flow_and_agents(
     from .agents import driver
 
     agents: list[AgentBase] = []
-    for spec in args.agents:
+    places: list[str] = []
+    # The list is split here rather than where one agent is read: every `-a` on the line adds
+    # to the same list, so what the line names is one list however it was typed -- and one
+    # mistyped agent among three is then reported as itself rather than as all three.
+    for spec in (one for said in args.agents for one in said.split(",")):
         try:
-            profile, model, effort, service_tier, provider, overrides = read_agent(spec)
+            place, profile, model, effort, provider = read_agent(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
         agent, config = driver(profile.name)
-        # Named rather than looked up: an account that is not there is caught by the agent
-        # the first time it needs one, which says whose it was and what it was called.
-        extra: dict[str, Any] = {"service_tier": service_tier}
-        if overrides and profile.name == "codex":
-            extra["overrides"] = overrides
-        elif overrides:
-            extra["allowed_tools"] = tuple(value for _key, value in overrides)
         try:
             # What it may do, whether it has goals and whether it may search the web are
             # left as they come: `Runner` settles all three from what the flow declared,
             # which is the one place any of them is said.
-            configured = config(model=model, effort=effort, provider=provider, **extra)
+            configured = config(model=model, effort=effort, provider=provider)
             agents.append(agent(configured))
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
-    return args.flow, agents, args.task, held, args.container, args.as_json
+        places.append(place)
+    return (
+        args.flow,
+        _as_declared(parser, args.flow, agents, places),
+        args.task,
+        held,
+        args.as_json,
+    )
+
+
+def _as_declared(
+    parser: ArgumentParser,
+    flow: str,
+    agents: list[AgentBase],
+    places: list[str],
+) -> list[AgentBase]:
+    """Puts the agents in the order the flow takes them, for a line that named their places.
+
+    A line that named none is in that order already, having been written in it. One that named
+    them is read against what the flow declares here, before anything runs: an actor handed
+    the reviewer's place is an hour of the wrong work, and which places there are is a
+    question the flow answers without being given any agents at all.
+
+    Args:
+      parser: The line, for reporting one to correct.
+      flow: The flow, as the line named it.
+      agents: The agents, in the order the line named them.
+      places: What each was named for, "" for one the line named no place for.
+
+    Returns:
+      The same agents, in the order the flow takes them.
+
+    Raises:
+      SystemExit: If some of them name a place and some do not, if the flow calls its agents
+        nothing, or if the names are not one apiece of the ones it declares.
+    """
+    if not any(places):
+        return agents
+    if not all(places):
+        parser.error(
+            "name every agent or none of them: an agent that names no place fills the flow's "
+            "next one, which cannot be counted while the others are filled by name"
+        )
+    from .flows.driving import NotAFlow, drives
+
+    try:
+        declared = drives(flow)
+    except NotAFlow:
+        # A flow that cannot be read is `Runner`'s to report and not this line's: reading one
+        # here is for the names, and a line refused twice is refused in two voices.
+        return agents
+    if not declared:
+        # A flow that has nobody to choose for it is a line with one agent too many, which
+        # is a miscount like every other and `Runner`'s to report.
+        return agents
+    if not any(declared):
+        parser.error(
+            f"{flow} declares a plain tuple and calls the agents it drives nothing, so they "
+            "are given in the order it takes them rather than by name"
+        )
+    for place in places:
+        if place not in declared:
+            parser.error(
+                f"{flow} drives no agent called {place}; it drives {', '.join(declared)}"
+            )
+        if places.count(place) > 1:
+            parser.error(
+                f"{flow} drives one agent called {place}, and the line names "
+                f"{places.count(place)}"
+            )
+    if unfilled := [one for one in declared if one not in places]:
+        parser.error(
+            f"{flow} also drives {', '.join(unfilled)}, which the line names nothing for"
+        )
+    held = dict(zip(places, agents, strict=True))
+    return [held[one] for one in declared]
 
 
 def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:

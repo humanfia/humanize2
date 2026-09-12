@@ -137,16 +137,16 @@ class Hmz:
 
     def read(
         self, argv: list[str]
-    ) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str, bool]:
+    ) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]:
         """Reads an `hmz exec` line into a flow, the agents, the task, and the flow's setup.
 
         Args:
           argv: The line, as `hmz exec` takes it.
 
         Returns:
-          The flow's path, the agents to drive it with, the task, what to set the flow up
-          with, the image to run the whole of it in, and whether the line asked for the run
-          to be written for a program rather than for a person.
+          The flow's path, the agents to drive it with in the order the flow takes them, the
+          task, what to set the flow up with, and whether the line asked for the run to be
+          written for a program rather than for a person.
 
         Raises:
           SystemExit: If the line does not name a flow and an agent apiece, as argparse
@@ -225,7 +225,7 @@ class Hmz:
         """
         # What the line said about who is reading is the command line's to act on: the SDK
         # answers with the run itself rather than with a rendering of it.
-        flow, agents, task, config, container, _ = self.read(argv)
+        flow, agents, task, config, _ = self.read(argv)
         # Through a run, which is the one thing a flow being driven is: an SDK user who ran a
         # line and one who built a run are then holding the same thing.
-        self.run(flow, agents, task, config, container=container).run()
+        self.run(flow, agents, task, config).run()

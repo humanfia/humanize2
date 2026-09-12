@@ -88,39 +88,6 @@ def run(
     )
 """
 
-#: A flow proving that one backend-native command-line setting reaches the
-#: concrete Claude config rather than being treated as a Codex override.
-CLAUDE_NATIVE_CONFIG = """
-import json
-from pathlib import Path
-
-from hmz.agents import AgentBase
-from hmz.flows import flow
-
-
-@flow
-def run(agents: tuple[AgentBase], task: str) -> None:
-    Path(__file__).with_suffix(".json").write_text(
-        json.dumps(list(agents[0].config.allowed_tools))
-    )
-"""
-
-#: One common provider-latency setting reaches both supported backend configs.
-SERVICE_TIER_CONFIG = """
-import json
-from pathlib import Path
-
-from hmz.agents import AgentBase
-from hmz.flows import flow
-
-
-@flow
-def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
-    Path(__file__).with_suffix(".json").write_text(
-        json.dumps([agent.config.service_tier for agent in agents])
-    )
-"""
-
 #: The same flow, declaring its agents as a named tuple: as many as there are places, and what
 #: each of them is for. It reaches them by name to prove it was handed the type it asked for.
 NAMED = """
@@ -143,7 +110,10 @@ def run(agents: Agents, task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps(
             {
-                "agents": [[agents.builder.id], [agents.reviewer.id]],
+                "agents": [
+                    [type(one).__name__, one.id]
+                    for one in (agents.builder, agents.reviewer)
+                ],
                 "held": type(agents).__name__,
                 "task": task,
                 "cwd": os.getcwd(),
@@ -229,7 +199,10 @@ def test_it_drives_the_flow_with_the_agents_the_command_line_names(
     assert seen["held"] == "tuple"  # a flow unpacks what it was promised
 
 
-def test_one_option_is_one_agent_however_it_is_written(tmp_path: Path) -> None:
+def test_one_option_may_name_several_agents_and_every_option_adds_to_them(
+    tmp_path: Path,
+) -> None:
+    """A comma separates agents and the option repeats: the line is one list either way."""
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase, AgentBase"))
     main(
         [
@@ -237,9 +210,7 @@ def test_one_option_is_one_agent_however_it_is_written(tmp_path: Path) -> None:
             "-f",
             flow,
             "-a",
-            "cli=claude,model=m,effort=high",
-            "-a",
-            "codex/m:high",
+            "claude/m:high,codex/m:high",
             "-a",
             "kimi/m:high",
             "task",
@@ -263,7 +234,7 @@ def test_an_agent_may_be_told_which_account_to_run_as(tmp_path: Path) -> None:
             "-a",
             "claude@subscription/claude-opus-5:high",
             "-a",
-            "cli=claude,model=claude-opus-5,effort=high,provider=deepseek",
+            "claude@deepseek/claude-opus-5:high",
             "task",
         ]
     )
@@ -293,48 +264,12 @@ def test_the_flow_says_what_each_of_its_agents_may_do(
             "-f",
             flow,
             "-a",
-            "cli=codex,model=m,effort=high",
-            "-a",
-            "claude/m:high",
+            "codex/m:high,claude/m:high",
             "task",
         ]
     )
 
     assert json.loads((tmp_path / "flow.json").read_text()) == [permission, "bypass"]
-
-
-def test_a_claude_agent_receives_its_native_allowed_tools_rule(
-    tmp_path: Path,
-) -> None:
-    flow = _flow(tmp_path, CLAUDE_NATIVE_CONFIG)
-    main(
-        [
-            "exec",
-            "-f",
-            flow,
-            "-a",
-            ("cli=claude,model=m,effort=high,config.allowed_tools=Bash(git diff *)"),
-            "task",
-        ]
-    )
-    assert json.loads((tmp_path / "flow.json").read_text()) == ["Bash(git diff *)"]
-
-
-def test_one_service_tier_setting_reaches_claude_and_codex(tmp_path: Path) -> None:
-    flow = _flow(tmp_path, SERVICE_TIER_CONFIG)
-    main(
-        [
-            "exec",
-            "-f",
-            flow,
-            "-a",
-            "cli=claude,model=m,effort=max,service_tier=fast",
-            "-a",
-            "cli=codex,model=m,effort=max,service_tier=fast",
-            "task",
-        ]
-    )
-    assert json.loads((tmp_path / "flow.json").read_text()) == ["fast", "fast"]
 
 
 def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
@@ -352,7 +287,144 @@ def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
     assert seen["held"] == "Agents"  # the named tuple, not a plain one
     # And the agents took those names, so a trace groups each one's sessions under a word
     # rather than under the codename an unnamed agent draws.
-    assert seen["agents"] == [["builder"], ["reviewer"]]
+    assert seen["agents"] == [
+        ["ClaudeCodeAgent", "builder"],
+        ["CodexAgent", "reviewer"],
+    ]
+
+
+def test_an_agent_may_name_the_place_it_fills_instead_of_waiting_its_turn(
+    tmp_path: Path,
+) -> None:
+    """Named, an agent fills the place the flow calls that, whatever order the line names."""
+    flow = _flow(tmp_path, NAMED)
+
+    main(
+        [
+            "exec",
+            "-f",
+            flow,
+            "-a",
+            "reviewer=codex/m:high,builder=claude/m:high",
+            "task",
+        ]
+    )
+
+    # The line named the reviewer first, and the flow still takes its builder first.
+    assert _seen(tmp_path)["agents"] == [
+        ["ClaudeCodeAgent", "builder"],
+        ["CodexAgent", "reviewer"],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("said", "complaint"),
+    [
+        (
+            ["-a", "builder=claude/m:high", "-a", "codex/m:high"],
+            "name every agent or none",
+        ),
+        (
+            ["-a", "builder=claude/m:high,typo=codex/m:high"],
+            "drives no agent called typo",
+        ),
+        (
+            ["-a", "builder=claude/m:high,builder=codex/m:high"],
+            "drives one agent called builder, and the line names 2",
+        ),
+        (["-a", "builder=claude/m:high"], "also drives reviewer"),
+        (["-a", "builder=claude/m:high,,reviewer=codex/m:high"], "bad agent ''"),
+    ],
+)
+def test_the_places_a_line_names_are_read_against_what_the_flow_declares(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    said: list[str],
+    complaint: str,
+) -> None:
+    """Before the first turn, for the reason a miscount is: which place is which is the work."""
+    flow = _flow(tmp_path, NAMED)
+
+    with pytest.raises(SystemExit) as stopped:
+        main(["exec", "-f", flow, *said, "task"])
+
+    assert stopped.value.code == 2
+    assert complaint in capsys.readouterr().err
+    assert not (tmp_path / "flow.json").exists()  # refused before anything was driven
+
+
+def test_a_flow_that_calls_its_agents_nothing_is_given_them_in_its_own_order(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A plain tuple says how many and no more, so there is no name for a line to fill."""
+    flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase"))
+
+    with pytest.raises(SystemExit) as stopped:
+        main(
+            [
+                "exec",
+                "-f",
+                flow,
+                "-a",
+                "builder=claude/m:high,reviewer=codex/m:high",
+                "task",
+            ]
+        )
+
+    assert stopped.value.code == 2
+    assert "declares a plain tuple and calls the agents it drives nothing" in (
+        capsys.readouterr().err
+    )
+
+
+@pytest.mark.parametrize(
+    ("said", "reported"),
+    [
+        ("cli=claude,model=m,effort=high", "cli=claude"),
+        ("model=m", "model=m"),
+        ("effort=high", "effort=high"),
+        ("provider=work", "provider=work"),
+        ("service_tier=fast", "service_tier=fast"),
+        ("config.model_context_window=1000000", "config.model_context_window=1000000"),
+    ],
+)
+def test_the_written_out_form_is_gone_and_a_line_that_writes_it_is_told_so(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], said: str, reported: str
+) -> None:
+    """`=` and `,` name the places now, so the two spellings cannot both be read."""
+    flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
+
+    with pytest.raises(SystemExit) as stopped:
+        main(["exec", "-f", flow, "-a", said, "task"])
+
+    assert stopped.value.code == 2
+    error = capsys.readouterr().err
+    assert f"bad agent {reported!r}" in error
+    assert "is gone: an agent is written CLI[@PROVIDER]/MODEL:EFFORT" in error
+
+
+def test_a_run_is_not_put_in_a_container_from_the_line_that_starts_it(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Where an agent works is the flow's to say, and `Isolated` is where it says it."""
+    flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
+
+    with pytest.raises(SystemExit) as stopped:
+        main(
+            [
+                "exec",
+                "-f",
+                flow,
+                "--container",
+                "python:3.12",
+                "-a",
+                "claude/m:high",
+                "task",
+            ]
+        )
+
+    assert stopped.value.code == 2
+    assert "unrecognized arguments: --container" in capsys.readouterr().err
 
 
 #: A flow that says one of the agents it drives is the person at the prompt.
@@ -448,6 +520,19 @@ def test_a_flow_whose_only_side_is_the_person_names_no_agent_at_all(
 
     seen = _seen(tmp_path)
     assert seen == {"agents": ["human"], "said": "answered"}
+
+
+def test_a_flow_that_chooses_nobody_is_a_miscount_rather_than_a_place_to_name(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """It calls its agents nothing because there are none, which is what it has to be told."""
+    flow = _flow(tmp_path, ALONE)
+
+    with pytest.raises(SystemExit) as stopped:
+        main(["exec", "-f", flow, "-a", "human=claude/m:high", "task"])
+
+    assert stopped.value.code == 2
+    assert "the flow drives 0 agents, 1 given" in capsys.readouterr().err
 
 
 def test_a_flow_that_does_drive_agents_still_has_to_be_given_them(
@@ -603,7 +688,8 @@ def test_a_flow_that_is_not_there_is_a_usage_error(
         "gemini/g:high",
         "/m:high",
         "claude/m:",
-        "cli=claude,model=m,effort=high,mode=x",
+        "builder=claude",
+        "builder=",
     ],
 )
 def test_an_agent_that_is_not_cli_model_and_effort_is_a_usage_error(
@@ -626,14 +712,13 @@ def test_a_line_that_says_what_the_flow_says_is_a_usage_error(
 ) -> None:
     """And says where it is said instead, which is beside the agent the flow declares."""
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
-    spec = f"cli=codex,model=m,effort=high,{said}"
 
     with pytest.raises(SystemExit) as stopped:
-        main(["exec", "-f", flow, "-a", spec, "task"])
+        main(["exec", "-f", flow, "-a", said, "task"])
 
     assert stopped.value.code == 2
     error = capsys.readouterr().err
-    assert f"bad agent {spec!r}" in error
+    assert f"bad agent {said!r}" in error
     assert "is the flow's to say, written beside the agent" in error
     assert not (tmp_path / "flow.json").exists()
 
