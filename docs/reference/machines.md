@@ -157,7 +157,9 @@ The container:
   secret;
 - is labelled `humanize=<your uid>`.
 
-An image with no `python3` in it is refused as the container starts, rather than a turn later.
+An image with no Python the target half can use is refused where the machine is set up, rather
+than a turn later; where the image keeps one does not matter, since it is looked for off the
+`PATH` as well as on it.
 
 A flow that wants this for one of its own agents writes
 [`Isolated("python:3.12")`](#isolated-python-3-12) beside the place instead of building a config:

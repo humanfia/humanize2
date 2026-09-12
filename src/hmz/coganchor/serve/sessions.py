@@ -49,6 +49,9 @@ HOST_SPECIFIC_ENV = frozenset(
         "OSTYPE",
         "PATH",
         "PWD",
+        # The login session a macOS client opened, which names a session of that machine's
+        # security server and does not exist here.
+        "SECURITYSESSIONID",
         "SHELL",
         "SHLVL",
         "TEMP",
@@ -60,8 +63,23 @@ HOST_SPECIFIC_ENV = frozenset(
     }
 )
 
-#: Prefixes of variables that are host-specific or belong to coganchor itself.
-HOST_SPECIFIC_PREFIXES = ("LD_", "SSH_", "XDG_", "HUMANIZE_")
+#: Prefixes of variables that are host-specific or belong to coganchor itself.  ``DYLD_`` is
+#: macOS's ``LD_``: ``DYLD_INSERT_LIBRARIES`` is its ``LD_PRELOAD`` and ``DYLD_LIBRARY_PATH``
+#: its ``LD_LIBRARY_PATH``, so a client's copy would name libraries of the client's on a
+#: target that has its own.  ``Apple``, ``XPC_`` and ``__CF`` are what a macOS client's
+#: launchd session puts in the environment -- sockets under its own per-session temporary
+#: directory, and the encoding and uid its login was opened with -- each of which names that
+#: machine and not this one.
+HOST_SPECIFIC_PREFIXES = (
+    "Apple",
+    "DYLD_",
+    "HUMANIZE_",
+    "LD_",
+    "SSH_",
+    "XDG_",
+    "XPC_",
+    "__CF",
+)
 
 
 def compose_env(remote_env: dict[str, str], cwd: str, *, tty: bool) -> dict[str, str]:
@@ -290,10 +308,7 @@ class ExecSession(Session):
         try:
             while selector.get_map():
                 for key, _ in selector.select():
-                    try:
-                        data = os.read(key.fd, CHUNK_SIZE)
-                    except OSError:
-                        data = b""  # a pty master reports EIO once the child is gone
+                    data = _read_stream(key.fd)
                     if not data:
                         selector.unregister(key.fileobj)
                         continue
@@ -353,8 +368,28 @@ class TunnelSession(Session):
         return {}
 
 
+def _read_stream(fd: int) -> bytes:
+    """Read what is waiting on ``fd``, answering the end of it with no bytes.
+
+    A pty master has two ways of saying that the child holding the other end is gone, and
+    which one it uses is the kernel's: Linux raises ``EIO`` from the read, while macOS ends
+    the file the way a pipe does and its ``kqueue`` reports it readable to say so.  Both mean
+    there is no more output, so both are answered here with the empty read the output pump
+    stops on -- a target that took only the error for the end would never finish a session on
+    a Mac.
+    """
+    try:
+        return os.read(fd, CHUNK_SIZE)
+    except OSError:
+        return b""
+
+
 def _attach_controlling_tty() -> None:  # pragma: no cover - runs in the forked child
-    os.setsid()
+    # A session of the child's own is asked for by ``start_new_session`` above, which the
+    # child enters before this runs; asking for a second one is ``EPERM``, and an error here
+    # is a command that never starts.  The controlling terminal is this machine's to claim
+    # even so: the slave is inherited rather than opened here, and an inherited descriptor
+    # does not become a controlling terminal by itself.
     with suppress(OSError):
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 

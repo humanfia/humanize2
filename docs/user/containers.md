@@ -115,9 +115,10 @@ ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:
 | `image` | `python:3.12` | Needs a `python3` for the target half, plus whatever the agent will reach for. |
 | `workspace` | this directory | The directory **itself**, mounted — not a copy — so the work outlives the container. |
 
-An image with no `python3` in it is refused as the container starts, rather than a turn later.
-An agent told to run `pytest` in an image without it spends a turn discovering that, so a good
-image is one you already build for CI.
+An image with no Python the target half can use is refused where the machine is set up, rather
+than a turn later; where the image keeps one does not matter, since it is looked for off the
+`PATH` as well as on it. An agent told to run `pytest` in an image without it spends a turn
+discovering that, so a good image is one you already build for CI.
 
 Where the flow says a place may be pointed anywhere (`Annotated[Agent, Remote]`), you can
 hand it a container instead:

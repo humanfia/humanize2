@@ -418,8 +418,13 @@ full list is [What is not guaranteed](/reference/remote-execution#what-is-not-gu
 ### `could not start a container of python:3.12: …`
 
 Whatever docker said is attached. The usual causes are no daemon to reach, an image that is not
-pulled and an image with no `python3` in it. That image is refused as the container starts,
-rather than a turn later.
+pulled, and an image with no shell in it.
+
+### `could not install humanize in …: container … is not running`
+
+The container stopped as soon as it was started, which is what an image holding no Python the
+target half can use does. What it said on the way out is attached: the places an interpreter was
+looked for. Any Python 3.12 or newer answers, on the image's `PATH` or at one of those paths.
 
 ### `no directory to give the container`
 
