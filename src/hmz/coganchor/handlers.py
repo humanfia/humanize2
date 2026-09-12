@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from hmz.coganchor.linux import procfs
-from hmz.coganchor.linux.syscalls import NR, syscall_name
+from hmz.coganchor.linux.syscalls import ARCH, NR, syscall_name
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle only matters for typing
     from collections.abc import Callable
@@ -41,6 +41,8 @@ __all__ = ["ALLOW", "STALL", "Action", "SyscallDispatcher", "fails"]
 
 log = logging.getLogger(__name__)
 
+#: Both from <linux/fcntl.h>, which is the same header on every architecture -- unlike the
+#: ``O_*`` flags below, one of which is not.
 AT_FDCWD = -100
 AT_REMOVEDIR = 0x200
 
@@ -48,12 +50,20 @@ O_WRONLY = 0o1
 O_RDWR = 0o2
 O_CREAT = 0o100
 O_TRUNC = 0o1000
-O_DIRECTORY = 0o200000
 O_ACCMODE = 0o3
+
+#: The one flag read here that an architecture is free to redefine, and aarch64 does: it
+#: takes ``O_DIRECTORY``, ``O_NOFOLLOW``, ``O_DIRECT`` and ``O_LARGEFILE`` from AArch32
+#: rather than from <asm-generic/fcntl.h>, so the number is 0o40000 there against x86-64's
+#: 0o200000.  Read the wrong way round, an ``open`` of a directory would be taken for one of
+#: a file and the shadow tree would be asked for contents that are not there.
+O_DIRECTORY = ARCH.o_directory
 
 _CREAT_FLAGS = O_CREAT | O_WRONLY | O_TRUNC
 
-#: The flags field of ``struct open_how``, which is the first ``u64`` of it.
+#: The flags field of ``struct open_how``, which is the first ``u64`` of it.  The structure
+#: is <linux/openat2.h>'s, fixed-width and the same shape everywhere, so unlike the flags it
+#: carries there is nothing architecture-dependent about reading it.
 _OPEN_HOW_FLAGS = 8
 
 #: Where the same structure keeps the resolution the call insists on, and the two
@@ -63,12 +73,6 @@ _OPEN_HOW_FLAGS = 8
 #: the promise or quietly re-root the path somewhere else.
 _OPEN_HOW_RESOLVE = 16
 _RESOLVE_CONFINED = 0x08 | 0x10
-
-#: What a redirected path is kept clear of: the red zone, which a leaf function of
-#: the tracee may be using this moment.  Only as many bytes as the paths themselves
-#: take are written below it -- a thread with a stack of its own may have very
-#: little left, and a fixed few kilobytes would be written past the end of it.
-_RED_ZONE = 128
 
 #: Where each syscall keeps the paths it names, as ``(descriptor argument, path
 #: argument)`` pairs -- the descriptor being ``None`` for a call that has none and
@@ -593,7 +597,9 @@ class SyscallDispatcher:
 #: The pair of times ``utimensat`` takes, sixteen bytes apiece.
 _TIMES_PAIR = 32
 
-#: ``UTIME_NOW``/``UTIME_OMIT`` sentinels from <sys/stat.h>.
+#: ``UTIME_NOW``/``UTIME_OMIT`` sentinels from <linux/stat.h>, which every architecture
+#: shares -- as do the ``timespec`` and ``timeval`` pairs read above, eight bytes a field on
+#: any 64-bit Linux.
 _UTIME_NOW = (1 << 30) - 1
 _UTIME_OMIT = (1 << 30) - 2
 
@@ -643,7 +649,7 @@ def _plant(
     # As the tracee named it: a path is bytes, and one that is not valid text
     # came back through the surrogates ``read_cstring`` escapes it with.
     blob = os.fsencode(path) + b"\0"
-    address = registers.stack_pointer - _RED_ZONE - taken - len(blob)
+    address = registers.scratch(taken + len(blob))
     try:
         procfs.write_bytes(pid, address, blob)
         if procfs.read_bytes(pid, address, len(blob)) != blob:
@@ -680,7 +686,14 @@ _SOCKADDR_IN6_SIZE = 28
 
 
 def _read_sockaddr(pid: int, address: int, length: int) -> tuple[int, str, int] | None:
-    """Decode an IPv4/IPv6 ``connect`` target, ignoring anything else."""
+    """Decode an IPv4/IPv6 ``connect`` target, ignoring anything else.
+
+    The family is a little-endian ``unsigned short`` on both architectures a tracee can be
+    watched on, and on every other Linux one: ``sa_family_t`` is the whole of the first
+    field.  That is *not* true of a BSD-style ``sockaddr``, where a one-byte ``sa_len``
+    comes first and the family is the second byte -- but no tracee is ever supervised on
+    one of those, and Linux is what this decodes.
+    """
     if address == 0 or length < _SOCKADDR_IN:
         return None
     try:

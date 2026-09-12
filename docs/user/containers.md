@@ -231,7 +231,7 @@ Read [Security](/user/security).
 ## Requirements
 
 You need `docker` on your `PATH` and a daemon to reach, plus what remote execution needs: Linux
-on x86-64 here, and a `python3` in the image.
+on x86-64 or aarch64 here, and a `python3` in the image.
 
 ## See also
 

@@ -7,6 +7,11 @@ The supervisor needs four capabilities from ptrace:
 * cancel a syscall and substitute a return value,
 * replace a syscall outright (``execve`` becomes ``exit_group``).
 
+Everything goes through ``PTRACE_GETREGSET``/``PTRACE_SETREGSET``, which is the only form
+aarch64 has -- ``PTRACE_GETREGS`` does not exist there at all -- and which x86-64 supports
+just as well.  Changing *which* syscall a tracee makes is the one thing the register set
+cannot always do: see :attr:`~hmz.coganchor.linux.syscalls.Arch.number_regset`.
+
 Everything here is synchronous and must be called from the thread that
 attached to the tracee -- the kernel enforces that.
 """
@@ -14,6 +19,7 @@ attached to the tracee -- the kernel enforces that.
 from __future__ import annotations
 
 import ctypes
+import errno
 import os
 from typing import Final
 
@@ -26,6 +32,9 @@ __all__ = [
     "EVENT_SECCOMP",
     "EVENT_VFORK",
     "OPTIONS",
+    "SYSCALL_STOP_ENTRY",
+    "SYSCALL_STOP_EXIT",
+    "SYSCALL_STOP_SECCOMP",
     "SYSCALL_STOP_SIG",
     "WALL",
     "Registers",
@@ -36,6 +45,7 @@ __all__ = [
     "setoptions",
     "setregs",
     "syscall",
+    "syscall_stop_kind",
     "traceme",
 ]
 
@@ -51,8 +61,16 @@ _SETOPTIONS: Final = 0x4200
 _GETEVENTMSG: Final = 0x4201
 _GETREGSET: Final = 0x4204
 _SETREGSET: Final = 0x4205
+_GET_SYSCALL_INFO: Final = 0x420E
 
 _NT_PRSTATUS: Final = 1
+
+#: ``PTRACE_SYSCALL_INFO_*``: which half of a syscall a stop is at, as the kernel itself
+#: reports it.  The alternative -- reading the result register and looking for ``-ENOSYS``
+#: -- only works where the kernel plants one, which aarch64 does not.
+SYSCALL_STOP_ENTRY: Final = 1
+SYSCALL_STOP_EXIT: Final = 2
+SYSCALL_STOP_SECCOMP: Final = 3
 
 # ``PTRACE_EVENT_*`` codes, delivered in the high bits of a wait status.
 # Events the supervisor does not name (exec, exit, vfork-done) are resumed
@@ -102,9 +120,16 @@ def _ptrace(request: int, pid: int, addr: int, data: int) -> int:
 
 
 class Registers:
-    """Mutable view over a tracee's ``user_regs_struct``."""
+    """Mutable view over the general-purpose registers ``NT_PRSTATUS`` carries."""
 
-    __slots__ = ("_buffer", "_dirty", "_vector")
+    __slots__ = (
+        "_buffer",
+        "_dirty",
+        "_number",
+        "_number_box",
+        "_number_vector",
+        "_vector",
+    )
 
     def __init__(self, buffer: ctypes.Array[ctypes.c_ulonglong]) -> None:
         self._buffer = buffer
@@ -114,6 +139,15 @@ class Registers:
         # reference, so a vector that outlived its buffer would name freed memory. Held here
         # so a tracer reading a register set per stop is not building one per stop too.
         self._vector = _Iovec(ctypes.addressof(buffer), ctypes.sizeof(buffer))
+        # And the one-`int` regset that renumbers a syscall where the register it was read
+        # out of cannot, with its own vector for the same reason. Built whatever the
+        # architecture, since it is one word per tracer rather than one per stop, and left
+        # untouched where `Arch.number_regset` is None.
+        self._number: int | None = None
+        self._number_box = ctypes.c_int()
+        self._number_vector = _Iovec(
+            ctypes.addressof(self._number_box), ctypes.sizeof(self._number_box)
+        )
 
     @property
     def dirty(self) -> bool:
@@ -128,6 +162,20 @@ class Registers:
         """Where the iovec naming this register set is, for a ptrace call to be given."""
         return ctypes.addressof(self._vector)
 
+    @property
+    def renumbered(self) -> bool:
+        """Whether this stop asked for a syscall other than the one the tracee made.
+
+        Only ever true where the number lives outside the register set: elsewhere the number
+        *is* a register, and writing the set writes it.
+        """
+        return self._number is not None
+
+    @property
+    def number_vector(self) -> int:
+        """Where the iovec naming the replacement syscall number is."""
+        return ctypes.addressof(self._number_vector)
+
     def settled(self) -> None:
         """Says these are the tracee's own registers again, with nothing written over them.
 
@@ -136,15 +184,28 @@ class Registers:
         from the last stop would answer for that one.
         """
         self._dirty = False
+        self._number = None
 
     @property
     def syscall_number(self) -> int:
+        if self._number is not None:
+            return self._number
         return self._buffer[ARCH.number_index]
 
     @syscall_number.setter
     def syscall_number(self, value: int) -> None:
-        self._buffer[ARCH.number_index] = _as_unsigned(value)
         self._dirty = True
+        if ARCH.number_regset is None:
+            self._buffer[ARCH.number_index] = _as_unsigned(value)
+            return
+        # The register this was read out of is not the one the kernel will act on -- aarch64
+        # has already taken the number out of `x8` by the time the stop is reported -- so
+        # writing it back would change nothing and lie to whoever read it again. The value
+        # is held here instead, and `setregs` writes it through the regset that does act.
+        # Held as the register would have held it, so that reading a number back answers the
+        # same on both architectures rather than -1 here and its unsigned self there.
+        self._number = _as_unsigned(value)
+        self._number_box.value = _as_signed_int(value)
 
     @property
     def result(self) -> int:
@@ -157,8 +218,31 @@ class Registers:
 
     @property
     def stack_pointer(self) -> int:
-        """Where the tracee's stack is, whose red zone serves as scratch space."""
+        """Where the tracee's stack is, below which scratch space is found."""
         return self._buffer[ARCH.stack_index]
+
+    def scratch(self, size: int) -> int:
+        """Where `size` bytes may be written in the tracee, for a path it is to be given.
+
+        Below the stack pointer, clear of whatever red zone the architecture reserves for a
+        leaf function that may be using it this moment -- 128 bytes on x86-64, and none at
+        all under the aarch64 procedure call standard, which is why the offset is a fact
+        about the architecture rather than a constant at the point of use. Only as many
+        bytes as are being written are skipped: a thread with a stack of its own may have
+        very little left, and a fixed few kilobytes would be written past the end of it.
+
+        Neither architecture promises the bytes survive a signal arriving in the meantime --
+        the kernel builds its signal frame below the stack pointer too -- but the tracee runs
+        no instruction between the write and the kernel's read of it, so the window is one
+        syscall wide.
+
+        Args:
+          size: How many bytes are to be written, including the terminator.
+
+        Returns:
+          The address the lowest of those bytes goes at.
+        """
+        return self._buffer[ARCH.stack_index] - ARCH.red_zone - size
 
     def arg(self, index: int) -> int:
         """Return syscall argument ``index`` (0-based) as an unsigned word."""
@@ -225,8 +309,16 @@ def getregs(pid: int, into: Registers | None = None) -> Registers:
 
 
 def setregs(pid: int, registers: Registers) -> None:
-    """Write registers back, which is how a syscall is answered or redirected."""
+    """Write registers back, which is how a syscall is answered or redirected.
+
+    Where the syscall number is not one of those registers, a second write carries it: on
+    aarch64 that is ``NT_ARM_SYSTEM_CALL``, and without it a cancelled syscall would run
+    anyway and a stand-in would never become an ``exit_group``.
+    """
     _ptrace(_SETREGSET, pid, _NT_PRSTATUS, registers.vector)
+    regset = ARCH.number_regset
+    if regset is not None and registers.renumbered:
+        _ptrace(_SETREGSET, pid, regset, registers.number_vector)
 
 
 def cont(pid: int, signal: int = 0) -> None:
@@ -237,6 +329,33 @@ def cont(pid: int, signal: int = 0) -> None:
 def syscall(pid: int, signal: int = 0) -> None:
     """Resume until the next syscall entry or exit stop."""
     _ptrace(_SYSCALL, pid, 0, signal)
+
+
+def syscall_stop_kind(pid: int) -> int | None:
+    """Which half of a syscall a stopped tracee is at, as the kernel itself says.
+
+    The alternative is to read the result register and look for the ``-ENOSYS`` the kernel
+    parks there on entry, which x86-64 does and aarch64 does not -- so asking is the only
+    answer that holds on both.
+
+    Args:
+      pid: The stopped tracee.
+
+    Returns:
+      One of `SYSCALL_STOP_ENTRY`, `SYSCALL_STOP_EXIT` or `SYSCALL_STOP_SECCOMP`; zero where
+      this stop is not a syscall stop at all; or None where the kernel will not say, the
+      request having arrived in Linux 5.3.
+    """
+    # Only the first word is read: it holds the op and the architecture, and the kernel
+    # truncates what it copies to the size it is given.
+    box = ctypes.c_uint64()
+    try:
+        _ptrace(_GET_SYSCALL_INFO, pid, ctypes.sizeof(box), ctypes.addressof(box))
+    except OSError as why:
+        if why.errno in (errno.EIO, errno.EINVAL):
+            return None
+        raise
+    return box.value & 0xFF
 
 
 def get_event_message(pid: int) -> int:

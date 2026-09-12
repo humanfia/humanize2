@@ -3,10 +3,10 @@
 Two questions, and they are not the same one.
 
 The first is whether the bindings import at all. :mod:`hmz.coganchor.linux` opens `libc.so.6`
-and picks a register map at import time, refusing anything but x86-64, so a test module that
-names those bindings cannot be *collected* anywhere else -- a skip written inside it would
-never be reached, because the import above it raises first. :data:`WITHOUT_BINDINGS` is what
-such a module asks before importing them.
+and picks a register map at import time, refusing any architecture it has not got one for, so
+a test module that names those bindings cannot be *collected* anywhere else -- a skip written
+inside it would never be reached, because the import above it raises first.
+:data:`WITHOUT_BINDINGS` is what such a module asks before importing them.
 
 The second is whether this kernel will really hand over a tracee, which only running one
 answers: a container without `CAP_SYS_PTRACE` has every module and can supervise nothing.
@@ -65,6 +65,13 @@ def cred(
     )
 
 
+#: The architectures :mod:`hmz.coganchor.linux.syscalls` has a register map for, spelled out
+#: again rather than read off it: reading it off would mean importing the very module this
+#: says whether it may be imported, which on a third architecture raises. That the two agree
+#: is checked by `tests/coganchor/test_architectures.py`, which runs where the import works.
+SUPPORTED_MACHINES = frozenset({"x86_64", "aarch64"})
+
+
 def _cannot_import() -> str:
     """Why the Linux bindings will not import here, or "" where they will.
 
@@ -73,8 +80,11 @@ def _cannot_import() -> str:
     """
     if sys.platform != "linux":
         return "a redirected run is a Linux seccomp filter and a ptrace supervisor"
-    if platform.machine() != "x86_64":
-        return f"the register map is x86-64 only, and this host is {platform.machine()}"
+    if platform.machine() not in SUPPORTED_MACHINES:
+        return (
+            f"there is a register map for {', '.join(sorted(SUPPORTED_MACHINES))}, "
+            f"and this host is {platform.machine()}"
+        )
     return ""
 
 
@@ -86,8 +96,8 @@ WITHOUT_BINDINGS = _cannot_import()
 def _cannot_trace() -> str:
     """Why a redirected run cannot be watched on this machine, or "" where one can.
 
-    Answered by running one: the modules import on any x86-64 Linux, and whether the kernel
-    will hand over a tracee is a question only the attempt asks.
+    Answered by running one: the modules import on any Linux there is a register map for,
+    and whether the kernel will hand over a tracee is a question only the attempt asks.
     """
     if WITHOUT_BINDINGS:
         return WITHOUT_BINDINGS

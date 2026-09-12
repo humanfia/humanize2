@@ -56,8 +56,24 @@ def build_program(numbers: Iterable[int]) -> bytes:
     Foreign architectures (32-bit syscall entry points) are allowed through
     untouched: coganchor is a redirector, not a sandbox, so failing open keeps
     an unexpected personality working rather than killing the agent.
+
+    A number below zero is dropped rather than assembled: that is how
+    :class:`~hmz.coganchor.linux.syscalls.Numbers` spells a call this
+    architecture has not got, and a caller that builds its trap set by naming
+    calls -- which is every caller -- would otherwise be asked to know which of
+    them exist here.  Nothing is lost by dropping one: a call the kernel has no
+    number for is a call no process can make.
+
+    Args:
+      numbers: The syscalls to trap, in any order and with repeats allowed.
+
+    Returns:
+      The assembled filter.
+
+    Raises:
+      ValueError: If the trap set is too large for a flat filter to jump over.
     """
-    ordered = sorted(set(numbers))
+    ordered = sorted({number for number in numbers if number >= 0})
     if len(ordered) * 2 + 4 > _MAX_JUMP:
         raise ValueError("trap set too large for a flat filter")
     program = [
