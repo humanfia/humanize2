@@ -180,16 +180,26 @@ def test_the_names_a_backend_serves_are_derived_from_its_own_facts() -> None:
     }
 
 
-def test_no_backend_has_been_given_a_layer_that_is_not_written_yet() -> None:
-    """The layers with nothing behind them yet are still empty; the preload is not one.
+def test_only_the_layers_nobody_has_written_yet_are_still_empty() -> None:
+    """Two layers have landed and one has not, and each says which backends it reaches.
 
-    Which CLIs take a preload is `hmz.agents.preload`'s to have filled in, and is checked
-    where that layer is -- here, what is checked is that the two nobody has written are
-    still written down nowhere.
+    The patched layer reaches the two CLIs shipped as one Bun file; the preload layer reaches
+    the four whose CLI is a plain Node script. The hook layer's unit has not landed, so it is
+    still written down nowhere -- which is the thing worth asserting, since a layer half
+    filled in would read as a backend that quietly gained one.
     """
+    assert {one.name for one in PROFILES if one.bundles} == {"claude", "opencode"}
+    assert {one.name for one in PROFILES if one.preloads} == {
+        "kimi",
+        "mimo",
+        "pi",
+        "qwen",
+    }
     for one in PROFILES:
         assert one.hooks is None, one.name
-        assert not one.bundles, one.name
+        if one.bundles:
+            # Every bundle written down fingerprints on a line rather than a path alone.
+            assert all(bundle.says for bundle in one.bundles), one.name
 
 
 def test_the_catalogue_names_where_an_agents_turns_may_land() -> None:
@@ -205,15 +215,19 @@ def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -
     told = {one.name: one for one in catalogue() if one.name.startswith("anchor:")}
     # An empty backend set means every backend here, so a way in that has not been built
     # must not be listed at all, and one only some of them serve must be listed with exactly
-    # those. These two are everybody's: every backend is a command line spawned here, and
-    # what a spawned turn runs is what an anchor traces.
-    assert told["anchor:native-cli"].backends == frozenset()
-    assert told["anchor:supervised"].backends == frozenset()
-    assert told["anchor:preloaded"].backends == frozenset(
-        {"kimi", "mimo", "pi", "qwen"}
-    )
+    # those. The two universal ones always are: every backend is a command line spawned here,
+    # and what a spawned turn runs is what an anchor traces. The patched layer is served by
+    # the two Bun bundles and the preload layer by the four Node scripts, so each is listed
+    # against exactly those; the hook layer is not built yet and is absent.
     assert set(told) == {
         "anchor:native-cli",
         "anchor:supervised",
+        "anchor:patched",
         "anchor:preloaded",
     }
+    assert told["anchor:native-cli"].backends == frozenset()
+    assert told["anchor:supervised"].backends == frozenset()
+    assert told["anchor:patched"].backends == frozenset({"claude", "opencode"})
+    assert told["anchor:preloaded"].backends == frozenset(
+        {"kimi", "mimo", "pi", "qwen"}
+    )
