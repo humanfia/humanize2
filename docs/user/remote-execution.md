@@ -69,7 +69,8 @@ installation. The two halves refuse to run against each other if their versions 
 
 ::: details It cannot connect
 Run `ssh build-box` yourself first. `hmz anchor` uses your own ssh config, agent and keys, and
-it adds nothing. Then check `python3 --version` there. See
+it adds nothing. Then check that there is a Python 3.12 or newer there; it need not be on the
+`PATH`, since humanize looks where a Mac and a Homebrew keep one too. See
 [Troubleshooting](/user/troubleshooting#the-target-cannot-be-reached).
 :::
 
@@ -233,8 +234,13 @@ is refused outright. Prefer `ssh://` or `docker://`, which need no port at all. 
 
 ## Requirements
 
-Linux on x86-64 or aarch64 **here**. A POSIX system with a recent `python3` **there**. No
-root, no compiler, no kernel module, nothing installed on the far end.
+Linux on x86-64 or aarch64 **here**. A POSIX system with a recent `python3` **there** — Linux
+or macOS, on any architecture. No root, no compiler, no kernel module, nothing installed on the
+far end.
+
+macOS ships no `python3` on the `PATH` a remote command is given, so humanize looks where a Mac
+keeps one — Homebrew's, or the framework the installer from python.org writes — and says what it
+looked for if it finds none.
 
 ## See also
 
