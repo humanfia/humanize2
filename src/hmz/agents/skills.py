@@ -40,6 +40,7 @@ __all__ = [
     "Loaded",
     "Mounted",
     "Skill",
+    "carried",
     "mount",
     "skills",
     "unmount",
@@ -255,6 +256,40 @@ def mount(backend: str, workspace: Path | str, loaded: Iterable[Loaded]) -> Moun
             _PLANTED[at] = (one.at, 1)
             planted.append(at)
     return Mounted(tuple(planted))
+
+
+def carried(backend: str, loaded: Iterable[Loaded]) -> tuple[tuple[str, str], ...]:
+    """Where a flow's skills go for a session whose CLI reads them on another machine.
+
+    The same question :func:`mount` answers, asked of a workspace this process cannot write.
+    A session driving the CLI already installed on a target has no mirror to plant these in --
+    the whole point of that arrangement is that there is no local copy of anything -- so what
+    it does instead is say where each of them belongs, relative to the workspace, and let
+    whoever is holding the connection put it there and take it away again.
+
+    Relative rather than absolute for the same reason: the workspace is named as the *target*
+    names it, and a path built here would be built against this machine's idea of where that
+    is.
+
+    Args:
+      backend: The CLI, by any name it answers to.
+      loaded: The skills the flow brings.
+
+    Returns:
+      One `(where the skill is on this machine, where it goes under the workspace)` pair
+      apiece. Nothing at all for a backend that reads no such directory -- one whose skills
+      are all its own -- and for a flow that brings none.
+    """
+    profile = named(backend)
+    if profile is None or not profile.mounts:
+        return ()
+    return tuple(
+        (str(one.at), f"{profile.mounts}/{one.name}")
+        for one in loaded
+        # A skill with no name is a skill the CLI would read as the directory it landed in,
+        # which is a directory this would have had to invent a name for.
+        if one.name
+    )
 
 
 def _copied(skill: Path, at: Path) -> bool:

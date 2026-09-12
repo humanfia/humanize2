@@ -6,6 +6,9 @@ none of it.
 
 ## The model
 
+There are two arrangements, and which one a session uses is a setting rather than a fact about
+the target. Everything below that is not marked otherwise is about the first.
+
 An agent runs on this machine, unchanged. Everything it *does* — reading and writing project
 files, running commands, reaching the network from those commands — happens on the target.
 
@@ -26,6 +29,61 @@ own path by default, so the paths the agent sees are the target's own.
      credentials,                             the work
    the model provider
 ```
+
+### The other arrangement: `--native`
+
+The CLI already installed **on the target** is the one that runs, and it runs there. Nothing is
+mirrored, nothing is traced, and nothing of humanize is below the agent: this side starts it on
+the target in the target's own copy of the workspace, carries its three streams byte for byte,
+sends it the signals aimed here, and exits with its own status.
+
+```
+     this machine                              the target
+┌────────────────────┐                   ┌────────────────────┐
+│  hmz anchor        │   one channel     │  claude / codex …  │
+│    --native        │──────────────────▶│         ↕          │
+│    ↕ three streams │  ssh / docker /   │  files, processes, │
+│                    │  tcp / a pipe     │  the network       │
+└────────────────────┘                   └────────────────────┘
+    the flow driving                       the work, and
+      the turn                            the account too
+```
+
+Which makes running a turn elsewhere an argument change for every backend that already speaks a
+framed protocol to a process humanize spawns — the frames cross a machine boundary and neither
+end is told.
+
+```sh
+hmz anchor --native --target docker://build-container --remote-path /srv/project claude
+```
+
+Three things do not follow the CLI across on their own, so the anchor carries each:
+
+- **The account.** What a provider sets is sent as the turn's environment; what it *hushes* is
+  taken off on the target with `--hush`, where the environment is composed. A variable merely
+  left out of what is sent survives in the target's own shell profile.
+- **Its credential files.** `--project NAME=DIR` writes them into a directory on the target that
+  only the target's user may enter, names them to the CLI by the variable that moves the
+  directory they belong in, and removes them when the turn is over. **The account leaves this
+  machine**, which is the trade this arrangement is: a machine that should not be trusted with
+  it is a machine to reach the other way. A credential the CLI reads out of `~/…` is the one
+  that does not cross — nothing but `HOME` points a CLI at one, and a replaced home takes the
+  target's git identity, its ssh keys and the CLI's own transcripts with it. An account kept
+  *only* there is refused rather than quietly run as the target's own.
+- **The skills the flow carries.** `--carry DIR=PATH` puts them in the target's copy of the
+  workspace for the length of the turn. Nothing already there is written over, and only what
+  was made is removed.
+
+And one thing cannot: a flow's own [callbacks](/weaver/tools). The bridge carrying them is a
+program on this machine speaking to a socket in this process, so a turn offering them to a CLI
+on another machine is refused rather than taken without them. A `local` target is the exception,
+the CLI there being here.
+
+Two more things follow from there being no supervisor. **The agent's own connections are the
+target's** — there is no `--net` here, so a provider pointed at `127.0.0.1` is a turn dialling
+the *target's* loopback; a gateway a native turn is to use has to be reachable under a name the
+target resolves. And **everything crosses every turn**: each turn is a process of its own, so
+the credentials and the skills are written again each time.
 
 ## Quick start
 

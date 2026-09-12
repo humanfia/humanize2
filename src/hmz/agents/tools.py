@@ -208,6 +208,12 @@ class Toolbox:
     def command(self) -> list[str]:
         """What a coding agent is told to run to reach these callbacks.
 
+        Both halves of it are this machine's: the program is the humanize installed here, and
+        the socket is in this very process, inside a directory nothing off this machine can
+        name. Which is the whole of why it works, and the whole of why a CLI driven on another
+        machine cannot be given it -- that turn is refused where it is spawned rather than
+        taken without the tools it was told it had.
+
         Returns:
           The bridge, as argv: it relays the pipe its CLI speaks the protocol over to the
           socket this is served on, so that the callback runs in this process.
