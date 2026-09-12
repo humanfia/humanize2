@@ -1264,8 +1264,16 @@ class SessionBase(ABC):
                             # saying it has been taken away.
                             self._sofar.append(event.text)
                         if event.kind == "tool":
-                            named, _, about = event.text.partition(" ")
-                            self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
+                            # Read off the stream only where the backend has no table of its
+                            # own pointed back here. A CLI says what it reached for and then
+                            # reaches for it, so a moment fired from here has already
+                            # happened, and a hook refusing it is watching rather than
+                            # gating. Where a gate is up the CLI asks first and waits, so the
+                            # moment fires from there instead -- and firing it here as well
+                            # would be one tool call putting the same hook twice.
+                            if not self._agent.hooks.gated(Moment.PRE_TOOL_USE):
+                                named, _, about = event.text.partition(" ")
+                                self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
                         elif event.kind in ("subagent", "subagent-ends"):
                             # An agent this one started of its own, bracketed the way a turn
                             # is: a fleet under a turn is something a flow may want a word

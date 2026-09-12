@@ -39,8 +39,9 @@ __all__ = [
 #: - `workspace-write`: it may change the workspace it was given, and is stopped at the edge
 #:   of it.
 #: - `auto`: it may reach for anything, and what it asks for is granted -- which is where a
-#:   hook hung on `PERMISSION_REQUEST` gets a say, since that is the one moment a backend
-#:   actually waits on.
+#:   hook hung on `PERMISSION_REQUEST` gets a say, that being a moment a backend actually
+#:   waits on. It is not the only one: on a CLI that takes a hook table written for a single
+#:   run, `PRE_TOOL_USE` is served from that table and is waited on at every rung.
 #: - `bypass`: nothing is asked and nothing is checked, which is what an unattended flow has
 #:   always run its agents at.
 #:

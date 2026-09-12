@@ -65,7 +65,7 @@ one a Ralph loop makes each turn. Hanging one mid-run is the point.
 | --- | --- | --- |
 | `SESSION_START` | a session is about to take its first turn | — |
 | `USER_PROMPT_SUBMIT` | a prompt is about to go to the agent | `refused` skips the turn; `adds` goes into the prompt |
-| `PRE_TOOL_USE` | the agent has reached for a tool | — |
+| `PRE_TOOL_USE` | the agent has reached for a tool | `refused` stops the tool on a backend that [takes a hook table for one run](#refusing-a-tool); elsewhere, — |
 | `PERMISSION_REQUEST` | the backend is asking whether a tool may run | `refused` denies it, with `because` as the reason |
 | `NOTIFICATION` | the agent has stopped to ask its user something | — |
 | `STOP` | a turn has ended | `refused` sends the agent on, with `because` as the next prompt |
@@ -135,12 +135,46 @@ hook where it is hung, rather than hanging one that quietly never fires.
 | `PERMISSION_REQUEST` | yes | yes | no | yes | no |
 
 Claude Code, Codex and ZCode ask before they use a tool and wait for the answer, so those are
-the three where a refusal reaches the agent. Kimi Code, pi, opencode and mimocode are driven
-unattended — a flow watches its agent rather than gating it. `Person` runs none of the moments:
-a moment is a point in a turn of a model, and the person takes no such turn.
+the three where a `PERMISSION_REQUEST` refusal reaches the agent. Kimi Code, pi, opencode and
+mimocode are driven unattended — a flow watches its agent rather than gating it. `Person` runs
+none of the moments: a moment is a point in a turn of a model, and the person takes no such
+turn.
 
 `PERMISSION_REQUEST` also wants the [`auto` rung](/user/permissions), the one setting under
 which a backend asks and waits.
+
+## Refusing a tool
+
+`PRE_TOOL_USE` is in every backend's `moments`, but what a refusal *does* there is not the same
+everywhere. A CLI says what it reached for and then reaches for it, so a refusal read off the
+stream a turn is read from would be describing a tool that had already run.
+
+On the backends whose CLI takes a hook table meant for a single run — Claude Code and Qwen Code
+— humanize puts the moment in that table instead. The CLI stops and waits for the answer, and a
+refusal means the tool **does not run**:
+
+```python
+def no_shell(occasion: Occasion) -> Verdict | None:
+    if occasion.tool == "Bash":
+        return Verdict(refused=True, because="this flow does not shell out")
+    return None
+
+with agent.hooks.on(Moment.PRE_TOOL_USE, no_shell):
+    agent(task)
+```
+
+Which backends those are is `anchor:hooked` in
+[what a backend serves](/features/capabilities). Nothing of your own configuration is read,
+written or replaced to do it: the table reaches the CLI on its own command line, or through a
+settings file this run alone is pointed at, and goes when the run does.
+
+`PRE_TOOL_USE` and `PERMISSION_REQUEST` are two different moments and both fire. The table gets
+the first word — a CLI runs its hooks before it decides whether a tool is permitted — so a
+refusal at `PRE_TOOL_USE` means the permission is never asked.
+
+On a backend with no such seam, and on a turn whose work lands on
+[another machine](/features/anchor) — where the relay is not — the moment is still told to every
+hook hung on it, and a refusal there is a flow watching a tool rather than stopping one.
 
 ## Saying so in the flow
 

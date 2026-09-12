@@ -41,6 +41,7 @@ from .grok import GrokBuildAgent, GrokBuildAgentConfig, GrokBuildSession
 from .hooks import (
     EVERYWHERE,
     SUBAGENTS,
+    Gate,
     Hook,
     Hooks,
     Hung,
@@ -142,6 +143,7 @@ __all__ = [
     "DshSession",
     "Event",
     "Failed",
+    "Gate",
     "Goal",
     "GrokBuildAgent",
     "GrokBuildAgentConfig",
