@@ -86,7 +86,9 @@ def test_a_setting_says_what_its_place_comes_to_without_starting_anything() -> N
     assert _ClaimingConfig(anchor=anchored.anchor).capabilities == frozenset()
 
 
-def test_a_machine_nobody_here_brought_up_is_not_one_anybody_here_may_take_down() -> None:
+def test_a_machine_nobody_here_brought_up_is_not_one_anybody_here_may_take_down() -> (
+    None
+):
     """`managed` is drawn on the same line `stop` is, so the two have to agree."""
     already = AnchoredConfig(anchor=AnchorConfig(target="ssh://build-box"))
 
@@ -94,7 +96,9 @@ def test_a_machine_nobody_here_brought_up_is_not_one_anybody_here_may_take_down(
     assert "managed" in DockerConfig().capabilities
 
 
-def test_an_anchor_says_how_a_turn_reaches_a_machine_rather_than_where_it_lands() -> None:
+def test_an_anchor_says_how_a_turn_reaches_a_machine_rather_than_where_it_lands() -> (
+    None
+):
     """The other axis of the same question, and the one the anchor is the only answer to.
 
     Where the work lands is the machine's setting to say; how a turn gets there is the
@@ -104,7 +108,9 @@ def test_an_anchor_says_how_a_turn_reaches_a_machine_rather_than_where_it_lands(
     assert AnchorConfig(target="ssh://build-box").capabilities == frozenset(
         {"anchor:supervised"}
     )
-    assert AnchorConfig().capabilities == AnchorConfig(target="docker://one").capabilities
+    assert (
+        AnchorConfig().capabilities == AnchorConfig(target="docker://one").capabilities
+    )
 
 
 def test_the_platform_a_machine_runs_is_read_from_the_handshake_rather_than_declared(
