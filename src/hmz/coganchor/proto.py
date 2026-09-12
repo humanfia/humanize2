@@ -44,6 +44,7 @@ from typing import IO, Any, cast
 
 __all__ = [
     "CHUNK_SIZE",
+    "PLATFORMS",
     "PROTOCOL_VERSION",
     "Channel",
     "Frame",
@@ -52,6 +53,7 @@ __all__ = [
     "ProtocolError",
     "RemoteOSError",
     "Stream",
+    "hello_capabilities",
     "rewrite_path_prefix",
 ]
 
@@ -105,6 +107,32 @@ class Op(enum.Enum):
 
     # TCP tunnelling.  CONNECT opens a stream carried by CHUNK/END frames.
     CONNECT = "connect"
+
+
+#: The platforms a target may be read as running, spelled as the reply to :attr:`Op.HELLO`
+#: spells them -- which is ``sys.platform`` on the machine that served it.  Both halves must
+#: agree on the spelling, so it lives beside the protocol, and it is a list of names rather
+#: than any behaviour, which is what keeps this module as portable as the target half it is
+#: loaded on: a name is a name on every architecture.  A target running something else says
+#: so on the wire all the same; it is simply not one of the names anything here asks after,
+#: and inventing one for it would be answering a question nobody can check.
+PLATFORMS = frozenset({"darwin", "linux"})
+
+
+def hello_capabilities(said: dict[str, Any]) -> frozenset[str]:
+    """Reads what a target said of itself at the handshake as capability names.
+
+    The one thing about a machine that cannot be declared ahead of it being reached: whoever
+    wrote the settings may promise a platform, but only the machine can confirm one.
+
+    Args:
+      said: The meta of the reply to :attr:`Op.HELLO`.
+
+    Returns:
+      The names in :data:`PLATFORMS` it answers to, which is empty for a target running
+      something nothing here has a name for.
+    """
+    return PLATFORMS & {str(said.get("platform", ""))}
 
 
 class Stream(enum.IntEnum):
