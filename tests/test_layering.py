@@ -177,8 +177,8 @@ ALLOWED: dict[str, set[str]] = {
         # `backends`, so this widens the DAG without bending it.
         "hmz.fallbacks",
         "hmz.flows",
-        # The agents written down under a name, which `/agents` walks and `hmz agents` says
-        # from a command line. It names nothing, so this widens the DAG without bending it.
+        # The agents written down under a name, which the Agents page of `/flow` walks and
+        # `hmz exec` reads back. It names nothing, so this widens the DAG without bending it.
         "hmz.kept",
         # What a token costs in money, which is drawn everywhere a token count is. It names
         # nothing above itself, so this widens the DAG without bending it.

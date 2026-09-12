@@ -273,8 +273,8 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     A directory is run in over and over; a trace filed inside one run while holding the work
     of every other is a trace of nothing anybody asked about. And by id rather than by
     directory, so a flow that worked in a machine's mirror is in its own trace too. A trace
-    of the directory itself is `hmz trace collect --all`, which is a command line: there is
-    no run here to hang it on, and this list is a list of runs.
+    of the directory itself is `Hmz().epics.trace()`, which is Python and nothing else:
+    there is no run here to hang it on, and this list is a list of runs.
     """
     import unittest.mock
 

@@ -50,7 +50,8 @@ hmz --version
 hmz 0.1.0
 ```
 
-![hmz --version and hmz --help, listing the commands there are](/demo/cli.gif)
+![hmz --version, and hmz --help: the one command there is, and what naming no command
+opens](/demo/cli.gif)
 
 From a checkout with `uv sync`, the command lives in that checkout's environment. Run `uv run
 hmz`, or activate `.venv` first.
@@ -115,12 +116,11 @@ reads dsh's normal configuration sources — the saved key and any `llm-deepseek
 
 For a separate key in humanize's provider store, choose `dsh` on the `cli` row, press enter on
 the `provider` row and **a** in the list of accounts, choose `key`, and enter an account name
-and the key. The same account is one command from a terminal, which asks for the key rather
-than taking it in the command itself:
-
-```sh
-hmz providers add dsh/deepseek -w key
-```
+and the key. The same account is made from the prompt at
+[`/providers`](/reference/tui#the-accounts-themselves), where **a** asks which CLI it is for
+before the same walk — `key`, then a name and the key. Either way the key is asked for rather
+than typed on a line: it is drawn as bullets as you enter it, goes straight into a credential
+store, and is never shown back.
 
 An agent that uses that stored account is written with `@deepseek`:
 
@@ -148,7 +148,8 @@ current SDK exposes no per-session permission or skill controls, so DeepSeek Har
 fill a place the flow left at `bypass`.
 
 To run one CLI as **more than one** account at a time, use [providers](/user/providers). It is
-a separate store, made with `hmz providers add` rather than by signing the CLI in twice.
+a separate store, made at [`/providers`](/reference/tui#the-accounts-themselves) rather than by
+signing the CLI in twice.
 
 ## Where humanize keeps things
 

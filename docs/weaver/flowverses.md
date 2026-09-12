@@ -50,12 +50,17 @@ git remote add origin git@github.com:you/my-flowverse.git
 git push -u origin main
 ```
 
-3. **Add it.** `add` clones the repository into `~/.humanize/flowverses/yours/`, and `show`
-   prints what it holds by the name `-f` takes.
+3. **Add it.** At the prompt, `/flowverses` and **a**: a URL or an `owner/repo`, and `yours` as
+   the name to keep it under. That clones the repository into `~/.humanize/flowverses/yours/`,
+   and **enter** on it reads back what it holds by the name `-f` takes. From a script the same
+   two are [`Hmz().verses`](/reference/sdk#flowverses):
 
-```sh
-hmz flowverses add you/my-flowverse yours
-hmz flowverses show yours
+```python
+from hmz.sdk import Hmz
+
+verses = Hmz().verses
+verses.add("you/my-flowverse", "yours")
+verses.holds(verses.find("yours"))
 ```
 
 4. **Run one.**
@@ -89,35 +94,39 @@ download has not happened.
 
 ## Adding one
 
-### From a command line
+### From a script
 
-`hmz flowverses` is the same store, reached without opening anything:
+[`Hmz().verses`](/reference/sdk#flowverses) is the same store, reached without opening
+anything:
 
-```sh
-hmz flowverses                       # what places flows come from
-hmz flowverses add you/my-flowverse yours
-hmz flowverses show yours            # what it holds, by the name -f takes
-hmz flowverses fetch yours           # again, or for the first time
-hmz flowverses remove yours          # flows and all
+```python
+from hmz.sdk import Hmz
+
+verses = Hmz().verses
+verses.all()                             # what places flows come from
+verses.add("you/my-flowverse", "yours")
+verses.holds(verses.find("yours"))       # what it holds, by the name -f takes
+verses.fetch("yours")                    # again, or for the first time
+verses.remove("yours")                   # flows and all
 ```
 
 Use this for a machine being set up, a CI job that runs a flow somebody else wrote, or anywhere
 the interface is not open. What it added is findable by `-f` at once:
 
 ```sh
-hmz flowverses add you/my-flowverse yours
 hmz exec -f yours/review -a claude/claude-opus-5:high "the payments module"
 ```
 
 - `add` names it after the repository when you do not, as `git clone` does.
-- `list -q` prints just the names, one a line, for a script to read.
-- `show` prints `official/humanize1:gen-plan`, not the `official/humanize1` its filename would
-  suggest. Working that out means **importing** the files, which is what `/flow` does for the
-  same question.
-- `list`, `add` and `fetch` read nothing, so a repository you have just cloned is never run
+- `all` answers with the places themselves, in the order their flows are offered, so a script
+  reads the names off the objects rather than off anything printed.
+- `holds` answers `official/humanize1:gen-plan`, not the `official/humanize1` its filename
+  would suggest. Working that out means **importing** the files, which is what `/flow` does for
+  the same question.
+- `all`, `add` and `fetch` read nothing, so a repository you have just cloned is never run
   until you ask what is in it.
 
-See [CLI reference](/reference/cli#hmz-flowverses).
+See [SDK reference](/reference/sdk#flowverses).
 
 ### At the prompt
 

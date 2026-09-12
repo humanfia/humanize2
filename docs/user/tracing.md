@@ -1,27 +1,28 @@
 # Tracing
 
-`hmz trace collect` turns everything a run's agents left behind into one timeline. Reach for it
-after a long run, when you want to see what each agent did and where the time went. It works on
-any session the backends logged, whether or not a flow drove it.
+A trace turns everything a run's agents left behind into one timeline. Reach for it after a
+long run, when you want to see what each agent did and where the time went. It works on any
+session the backends logged, whether or not a flow drove it.
 
 ## Try it
 
-In the project you have been running in, run:
+In the project you have been running in, type `/epics` at the prompt. Every run of a flow in
+this directory is there, newest first — which flow it was, what it was asked to do, how many
+sessions it opened:
 
-```sh
-hmz trace collect
-```
+![The /epics list: the runs of this directory, newest first, each saying which flow it was, what
+it was asked to do and how many sessions it opened](/demo/epics.png)
+
+Put the cursor on the run you have just finished, press **enter**, and choose **collect a
+trace**. What was gathered is said under the list:
 
 ```console
-~/.humanize/epics/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
+~/.humanize/epics/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json · 3 sessions, 412 slices
 ```
 
-The line prints the file, then the run it is a trace of, then what went into it. The file lands
-in `traces/` inside that run's own directory, next to the run's record and the links to its
-sessions.
-
-![hmz trace collect writing into the last run's own directory: the path, the run it is of, and
-1 session, 10 slices, 3 programs](/demo/collect.png)
+The file, then what went into it. It lands in `traces/` inside that run's own directory, next
+to the run's record and the links to its sessions, because a trace of a run is a thing to find
+again with the run rather than in whatever directory you happened to be standing in.
 
 Now open it. Go to [ui.perfetto.dev](https://ui.perfetto.dev) and drag the file in. Nothing is
 uploaded; Perfetto opens it in the browser. `chrome://tracing` works too, as does anything that
@@ -65,8 +66,8 @@ trace is one configuration: a backend at a model at an effort, plus every sub-ag
 A Ralph loop of a hundred one-shot sessions reads as one agent, which is right. An actor and a
 reviewer at the same model and effort would read as one agent, which is not.
 
-That is what an [epic](#what-a-run-writes-down) is for. `hmz trace collect` reads the run it is
-tracing, so `official/rlar` traces as `actor` and `reviewer` without being told anything.
+That is what an [epic](#what-a-run-writes-down) is for. A trace of a run reads the run it is of,
+so `official/rlar` traces as `actor` and `reviewer` without being told anything.
 
 Driving agents by hand from Python, say so yourself:
 
@@ -194,20 +195,19 @@ one directory: a called flow is part of the run that called it.
 
 ## Which run, and what else there is to trace
 
-```sh
-hmz trace collect                                    # the last run of this workspace
-hmz trace collect ~/code/other                       # the last run of another workspace
-hmz trace collect --epic 20260809T0144               # that run of it, by name
-hmz trace collect --start "3 days ago"               # and only what it did since
-hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
-```
-
 A trace is **of a run**. It holds the sessions that run opened and no others, by the ids the
 run wrote down as it went, so a directory run in fifty times has fifty traces to collect and
 none of them holds another's work. A run that opened nothing is a trace of nothing. It goes by
 id rather than by directory, so a flow that ran on a [machine of its
 own](/user/remote-execution) is in its own trace too, though the backend logged it under a
 mirror this directory has never heard of.
+
+Which run is therefore a row to walk to rather than a name to spell out. `/epics` is that list,
+newest first, and **s** searches what each run was asked to do — which is how last Tuesday's is
+found among fifty:
+
+![/epics, the menu that opens on a run, and the trace that menu gathers into that run's own
+directory](/demo/epics.gif)
 
 ::: details `0 sessions, 0 slices`
 Three usual reasons. You are in a different directory from the one the run happened in. The
@@ -217,44 +217,32 @@ gather. Or the run being traced died before it opened a session. See
 :::
 
 A directory also holds sessions no run of a flow ever opened: your own afternoon at a coding
-agent. Ask for those outright:
-
-```sh
-hmz trace collect --all                              # every session of this workspace
-hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
-hmz trace collect ~/code/other --session 0a1b2c3d    # that session, only if it ran there
-```
-
-Neither is a trace of any run, so neither is filed inside one. They go beside that workspace's
-runs, in `~/.humanize/epics/<workspace>/`. Asking for `--epic` with `--all` or `--session` is
-a usage error rather than one of them quietly winning. Neither is offered in the interface,
-because `/epics` is a list of runs with nothing to hang them on.
-
-A session is named by its whole id, by the key the trace shows it under, or by a leading part
-of either, and the sub-agents it started come with it. `--start` and `--end` take anything
-[dateparser](https://dateparser.readthedocs.io/) understands. `--output` wins over where any of
-these would otherwise land; a trace is also a thing to attach to an issue. The default output
-is named after the UTC moment it was collected, so collecting twice keeps both.
-
-![hmz trace collect three times: the last run of this directory, one named with --epic, and
-one sent elsewhere with --output](/demo/collect.gif)
-
-From Python the same choices are one call:
+agent. Those are not in `/epics` — it is a list of runs, and a session no run drove has nothing
+there to hang on — so they are asked for by id, from Python:
 
 ```python
-from hmz.tracing import collect
+from hmz.sdk import Hmz
 
-document = collect(
-    "~/code/myproject",
-    sessions=["0a1b2c3d"],
-    agents={"actor": actor.opened, "reviewer": reviewer.opened},
+document = Hmz("~/code/myproject").epics.trace(
+    sessions=["0a1b2c3d"],     # a leading part of an id will do; none at all is all of them
     output="trace.json",       # omit and nothing is written
     start="3 days ago",
 )
 ```
 
-It returns the document. Writing a file only when `output` is given is the one thing the
-library does that the command line does not let you skip.
+Naming sessions and no directory — `Hmz().epics.trace(sessions=…)` — collects them wherever
+they were recorded; naming a directory with them keeps only the ones recorded there. A session
+is named by its whole id, by the key the trace shows it under, or by a leading part of either,
+and the sub-agents it started come with it. `start` and `end` take anything
+[dateparser](https://dateparser.readthedocs.io/) understands, and the document comes back
+whether or not a file was written.
+
+A run you have already picked out of the list is the other call,
+[`traced`](/reference/sdk#epics) — the one **collect a trace** makes: that run's sessions by the
+ids it wrote down, the programs it ran if it was profiled, and an `output` for when you want it
+somewhere other than the run's own `traces/`, a trace being a thing to attach to an issue as
+well as to read. Left alone it is named after the UTC moment it was collected, so collecting
+twice keeps both.
 
 ## Profiling a run
 
@@ -321,7 +309,9 @@ A home that does not exist is skipped rather than being an error. So is a backen
 no reader for; its home being there changes nothing.
 
 A flow that ran on a [machine of its own](/user/containers) worked in a mirror rather than in
-this directory. Find its trajectories with `--session` rather than by workspace.
+this directory. Its run's own trace holds those sessions all the same, since they are asked for
+by the ids the run wrote down; outside a run, name the sessions rather than the workspace that
+never saw them.
 
 ## Watching instead
 
@@ -339,5 +329,6 @@ slices and programs. What a run cost — tokens and money alike — is the live 
 - [Picking a run up](/user/resuming) — carrying one of these runs on where it stopped
 - [Exporting a run](/user/export) — the same run packaged up whole, to send to somebody else
 - [Tracing reference](/reference/tracing)
-- [CLI › `hmz trace`](/reference/cli#hmz-trace)
+- [TUI › The runs that have already happened](/reference/tui#the-runs-that-have-already-happened)
+- [SDK › Epics](/reference/sdk#epics) — gathering one from Python
 - [Troubleshooting](/user/troubleshooting#_0-sessions-0-slices)

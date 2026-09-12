@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// What `hmz trace collect` hands Perfetto: a process per agent, a track per row of its
+// What a trace hands Perfetto: a process per agent, a track per row of its
 // sessions, a slice per thing it did -- and, for a profiled run, the programs those turns
 // ran drawn the same way underneath. The two switches are the two things that are easy to
 // get wrong: leaving the programs out, and timing them against the wrong clock.

@@ -22,8 +22,8 @@ That is the whole reason this is a container rather than a script you run on you
 | the workspace | `/work/demo`, built by `stage.py` |
 | the homes | `/root/.humanize` and `/root/.claude`, inside the container |
 | the backends | `standin/claude` and `standin/codex`, which run nothing and exit 1 |
-| the accounts | made with `--no-login`, or by a way that runs nothing, at `gateway.example.invalid`, with `not-a-real-token` and `not-a-real-key` |
-| the runs, and the transcripts `hmz trace collect` reads | invented by `stage.py` |
+| the accounts | made by a way in that runs nothing, at `gateway.example.invalid`, with `not-a-real-token` and `not-a-real-key` |
+| the runs, and the transcripts a collected trace is drawn out of | invented by `stage.py` |
 
 **No tape takes a turn.** The interface demos open, show their own lists, and leave.
 

@@ -570,7 +570,8 @@ class AcpAgent(AgentBase):
         found = backends.speaking().get(self.backend)
         if not found:
             raise ValueError(
-                f"{self.backend}: no command to start it with; add it with `hmz acp add`"
+                f"{self.backend}: no command to start it with; /providers, then a, "
+                "then `a CLI of your own` is where one is written down"
             )
         return found
 

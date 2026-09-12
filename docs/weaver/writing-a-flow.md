@@ -207,16 +207,19 @@ by taking its name. A file whose name starts with `_` is not a flow.
 
 ## Check your work
 
-`hmz check` reads the flow before anything runs it: a static reading that executes nothing,
-then the flow loaded in a subprocess held to a clock. Driving it with stubs — including the
-world where the reviewer never says the work is done — is `proved()`, a call of your own. See
-[Checking a flow](/weaver/checking-flows).
+`Hmz().flows.check` reads the flow before anything runs it: a static reading that executes
+nothing, then the flow loaded in a subprocess held to a clock. Driving it with stubs —
+including the world where the reviewer never says the work is done — is `proved()`, a call of
+your own. See [Checking a flow](/weaver/checking-flows).
 
-```sh
-hmz check local/twice
+```python
+from hmz.sdk import Hmz
+
+for one in Hmz().flows.check("local/twice"):
+    print(f"{one.where}:{one.line}: {one.severity}: {one.code}: {one.said}")
 ```
 
-And from Python:
+And to ask a flow what it declares, without reading it for anything else:
 
 ```python
 from hmz.flows import drives

@@ -127,8 +127,8 @@ To carry on a run that is **not** the last one, open the list — which is the n
 it was, what it was asked to do, how many sessions it opened, and a mark on the runs whose flow
 says it can be picked up. Enter opens what there is to do with the run under the cursor:
 
-![the /epics list with the run that can be picked up marked, the menu that opens under one
-run, and a trace collected from it](/demo/epics.gif)
+![the /epics list with the run that can be picked up marked, and the menu that opens under one
+run with carrying it on at the top](/demo/epics.gif)
 
 | | |
 | --- | --- |

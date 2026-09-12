@@ -59,9 +59,9 @@ going is a thing about the work rather than about the agent. There is no third s
 flow does not change an agent after the run has started.
 
 A place run under a `Goal` has goals, whatever else it wrote; writing both against one place is
-a flow saying two things about one agent, and [`hmz check`](/reference/cli#hmz-check) says so:
+a flow saying two things about one agent, and [checking it](/weaver/checking-flows) says so:
 
-```console
+```text
 loop.py:11: error: goals-both-ways: this place is run under a goal and declared without
 goals -- a required goal is a goal, so drop one of the two rather than leaving the flow to
 say which it meant

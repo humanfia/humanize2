@@ -80,7 +80,7 @@ def run(agents: Agents, task: str) -> None:
 It is run exactly as any other flow is:
 
 ```sh
-hmz exec -f review_loop -a claude/sonnet:high -a codex/gpt-5.6-sol "$(cat TASK.md)"
+hmz exec -f review_loop -a claude/claude-opus-5:high -a codex/gpt-5.6-sol:high "$(cat TASK.md)"
 ```
 
 ## The two kinds of node
@@ -240,25 +240,29 @@ compiled is refused, however it is spelled.
 
 ## Reading what it compiles to
 
-```sh
-hmz check --prophecy review_loop
+```python
+from hmz.flows import canonical
+from hmz.sdk import Hmz
+
+print(canonical(Hmz().flows.prophecy("review_loop")))
 ```
 
-prints the canonical prophecy — one line of JSON, everything ordered by what it is rather than
-where it was written, so two readings of the same atlas are the same bytes and a diff of two
-prophecies is a diff of two graphs. `hmz check` on an atlas is the stricter reading
-automatically:
+`canonical` writes the graph out as one line of JSON, everything ordered by what it is rather
+than by where it was written, so two readings of the same atlas are the same bytes and a diff
+of two prophecies is a diff of two graphs. `prophecy` answers `None` for an atlas that does not
+compile, and checking one is the stricter reading automatically — an atlas is compiled rather
+than read as a program, so the reasons come back as findings:
 
-```sh
-hmz check review_loop
+```python
+Hmz().flows.check("review_loop")
 ```
 
 ## Shipping the prophecy
 
 A flowverse may ship what compiling came to, beside the flow:
 
-```sh
-hmz check --ship official/review     # writes official/review/prophecy.pkl
+```python
+Hmz().flows.foretell("official/review")    # writes official/review/prophecy.pkl
 ```
 
 Where there is one, that is what runs. The compiling is where an atlas is refused, and a
@@ -266,7 +270,7 @@ repository that has been through it once has an answer worth carrying rather tha
 again at every run. The flow's own Python still has to be there — a prophecy names the
 functions its nodes are.
 
-`hmz check` says when a shipped prophecy and the source it came from have drifted apart:
+Checking the flow says when a shipped prophecy and the source it came from have drifted apart:
 
 ```
 …/prophecy.pkl:0: error: stale-prophecy: the prophecy shipped here is d1f27db7dffd22e3 and

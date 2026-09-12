@@ -13,15 +13,13 @@ A coding agent CLI signs in once. Claude Code keeps its account under `~/.claude
 `claude` started on this machine is whoever is signed in there — so a flow that wants two of
 them on two accounts has two accounts wanting one directory.
 
-A provider is the second directory. [flame_chase](/flows/flame-chase) hands
-the same task to two agents in turn; here both are Claude Code — one on the Anthropic
-subscription running Opus, one on a DeepSeek endpoint running DeepSeek's own model:
+A provider is the second directory. Two of them are made at
+[`/providers`](#making-one-and-what-one-holds) — one signed into the Anthropic subscription, one
+pointed at a DeepSeek endpoint — and [flame_chase](/flows/flame-chase) hands the same task to
+two agents in turn; here both are Claude Code, one running Opus and one running DeepSeek's own
+model:
 
 ```sh
-hmz providers add claude/anthropic -w login          # runs `claude auth login`, here
-hmz providers add claude/deepseek -w gateway \
-    -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic   # then asks for the token
-
 hmz exec -f official/flame_chase \
     -a claude@anthropic/claude-opus-5:max \
     -a claude@deepseek/deepseek-chat:high "fix the build"
@@ -82,8 +80,9 @@ the home itself. See [Environment variables](/reference/cli#environment-variable
 ## The ways in
 
 A way is one kind of account: a subscription signed into, a key, a gateway, an account on
-somebody's cloud. `hmz providers ways <cli>` prints the list on this machine, which is the one to
-trust; these are the ways as they stand.
+somebody's cloud. What `/providers` offers once it has been told which CLI is the list on this
+machine, which is the one to trust — `Hmz().accounts.ways(cli)` answers the same; these are the
+ways as they stand.
 
 An answer in parentheses is what a question takes when you say nothing. A way with a command of
 its own runs it on this terminal, under the provider's paths, and what it writes is the provider;
@@ -192,98 +191,84 @@ second time as a variable.
 | `env` | Variables of your own: whatever this CLI reads a key or an endpoint under. | the `NAME=VALUE` lines you give it |
 
 DeepSeek Harness is the exception: it is driven through an SDK that takes an API key and
-nothing else, so `hmz providers ways dsh` offers only its own `key` way.
+nothing else, so `dsh` offers its own `key` way and no `env` at all.
 
 The names are typed rather than chosen because there is no list worth keeping: pi has a variable
 for each provider it knows and opencode one for each of a hundred and eighty, across six vendors
 that move. One variable a line, and shift+enter — or ctrl+j — is what breaks the line, enter
 being what takes the form.
 
-## `hmz providers`
+## Making one and what one holds
 
-```
-hmz providers list [<cli>]
-hmz providers ways <cli>
-hmz providers add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] [--also <cli>,...]
-hmz providers login <cli>/<name> [-s VAR=VALUE]...
-hmz providers show <cli>/[<name>]
-hmz providers falls-back <cli>/[<name>] [<name>]
-hmz providers remove <cli>/<name>
-```
+An account is named `<cli>/<name>` wherever one is asked for. The name is a directory, so it is
+letters, digits, dot, dash and underscore, starting with a letter or a digit.
 
-A provider is named `<cli>/<name>` everywhere the command line asks for one. The name is a
-directory, so it is letters, digits, dot, dash and underscore, starting with a letter or a digit.
-
-`<cli>/` — a backend and no name at all — is **the account this machine is already signed
-into**: an account of every backend, which humanize did not make and keeps no credentials for.
-`show` and `falls-back` take it; `add`, `login` and `remove` refuse it, there being nothing to
+`<cli>/` — a backend and no name at all, and `""` where Python asks for the name — is **the
+account this machine is already signed into**: an account of every backend, which humanize did
+not make and keeps no credentials for. It is read like any other and what it falls back to is
+written on it; making it, signing it in and taking it away are refused, there being nothing to
 make, sign in or take away.
 
-| Command | |
+`/providers` is where all of this happens. **a** makes one — which CLI, then how to sign in,
+then what that way asks, three questions rather than one form because each is only answerable
+once the one before it has been. **d** twice takes one away, credentials and all. **enter**
+opens what else can be done to the one under the cursor:
+
+| | |
 | --- | --- |
-| `list` | What providers there are, or one backend's. The line is the name, the way it was made by, and the variables it sets. |
-| `ways` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. `--also` writes the same account down for the backends it names, comma separated, or for every one it could be run as with `all`. |
-| `login` | Signs an existing one in again, by the way it was made with. For a way that has nothing to run, `add` it again instead. |
-| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, the **names** of the variables it sets, which paths a turn under it is given instead of which, an `also runs` line per [other backend](#one-account-several-clis) that could be run as it, and — for an account written down before retrying moved — the line that says where that is said now. |
-| `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. How many times over a failed turn is taken again first is [`hmz fallback retry`](/user/fallback), that being a thing about the place rather than the account. |
-| `remove` | Takes it away, credentials and all. |
+| **correct what it holds** | The answers its way in was made with, asked again. What it holds is replaced rather than merged and the credentials a login left in its directory are left alone: a key corrected is not a reason to sign in again. |
+| **sign in again** | The backend's own way in, run again under this account's paths — for a way that has a command of its own. For one that is only answers, correcting it is what there is. |
+| **falls back to** | Which account of that CLI a turn carries on under when this one fails, or nothing at all for an account that is the end of the line. |
 
-Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
-echoed. A line run where nobody is at a terminal has to answer everything itself — a question
-with no answer and no default is reported rather than waited on.
+How many times over a failed turn is taken again is not among them: that is a thing about the
+place a turn runs at rather than about the credentials it runs with, and
+[`/fallback`](/user/fallback) is the menu it is said on.
 
-```console
-$ hmz providers add claude/deepseek -w gateway
-where it is, as a URL: https://api.deepseek.com/anthropic
-the token it takes:
-claude/deepseek is written down at /home/you/.humanize/providers/claude/deepseek
+A way with a login command of its own is **handed the terminal**: its browser or its device code
+owns the screen until it is done, and what it writes lands in that account's own directory
+rather than in the CLI's. Whatever a way asks is asked at the prompt, and a secret is drawn as
+bullets and never shown back — which is also why correcting an account starts its secrets blank.
 
-$ hmz providers list
-claude/anthropic  login      -  falls back to deepseek
-claude/deepseek  gateway    ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
-claude/  as local   -  2 tries, exponential-jitter
-codex/work  login      -
+Making one and signing one in happen as they are asked for, both owning the terminal while they
+run; the other two are held until the menu is saved, as everything on a menu is. The screens
+themselves are [TUI › The accounts themselves](/reference/tui#the-accounts-themselves).
 
-$ hmz providers show claude/deepseek
-provider    claude/deepseek
-way         gateway
-made        2026-08-11T15:01:01Z
-kept in     /home/you/.humanize/providers/claude/deepseek
-falls to    nowhere
-tried       once
-sets        ANTHROPIC_AUTH_TOKEN
-sets        ANTHROPIC_BASE_URL
-answers     /home/you/.claude/.credentials.json -> …/providers/claude/deepseek/home/.credentials.json
-answers     /home/you/.claude/.claude.json -> …/providers/claude/deepseek/home/.claude.json
-answers     /home/you/.claude.json -> …/providers/claude/deepseek/user/.claude.json
+From Python, which is what those screens go through:
 
-$ hmz providers ways claude
-login      sign in to an Anthropic account, as `claude auth login` does
-           asks: -
-           runs: claude auth login
-token      a long-lived token, as `claude setup-token` prints one
-           asks: CLAUDE_CODE_OAUTH_TOKEN
-           runs: -
-…
+```python
+from hmz.sdk import Hmz
 
-$ hmz providers remove claude/deepseek
-claude/deepseek is gone, credentials and all
+accounts = Hmz().accounts
+
+accounts.all()                                   # every account somebody made
+accounts.all("claude")                           # one backend's
+accounts.ways("claude")                          # how that backend can be signed into
+way = accounts.way("claude", "gateway")
+accounts.asks(way, {"ANTHROPIC_BASE_URL": url})  # what it still has to be told
+one = accounts.make("claude", "deepseek", way, answers)
+accounts.sign_in(one, way)                       # its own way in, under this account's paths
+accounts.remove("claude", "deepseek")            # it and its credentials
 ```
 
-![hmz providers show on a gateway account: the way, when it was made, where it is kept, what it
-falls back to, how it is tried again, the two variables it sets by name, and the three paths a
-turn under it is answered with](/demo/providers-show.png)
+`make` writes one down out of what its way in was answered with; `write` writes one down as it
+stands without running anything, which is what an account that is only variables takes. Either
+of them on an account already there replaces what it holds and leaves its credentials alone. A
+question a way has no answer for is reported rather than waited on, and `asks` is what names
+those before anything runs. All of it is [SDK › Accounts](/reference/sdk#accounts).
 
-Making a provider that is already there replaces what it holds and leaves its credentials alone:
-a key corrected is not a reason to sign in again.
+What one account holds is read off the account itself — the **names** of the variables it sets,
+never their values:
 
-In the interface, `/providers` walks the same list, with the account this machine is signed
-into last under each CLI's heading. **a** makes one and **d** twice takes it away; **enter**
-opens what else can be done to the one under the cursor — correct what it holds, sign it in
-again, say what it falls back to, say how a failed turn under it is tried again. The screens
-themselves are [TUI › The accounts themselves](/reference/tui#the-accounts-themselves), and the
-account chains are also the second page of [`/fallback`](/user/fallback).
+```python
+one = accounts.find("claude", "deepseek")
+
+one.way, one.made, one.at    # how it was made, when, and where its credentials are kept
+one.env                      # what a turn under it is run with
+one.args                     # what it adds to the backend's own command line
+one.swaps()                  # which paths a turn under it is answered with, instead of which
+accounts.serves(one)         # the other backends it could be run as
+accounts.chain(one)          # it, and every account it falls back to, in order
+```
 
 **An account's chain and an agent's are two different things.** This one answers an account
 going down — a subscription that ran out, a key refused, a gateway that answered 503 — and it
@@ -300,48 +285,35 @@ key whether Claude Code, pi, opencode, mimocode or ZCode is holding it, and a Cl
 subscription token is one under whatever name each of them reads it under — so an account
 made for one backend is often an account several others could be run as.
 
-```console
-$ hmz providers add claude/work -w key -s ANTHROPIC_API_KEY=sk-… --no-login
-claude/work is written down at ~/.humanize/providers/claude/work
-it could also run pi, opencode, mimo, zcode; `--also` writes it down for them
+```python
+accounts = Hmz().accounts
 
-$ hmz providers add claude/work -w key -s ANTHROPIC_API_KEY=sk-… --no-login --also all
-claude/work is written down at ~/.humanize/providers/claude/work
-pi/work is written down at ~/.humanize/providers/pi/work
-opencode/work is written down at ~/.humanize/providers/opencode/work
-mimo/work is written down at ~/.humanize/providers/mimo/work
-zcode/work is written down at ~/.humanize/providers/zcode/work
-
-$ hmz providers show claude/work
-…
-also runs   pi
-also runs   opencode
-also runs   mimo
-also runs   zcode
+one = accounts.write("claude", "work", "key", {"ANTHROPIC_API_KEY": key})
+accounts.serves(one)                 # ('pi', 'opencode', 'mimo', 'zcode')
+for cli in accounts.serves(one):
+    accounts.copies(one, cli)        # pi/work, opencode/work, mimo/work, zcode/work
 ```
 
-`--also` takes the backends by name, comma separated, or `all` for every one that could be run
-as it. A copy is written down **under the same name**, spelled as that backend reads it — a
-Claude subscription token lands on pi as `ANTHROPIC_OAUTH_TOKEN` — and **over one already
-there**, which is what makes this a way of rotating a key everywhere at once rather than in
-five places.
+A copy is written down **under the same name**, spelled as that backend reads it — a Claude
+subscription token lands on pi as `ANTHROPIC_OAUTH_TOKEN` — and **over one already there**,
+which is what makes this a way of rotating a key everywhere at once rather than in five places.
 
-`show` ends with an `also runs` line per backend this account could be run as, which is what it
-could be copied to rather than what it has been copied to: a backend already holding a copy
-reads the same as one holding none. The copies themselves are in `list`, under that same name.
+`serves` answers what this account **could** be copied to rather than what it has been copied
+to: a backend already holding a copy reads the same as one holding none. The copies themselves
+are accounts of their own, listed under that backend's heading and under that same name.
 
-An account written down before [retrying](/user/fallback) became a thing about the place gets
-one line after those, in `list` as well as in `show`: the tries it still holds are no longer
-read, and the line names the `hmz fallback retry` to type instead, carrying the number, the
-policy and the timeout that were written down. Only the model is missing, that being the part
-an account never had — which is why nothing could carry these over by itself. The same line is
-under the account's own menu on `/providers`.
+An account written down before [retrying](/user/fallback) became a thing about the place says
+so under its own menu on `/providers`: the tries it still holds are no longer read, and the
+line names `/fallback` as where that is said now. What it held — the number, the policy and the
+timeout — is there to be written down again against a place. Only the model is missing, that
+being the part an account never had, which is why nothing could carry these over by itself.
 
-In the interface it is a question rather than a flag: making an account that several backends
-could be run as asks which of them to write it down for, with the ones installed here already
-ticked. Correcting one asks the same, of the account as corrected, and holds it with the
-correction until the menu is saved — so what a correction reaches is the backends ticked in that
-question, which start as the ones installed here rather than as the ones a copy is already on.
+At the prompt it is asked at the moment the account exists rather than left to be found out:
+making an account that several backends could be run as asks which of them to write it down
+for, with the ones installed here already ticked. Correcting one asks the same, of the account
+as corrected, and holds it with the correction until the menu is saved — so what a correction
+reaches is the backends ticked in that question, which start as the ones installed here rather
+than as the ones a copy is already on.
 
 ![/providers, a, claude, key: an account named and its key typed as bullets, then the question
 of which other backends to write it down for](/demo/alike.gif)
@@ -358,32 +330,30 @@ nowhere, and neither is one holding a credential the other backend has no name f
 
 ## When an account goes down
 
-An account says what happens when it is the one that fails, and both halves are written down
-beside it: it is the account that goes down, and whichever agent was running under one when it
-did is the agent that needs somewhere else to run.
+An account says one thing about failing, and that one thing is written down beside the account
+rather than on any agent: it is the account that goes down, and whichever agent was running
+under one when it did is the agent that needs somewhere else to run.
 
-**Tried again.** Nothing is retried by default — a prompt the model refused is the same refusal
-every time, and only you know which of your accounts fails the other way. The waits are the
-ones everybody uses, `BASE` being one second and no single wait longer than a minute:
+**Tried again first, though not from here.** How many times over a failed turn is taken again
+is a thing about the place a turn runs at — the CLI, the account and the model together —
+rather than about the credentials it runs with, so it is said against the place, on
+[`/fallback`](/user/fallback), and the waits are listed [there](/user/fallback#trying-again).
+Nothing is retried unless you say so.
 
-| Policy | The waits before the 2nd, 3rd, 4th… try |
-| --- | --- |
-| `none` | none at all |
-| `constant` | 1s, 1s, 1s |
-| `linear` | 1s, 2s, 3s |
-| `exponential` | 1s, 2s, 4s, 8s |
-| `exponential-jitter` | anywhere up to the exponential wait — the default, and what keeps a flow's agents from all coming back on the same second |
-| `fibonacci` | 1s, 1s, 2s, 3s, 5s |
+**Then the chain.** Each account names the one to carry on under, and that one names the next.
+It is *falls back to* on the menu **enter** opens, which offers that backend's other accounts,
+and one call apiece from Python:
 
-`-t` is checked **before** a wait rather than after it, so a turn is never started knowing the
-time it was given is already spent.
+```python
+from hmz import providers
 
-**Then the chain.** Each account names the one to carry on under, and that one names the next:
+providers.points("claude", "subscription", "key")
+providers.points("claude", "key", "gateway")
+providers.points("claude", "", "subscription")   # "" is the machine's own account
 
-```sh
-hmz providers falls-back claude/subscription key
-hmz providers falls-back claude/key gateway
-hmz providers falls-back claude/ subscription   # where an agent with no account starts
+held = providers.find("claude", "subscription")
+providers.chain(held)                       # [subscription, key, gateway]
+providers.alone("claude")                   # where what is said about the machine's own is kept
 ```
 
 A turn walks it inside the conversation that was running, and the agent stays where it landed.
@@ -391,17 +361,6 @@ A chain that comes round on itself ends at the second sight of an account; one n
 account that is not there ends there. Nothing may fall back *to* the machine's own account:
 an agent that is to try it is an agent given no account, which is where its chain already
 starts.
-
-From Python:
-
-```python
-from hmz import providers
-
-held = providers.find("claude", "subscription")
-providers.chain(held)                       # [subscription, key, gateway]
-providers.points("claude", "", "subscription")   # "" is the machine's own account
-providers.alone("claude")                   # where what is said about the machine's own is kept
-```
 
 ## Choosing one for an agent
 
@@ -417,8 +376,11 @@ On a command line, after the CLI and an `@`:
 
 ```sh
 hmz exec -f official/flame_chase -a claude@deepseek/claude-opus-5:max "fix the build"
-hmz exec -f ralph_loop -a cli=claude,model=claude-opus-5,effort=max,provider=deepseek "…"
 ```
+
+The account and never the model, whatever comes after the slash: a CLI is never spelled with an
+`@` in it, so the two are told apart wherever an agent is written. See [CLI › Writing an
+agent](/reference/cli#writing-an-agent).
 
 In the interface it is the `provider` row of the sheet an agent is set up on — which
 CLI, and which of its accounts — because an account belongs to a backend and everything after it
@@ -509,18 +471,20 @@ $ hmz exec -f ralph_loop -a claude@work/claude-opus-5:high "..."
 `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `CLAUDE_CODE_OAUTH_TOKEN`,
 `CLAUDE_CODE_USE_BEDROCK`, `OPENAI_API_KEY`, `CODEX_API_KEY`, `KIMI_MODEL_*`,
 `OPENCODE_AUTH_CONTENT`, `XIAOMI_API_KEY`, `ZCODE_API_KEY` and the rest of each backend's own
-— `hmz providers ways <cli>` names the ones its ways use. Everything else in the environment
-is left exactly as it was found, and an agent with **no** provider is not touched at all.
+— each backend's [ways in](#the-ways-in) name the ones they use. Everything else in the
+environment is left exactly as it was found, and an agent with **no** provider is not touched
+at all.
 
 ## Security
 
 **A provider directory holds real credentials.** It is made at `0700` and `provider.json` at
-`0600`, which is what these CLIs keep their own at. `remove` deletes it, credentials and all —
-that is what taking away an account this machine can run turns as means.
+`0600`, which is what these CLIs keep their own at. Taking one away deletes it, credentials and
+all — that is what taking away an account this machine can run turns as means.
 
-**Nothing prints a secret.** `show` and `list` print the names of the variables a provider sets
-and never their values; a secret answered at the terminal is not echoed. One given with `-s` is
-in your shell's history, so leave it to be asked for.
+**Nothing draws a secret.** What is read back of a provider is the names of the variables it
+sets and never their values, and a secret answered at the prompt is drawn as bullets rather than
+echoed. A value handed to `make` from a script is a value in whatever that script was given it
+by, so leave it to be asked for where there is somebody to ask.
 
 **The credentials stay on this machine.** An agent runs here however its
 [machine](/reference/machines) is configured, so a provider's files do not cross to a target — what
@@ -529,6 +493,9 @@ inherited by every command it runs there, so a provider's are named as the agent
 dropped on the way over.
 
 ## API summary
+
+`Hmz().accounts` is the whole of this as one object, and is what the interface goes through —
+[SDK › Accounts](/reference/sdk#accounts). The modules under it, for anything reaching past it:
 
 ```python
 from hmz.providers import (

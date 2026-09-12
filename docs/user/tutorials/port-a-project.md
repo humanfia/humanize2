@@ -236,8 +236,11 @@ git log --oneline
 ## Step 6 — read the run back
 
 ```sh
-hmz trace collect
+hmz
 ```
+
+Then `/epics`, **enter** on the run at the top of the list, and *collect a trace*. The line
+under the list says where it went: `traces/`, inside that run's own directory.
 
 In [ui.perfetto.dev](https://ui.perfetto.dev) this run looks quite different from
 [`flame_chase`](/user/tutorials/take-home). The actor is one long track — a single session, one

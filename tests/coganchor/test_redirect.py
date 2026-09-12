@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from tests.coganchor.conftest import Anchorage
 
 #: A provider's copy of a credential and the path the CLI insists on looking at, as
-#: `hmz providers` lays them out.
+#: `hmz.providers` lays them out.
 NAMED = "/home/me/.claude/.credentials.json"
 INSTEAD = "/home/me/.humanize/providers/claude/work/home/.credentials.json"
 
