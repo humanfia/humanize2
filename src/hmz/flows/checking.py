@@ -2103,8 +2103,9 @@ _REACHED = ("anchor:native-cli", "anchor:supervised")
 #: How a turn's own commands are reached, which is what an anchor is made of, by the name a
 #: flow and a compiler ask for each under -- and what the ask looks like.
 _ANCHORS = {
-    "anchor:native-cli": "a turn taken as the CLI's own command line, spawned here and read "
-    "off its streams, which is every turn that is anchored nowhere",
+    "anchor:native-cli": "a turn taken as the CLI's own command line, read off its streams "
+    "-- spawned here when nothing anchors it, and on the target when an anchor drives the "
+    "CLI already installed there",
     "anchor:supervised": "a turn whose commands are reached by tracing the process it runs "
     "them in, which is how an anchored turn's work lands on the machine the flow chose",
     "anchor:hooked": "a turn reached through the CLI's own hooks, written for this run and "
