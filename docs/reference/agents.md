@@ -49,9 +49,12 @@ flow would otherwise see is a turn that failed. Two things happen first.
 between tries, and how long the whole of that may go on for are said about the **place** the
 turn runs at — the CLI, the account and the model — rather than about the credentials:
 
-```sh
-hmz fallback retry claude@mine/claude-opus-5 3 -p exponential-jitter -t 120
+```python
+Hmz().fallbacks.retrying("claude@mine/claude-opus-5", 3, "exponential-jitter", 120)
 ```
+
+`/fallback` at the prompt says the same thing, and is where somebody sitting at humanize says
+it.
 
 Nothing is retried by default — a turn is taken once, as it always was — because a prompt the
 model refused is the same refusal every time, and only you know which of your places fails the
@@ -81,9 +84,9 @@ so a flow that catches turns catches it.
 the account that goes down, and each account names the one to carry on under when it has
 failed, and that one names the next:
 
-```sh
-hmz providers falls-back claude/subscription key
-hmz providers falls-back claude/key gateway
+```python
+Hmz().accounts.points("claude", "subscription", "key")
+Hmz().accounts.points("claude", "key", "gateway")
 ```
 
 so a subscription that runs out falls to a key, and a key that is refused falls to a gateway.
@@ -93,8 +96,8 @@ so a subscription that runs out falls to a key, and a key that is refused falls 
 is an account here as well — `claude/`, a backend and no name at all — so it is where the
 chain of an agent nobody configured begins:
 
-```sh
-hmz providers falls-back claude/ spare     # your own login, then the key
+```python
+Hmz().accounts.points("claude", "", "spare")   # your own login, then the key
 ```
 
 It is an account for that purpose and nothing else: humanize did not make it, keeps no
@@ -112,8 +115,8 @@ Another key for the same backend is another way of asking the same thing that is
 What answers those is another **place** — a CLI, an account and a model — and it is written
 down [between the two](/user/fallback) rather than on either:
 
-```sh
-hmz fallback add claude@work/claude-opus-5 codex@key/gpt-5.6-sol
+```python
+Hmz().fallbacks.points("claude@work/claude-opus-5", "codex@key/gpt-5.6-sol")
 ```
 
 ```python
@@ -232,7 +235,7 @@ The protocol says nothing about which models an agent runs or how hard it can be
 think, so neither is offered: both rows read `as configured`, and the agent runs as whoever
 installed it set it up. It cannot be steered mid-turn either — every agent spells that
 extension its own way — and it has no goal feature, no permission rungs and no logs for
-`hmz trace collect` to read.
+`Hmz().epics.trace()` to read.
 
 `cursor` names one out of its own catalogue — `cursor-agent --list-models` prints them — and
 its models take their parameters in brackets after the name, which is where humanize writes the
@@ -1385,7 +1388,7 @@ way is not on the SDK's JSON-RPC surface, which answers `initialize`, `session/p
 `shutdown` and nothing else.
 
 opencode and mimocode keep a session in a database rather than in a log file, so there is
-nothing for `hmz trace collect` to gather and nothing for the interface to read a running cost out
+nothing for `Hmz().epics.trace()` to gather and nothing for the interface to read a running cost out
 of. What their turns cost still reaches a flow: each backend says it as the turn lands.
 
 A backend is driven through its command line where that can express what an agent is configured

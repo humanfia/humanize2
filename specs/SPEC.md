@@ -249,7 +249,7 @@ What each backend runs, asked of that backend and kept until it is asked again.
   home.
 - Asking MUST NOT happen at a prompt: it is a coding agent starting up, or a request to
   somebody's endpoint, and neither is a thing to do while a sheet is being drawn. `ask` is
-  the explicit refresh behind `r` and behind `hmz providers`, never the drawing of a list.
+  the explicit refresh behind `r` and behind `/providers`, never the drawing of a list.
   Reading what was kept MUST cost one file read and MUST reach nothing.
 - An account MUST be asked as soon as it is made, since that is the first moment there is
   anything to ask. A backend that would not answer MUST leave the account made: an account
@@ -667,7 +667,7 @@ report of a bug is developed against.
   send. So every byte written MUST go through one scrubbing: the value of every variable any
   account here runs a turn with, struck literally, since no pattern knows what somebody
   pasted; the shapes the vendors mint keys in; whatever is signed into a URL, which is where
-  `hmz flowverses` already takes one out; and any value a log named as a token, a secret, a
+  `/flowverses` already takes one out; and any value a log named as a token, a secret, a
   key or a password.
 - The scrubbing MUST NOT be the one `telemetry.py` does. That module keeps a promise about
   names and counts on humanize's behalf, and this keeps a promise about credentials on the
