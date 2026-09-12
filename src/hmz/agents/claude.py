@@ -182,6 +182,12 @@ class ClaudeCodeSession(StreamSessionBase):
     #: this turn without anything of the person at this machine's being written.
     takes_tools: ClassVar[bool] = True
 
+    #: The process stands for the life of the session, so a word typed at a turn already
+    #: running reaches it: `interject` writes it on the stream Claude is reading, and the
+    #: `command_lifecycle` `started` that comes back under its own uuid is the agent having
+    #: heard rather than the pipe having taken it.
+    steers: ClassVar[bool] = True
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:

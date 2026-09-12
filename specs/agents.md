@@ -579,6 +579,9 @@ class SessionBase(ABC):
     #: Whether the backend can be held to a shape rather than asked to keep to one.
     shapes: ClassVar[bool] = False
 
+    #: Whether a turn of the backend can be talked to while it is running.
+    steers: ClassVar[bool] = False
+
     def __init__(self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None): ...
 
     @property
@@ -769,6 +772,11 @@ class SessionBase(ABC):
   A word that would be answered as a turn of its own once this one ended is a turn queued
   behind rather than a word put in, and MUST be moved into the running turn where the backend
   offers a way -- which every one driven through an app server does.
+- Which of the two a backend is MUST be declared as `steers`, so that a flow meaning to put a
+  word in asks beforehand rather than catching a refusal from a turn it is already an hour
+  into. It MUST be true only where a word actually reaches the running turn and the agent
+  says it has it: a backend whose second prompt would be answered as the next turn MUST say
+  False, whatever it does with the word.
 - `interrupt` MUST NOT end the conversation, and MUST say why: a turn that ended without a
   reason reads as a turn that crashed. The turn it stops fails; the session it stops it in
   MUST still be there, under the id it was opened with, for the next turn to resume. Every
@@ -1177,3 +1185,17 @@ class DummySession(CommandSessionBase): ...
   settings to do it: what the person who started the flow has installed is theirs. The skills
   a flow brings MUST reach a session by being mounted where that backend reads them, which is
   `hmz.flows.skills` and `Profile.mounts`.
+- What a driver declares on its classes MUST be what is true of driving that CLI: which
+  moments it reaches, whether it has a goal feature of its own, whether it can be held to a
+  shape, whether it takes a tool the flow wrote, which service tiers it can express, and
+  whether a turn of it can be steered. Whether it forks a conversation, whether one survives
+  its process, whether it can be told not to search the web, whether it takes a hook table
+  meant for one run, whether its runtime takes a preload, and what says a file it ships is
+  the one a patch was written for are facts about the CLI rather than about driving it, and
+  MUST be read off `hmz.backends` rather than declared here a second time: one fact written
+  in two places is one that goes on being right in only one of them.
+- One vocabulary MUST name both halves, so that whatever asks what a backend serves asks
+  under one word: `goal`, `steer`, `shape`, `tools`, `fork`, `search`, `swarm`, `resume` and
+  `moment:<name>` of an agent, and `anchor:<how>` of the way a turn's own commands are
+  reached. Which of them a backend serves MUST be derived from the facts already written
+  down rather than stored a second time beside them, under the word.

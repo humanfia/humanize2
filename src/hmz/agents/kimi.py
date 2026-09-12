@@ -435,6 +435,11 @@ class KimiCodeCLISession(SessionBase):
 
     _agent: KimiCodeCLIAgent  # every turn is submitted to the server this agent holds
 
+    #: A prompt sent to a session the daemon is already working is queued behind as a turn of
+    #: its own; steering moves it into the turn that is running, which is what makes it a word
+    #: put in rather than one waiting.
+    steers: ClassVar[bool] = True
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:

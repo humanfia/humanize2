@@ -717,6 +717,7 @@ from.
 ## Talking to a turn already running
 
 ```python
+session.steers                          # whether this backend can be talked to mid-turn
 session.interject("actually, use pathlib")
 ```
 
@@ -725,6 +726,8 @@ rather than being restarted with it. Landing it is not the agent having it: the 
 as a `took` event once it is in front of the model, which is what tells a flow it was heard.
 
 - On a backend that takes a turn's whole prompt up front, this raises `NotImplementedError`.
+  `session.steers` is `False` there, so a flow that means to steer asks first rather than
+  catching the refusal from a turn it is already an hour into.
 - On a backend that can be talked to, it raises `RuntimeError` when nothing is running to hear
   it.
 
@@ -1354,7 +1357,7 @@ never `0.0`, for a model nobody lists, so a flow steering by money can tell *not
 | | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Driven through | its command line, held open for ordinary turns | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, held open for ordinary turns | its app server | its command line, held open | its command line, held open for ordinary turns | its command line, one run per turn | its app server |
-| [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a second prompt is a second turn | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
+| [`interject`](#talking-to-a-turn-already-running) — `session.steers` | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a second prompt is a second turn | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
 | [`pursue`](#goals) | no | yes | yes | no | yes | no | yes | no | no | no | yes |
 | [`session.fork`](#a-conversation-that-goes-two-ways) | no | `--fork-session` | `thread/fork` | no | no | `--fork-session` | `kimi fork` | `--fork` | `--fork-session` | `run --fork` | no |
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |

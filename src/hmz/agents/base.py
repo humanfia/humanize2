@@ -462,6 +462,14 @@ class SessionBase(ABC):
     #: offering it -- a tool the model never sees is a flow that does not do what it says.
     takes_tools: ClassVar[bool] = False
 
+    #: Whether a turn of this backend can be talked to while it is running, rather than only
+    #: between turns. A session that can takes a later word into the turn already under way,
+    #: which is what :meth:`interject` does; one that cannot was handed the whole prompt up
+    #: front and has nowhere to put a second, so it refuses rather than queueing the word
+    #: behind as a turn of its own. Said on the class so that a flow which means to steer asks
+    #: beforehand rather than catching a `NotImplementedError` from a turn already an hour in.
+    steers: ClassVar[bool] = False
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
