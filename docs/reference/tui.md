@@ -152,7 +152,7 @@ list appears under the editor with a line about each.
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), [export it](/user/export), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run under its cursor, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
-| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, or pointed at what it falls back to. How often a failed turn is taken again is not here: that is said of a [place](#where-a-turn-goes-when-it-cannot-be-taken) rather than of an account. |
+| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, and, on enter, corrected, signed in again, pointed at what it falls back to, or taken away. How often a failed turn is taken again is not here: that is said of a [place](#where-a-turn-goes-when-it-cannot-be-taken) rather than of an account. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/monitor` | | [The run, drawn](#watching-the-run): a box per agent that has worked, marked as it works and saying how long it has been at it, with the handovers between them as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
 | `/btw` | `<question>` | Asks a side question about the running flow from a read-only snapshot of its progress. It runs in a separate session and never steers the flow. |
@@ -380,8 +380,10 @@ fleet too long to draw is cut, with a line saying how many were left off.
 
 **The board is under the diagram**, for a flow that talks to you: the named lines you and the
 flow both write on, and neither waits at. `a` puts one up — a name, then what it says — enter
-changes the one under the cursor, and `d` twice takes it off. A line the flow keeps to itself
-says so instead of opening an editor. See [The mission board](/user/board).
+changes the one under the cursor, and `d` twice takes it off — the one taking-away still on a
+key, because enter on a line opens the words of that line rather than a menu with a row to
+spare, and it lands the moment it is pressed. A line the flow keeps to itself says so instead
+of opening an editor. See [The mission board](/user/board).
 
 **Enter or a click on a box reads that agent** — whether or not it is working. tab is held to
 the ones thinking, so this is the one place an agent that has stopped is reached. The box under
@@ -612,15 +614,20 @@ URL marked as not fetched yet](/demo/flowverses.png)
 
 | Key | |
 | --- | --- |
-| **enter** | What that flowverse holds: one row per flow, with the line it says about itself. Reading them means importing them, so it is asked of the one you opened rather than of all of them at once. |
+| **enter** | What that flowverse holds: one row per flow, with the line it says about itself, and past them the row that takes the flowverse away. Reading the flows means importing them, so it is asked of the one you opened rather than of all of them at once. |
 | **a** | Add one: a URL or an `owner/repo`, and a name to keep it under. |
 | **r** | Fetch the one under the cursor again, or for the first time. `builtin` came with humanize, and `local` and `user` are directories of your own: all three say there is nothing to fetch. |
-| **d** **d** | Take an added one away, flows and all. `builtin`, `official`, `local` and `user` are always here, and say so. |
 
-Its own menu rather than three more keys on `/flow`, because they are about something else:
-adding a repository, fetching one again and taking one away are done to the list of places,
-while the page they were on is asking which flow to run — and a sheet that asks one question
-with three keys about another is a sheet asking two.
+**Taking one away is inside what it holds**, rather than a key on the list. What a flowverse
+*is*, is what is in it, so the decision to be rid of one is made where that has just been read
+— and the row is past the end of the flows, out of their numbering, because it is about the
+place rather than about anything in it. `builtin`, `official`, `local` and `user` do not offer
+it at all, and the sheet says why where it would have been.
+
+Its own menu rather than more keys on `/flow`, because they are about something else: adding a
+repository and fetching one again are done to the list of places, while the page they were on
+is asking which flow to run — and a sheet that asks one question with keys about another is a
+sheet asking two.
 
 **What happens here happens as it is asked for** rather than when the menu is saved: each of
 these runs git, and something that has already been cloned is not a draft. A clone runs off
@@ -886,24 +893,27 @@ and a asking which backend a new one is for](/demo/accounts.gif)
 
 | Key | What it does |
 | --- | --- |
-| **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to |
+| **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to, take it away |
 | **a** | Makes one: which CLI, then how to sign in, then what that way asks. The list of CLIs is also where a CLI of your own that speaks ACP is written down |
-| **d** **d** | Takes it away, credentials and all |
 | **esc** | Closes the menu, asking about anything it is holding |
 
-![What enter opens on one account: correct what it holds, sign it in again, and what it
-falls back to](/demo/account-does.png)
+![What enter opens on one account: correct what it holds, sign it in again, what it falls back
+to, and take it away](/demo/account-does.png)
 
-Three questions about one account are a menu rather than three letters to read off the
+Four questions about one account are a menu rather than four letters to read off the
 bottom of the screen — while **enter**, which every list already means, was doing one of
 them.
 
+**Taking it away is the last of those rows**, read beside what the account is and what it
+holds, which is what you are deciding about. It is held until the menu is saved like the rest,
+so an account already marked to go offers *keep it after all* on that same row rather than the
+same offer twice.
+
 The last row under each CLI is the account this machine is already signed into — the CLI as
 you run it, which is what an agent nobody gave an account runs as, and where that agent's
-chain begins. Where it falls back to is the one of the three it takes; correcting it and
-signing it in are not offered at all, and the menu says why under the row that is left.
-**d** says the same thing: humanize did not make that account and keeps no credentials
-for it.
+chain begins. Where it falls back to is the one of the four it takes; correcting it, signing it
+in and taking it away are not offered at all, and the menu says why under the row that is left:
+humanize did not make that account and keeps no credentials for it.
 
 An account written down before retrying became a thing about a place still holds the tries
 somebody set on it, and this menu says under the list that they are no longer read: tries
@@ -939,9 +949,11 @@ may reach for are what that agent *is*, so they are not asked here and come acro
 unchanged.
 
 `a` chooses the place that cannot run and then the place that takes its turns, each as three
-questions: the CLI, one of its accounts, one of the models it says it runs. `d` twice takes a
-step away. Enter on a row asks the two things a step says — where its turns go, and how many
-times over a failed turn is taken again first.
+questions: the CLI, one of its accounts, one of the models it says it runs. Enter on a row asks
+the three things there are to say about a step — where its turns go, how many times over a
+failed turn is taken again first, and whether to be rid of it at all. Taking it away is the
+last of those rather than a key on the list: what the step says is what says whether it is
+wanted, so it is decided beside the two things it says.
 
 The retry sheet answers in rungs rather than in numbers: the tries step through 0, 1, 2, 3, 5,
 8, 13 and 21, and the time the retrying is given through *as long as it takes*, 30s, 1m, 5m,
@@ -963,7 +975,7 @@ Everything is held until the menu is saved on the way out, as everything on a me
   ❯ 1. claude@work/claude-opus-5   3 more tries, exponential · falls back to codex@key/gpt-5.6-sol
     2. codex@key/gpt-5.6-sol       falls back to dsh/deepseek-v4-flash
 
-  Enter for what happens · a adds one · d twice takes one away · Esc to close
+  Enter for what happens · a adds one · Esc to close
 ```
 
 A place cannot fall back to itself, and a chain that comes round on itself ends at the second

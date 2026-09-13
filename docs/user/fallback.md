@@ -26,8 +26,10 @@ across the step unchanged. What failed was the place, so the place is what moves
 
 One page, one row per place. `a` chooses the place that cannot run — the CLI, then one of its
 accounts, then one of the models it says it runs — and then the place that takes its turns.
-Enter on a row asks the two things a step says: where its turns go, and how many times over a
-failed turn is taken again first. `d` twice takes a step away.
+Enter on a row asks the three things there are to say about a step: where its turns go, how many
+times over a failed turn is taken again first, and whether to be rid of it at all. Taking it
+away is the last row in there rather than a key on the list — what the step says is what says
+whether it is wanted.
 
 Nothing lands until the menu is saved on the way out, as on every menu.
 

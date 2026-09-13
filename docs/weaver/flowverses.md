@@ -136,13 +136,16 @@ See [SDK reference](/reference/sdk#flowverses).
 
 | Key | |
 | --- | --- |
-| **enter** | What that flowverse holds — which means importing its flows, so it is asked of the one you open rather than of the whole list |
+| **enter** | What that flowverse holds — which means importing its flows, so it is asked of the one you open rather than of the whole list. Past the flows, the row that takes the flowverse away |
 | **a** | Add one: a URL or an `owner/repo`, and a name to keep it under — blank for the repository's own |
 | **r** | Fetch the one under the cursor again, or for the first time |
-| **d** **d** | Take an added one away, flows and all |
 
-What a flowverse holds is something you read rather than choose from: each flow's name, and the
-line it says about itself.
+What a flowverse holds is mostly something you read rather than choose from: each flow's name,
+and the line it says about itself. The one row that is not a reading is the last, which takes
+the whole place away, flows and all. It is in here rather than on a key of the list because what
+a flowverse *is*, is what is in it — so being rid of one is decided where that has just been
+read. `builtin`, `official`, `local` and `user` do not offer it, and say why where it would
+have been.
 
 ![what builtin holds: chat, ralph_loop and stateful_ralph, each with the line its flow says
 about itself](/demo/flowverse-holds.png)

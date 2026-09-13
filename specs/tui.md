@@ -358,9 +358,17 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - A page made of several lists MUST show what they are called, and the left and right arrows
   MUST step between them: the list itself is walked up and down, so across is what is left,
   and the titles are read the same way the pages' are.
-- Taking anything away MUST be asked for twice on the same key, the first press saying what
-  the second one does. Moving the cursor MUST put it down again, so that a stray press is
-  harmless.
+- Where a row opens onto what it is, taking it away MUST be a row of that menu rather than a
+  key of the list: what a thing is, is what is in it, and somebody deciding to be rid of one
+  has to have read the thing they are deciding about. It MUST be the last row, so that what it
+  is comes before what may happen to it, and a row that cannot be taken away MUST say why
+  where the row would have been rather than be silently absent.
+- Taking anything away on a key MUST be asked for twice on the same key, the first press
+  saying what the second one does, and moving the cursor MUST put it down again so that a
+  stray press is harmless. That is for a key that acts on the spot -- one press and the thing
+  is gone, with no menu walked into and no save to change one's mind before. A row that was
+  walked to and chosen has already been chosen once, so it MUST NOT be asked about twice as
+  well.
 - The keys MUST be inside the terminal, whatever the sheet is holding: the list is what MUST
   be shortened until they are, since everything else on a sheet is a line or two and the rows
   are what there are a hundred of. The keys are the last row, so they are what falls off the
@@ -500,7 +508,13 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   one place it is kept, whichever way somebody reached it.
 - Enter MUST say what one holds, which MUST be read only of the flowverse it was asked of: a
   flow is read by running it, so what a place holds is the one question about it with no cheap
-  answer. `a` MUST add one; `r` MUST fetch one again; `d` twice MUST take one away.
+  answer. `a` MUST add one and `r` MUST fetch one again.
+- Taking one away MUST be a row of what it holds rather than a key of the list: what a
+  flowverse is, is what is in it, so being rid of one is decided where that has just been
+  read. It MUST NOT be one of the flows -- it is about the place rather than about anything in
+  it, so it MUST be past the end of them, out of their numbering and out of whatever a search
+  narrowed them to. The four that are always here MUST NOT offer it, and MUST say so where it
+  would have been.
 - Nothing here MUST be held until the menu is saved: each of these runs git, and something
   that has already been cloned is not a draft. What became of one MUST be said under the list
   rather than raised at whoever opened it, and MUST NOT stop the interface redrawing while it
@@ -514,12 +528,16 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 
 - The accounts menu MUST list every account there is under a heading per CLI, and MUST be read
   rather than chosen from: which account an agent runs as is asked where that agent is set up.
-  `a` MUST make one and `d` twice MUST take one away.
+  `a` MUST make one.
 - What else can be done to one account -- correcting what it holds, signing it in again,
-  saying which account it falls back to -- MUST be a menu opened with enter on the account it
-  is about, rather than a letter apiece on the list. Three questions about one row is a menu;
-  three letters that have to be read off the bottom of the screen are three keys nobody
-  presses, while enter -- which every list already means -- did one of them.
+  saying which account it falls back to, taking it away -- MUST be a menu opened with enter on
+  the account it is about, rather than a letter apiece on the list. Four questions about one
+  row is a menu; four letters that have to be read off the bottom of the screen are four keys
+  nobody presses, while enter -- which every list already means -- did one of them.
+- Taking it away MUST be the last of those rows, and MUST be held until the accounts menu is
+  saved like the rest of what is written down without running anything. An account already
+  held to go MUST be offered the way back on that same row rather than the same offer again:
+  nothing has happened to it yet, so what was said may be taken back.
 - How often a failed turn under it is taken again MUST NOT be among them: that is a thing about
   the place a turn runs at rather than about the credentials it runs with, and `/fallback` is
   the menu it is said on. An account still holding what was written down before it moved MUST
@@ -531,10 +549,10 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   want is not one humanize drives.
 - The account this machine is already signed into MUST be a row too, under each CLI that has
   an account of its own and after the ones somebody made: it is what an agent nobody gave an
-  account runs as, and where that agent's chain begins. Correcting it and signing it in MUST
-  NOT be offered for it, with the reason said where they would have been, and taking it away
-  MUST say why there is nothing to do rather than doing nothing: humanize did not make that
-  account and keeps no credentials for it.
+  account runs as, and where that agent's chain begins. Correcting it, signing it in and
+  taking it away MUST NOT be offered for it, with the reason said where they would have been:
+  humanize did not make that account and keeps no credentials for it. Saying why is what MUST
+  happen rather than three rows quietly not being there.
 - An account several backends could be run as MUST be asked, at the moment it is made and at
   the moment it is corrected, which of them to write it down for as well. It is one question
   about one account rather than a walk of its own, so it MUST be one sheet of switches, and
@@ -575,6 +593,9 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   numbers to type: a text box for an integer is a text box to validate. It MUST be said here
   rather than on an account, one row saying both what happens when a turn fails and how often
   it is taken again first, since both are answers to the one thing that happened.
+- Taking a step away MUST be the last row of what enter opens on it rather than a key of the
+  list: what the step says is what says whether it is wanted, so it is decided beside the two
+  things it says. It MUST be held until the menu is saved, as everything on this menu is.
 - The accounts page MUST be the same store `/providers` walks, and its keys MUST say so: an
   account is made and taken away there, and this page is where it is said what one falls back
   to. A key that did nothing MUST say why rather than do nothing.
@@ -700,9 +721,13 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   say so and MUST NOT be opened for editing: a flow writing down how far through it is must not
   have that edited underneath it. Refusing MUST be said where the key was pressed rather than
   by doing nothing.
-- Putting a line up, changing one and taking one away MUST be the keys the rest of the
-  interface uses for those: a letter to add, enter to change what is under the cursor, and the
-  taking-away key pressed twice.
+- Putting a line up, changing one and taking one away MUST be a letter to add, enter to change
+  what is under the cursor, and the taking-away key pressed twice. This is the one place the
+  taking-away key is still pressed: enter on a line of the board opens what that line says,
+  which is words being typed rather than a menu with a row to spare, so there is nowhere to
+  walk to and the key acts where it is pressed. It lands at once, with no save to change one's
+  mind before and a flow that may read the board on its very next line, so it MUST be asked
+  for twice and MUST be put down again when the cursor moves.
 - Nothing here MUST be held until the sheet is left. This is not a menu: the flow may be
   reading the board on the next line it runs, and a line held back would be one the flow was
   never told about.

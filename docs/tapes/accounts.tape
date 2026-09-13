@@ -27,8 +27,9 @@ Type "/providers" Enter
 Wait+Screen /Providers/
 Sleep 1400ms
 
-# Enter opens what there is to do with the one under the cursor -- three questions about one
-# account, rather than three letters to read off the bottom of the screen.
+# Enter opens what there is to do with the one under the cursor -- four questions about one
+# account, taking it away among them, rather than four letters to read off the bottom of the
+# screen.
 Enter
 Wait+Screen /What to do with this account/
 Sleep 1400ms

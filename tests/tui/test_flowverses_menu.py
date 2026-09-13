@@ -1,10 +1,12 @@
 """`/flowverses` -- the places flows come from, and the four things to do with one.
 
-Its own menu rather than three keys on the sheet a flow is chosen at. Adding a repository,
-fetching one again and taking one away are things done to the list of places rather than to
-the flow under the cursor, and a sheet that asks `which flow` with keys on it about something
-else is a sheet asking two questions. What one holds is the fourth: it is the one question
-about a flowverse that costs something to answer, since reading a flow means running it.
+Its own menu rather than two keys on the sheet a flow is chosen at. Adding a repository and
+fetching one again are things done to the list of places rather than to the flow under the
+cursor, and a sheet that asks `which flow` with keys on it about something else is a sheet
+asking two questions. What one holds is the third: it is the one question about a flowverse
+that costs something to answer, since reading a flow means running it. And taking one away is
+the fourth, which is a row of what it holds rather than a key here: what a flowverse is, is
+what is in it, so being rid of one is decided where that has just been read.
 
 Driven headlessly, as every test of the interface is, so what is checked is where a keystroke
 lands rather than how it is drawn.
@@ -21,7 +23,7 @@ from textual.widgets import Label, OptionList
 from hmz.flows import LOCAL, OFFICIAL, USER, flowverses
 from hmz.flows import verses as store
 from hmz.tui import Humanize
-from hmz.tui.pick import Fetches, Flowverses, Holds
+from hmz.tui.pick import _TAKES_AWAY, Fetches, Flowverses, Holds
 from tests.stubs import written
 
 from .test_app import onto, rows, until
@@ -130,7 +132,8 @@ async def test_what_one_holds_is_read_when_it_is_asked_for(theirs: Path) -> None
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Holds), driver)
 
-        assert rows(app) == ["theirs/loop"]
+        # The flows, and past them the one row that is not a reading.
+        assert rows(app) == ["theirs/loop", _TAKES_AWAY]
         assert "Somebody else's loop" in str(
             app.screen.query_one("#choices", OptionList).get_option_at_index(0).prompt
         )
@@ -261,16 +264,18 @@ async def test_a_name_that_is_not_one_is_refused_before_anything_is_cloned() -> 
 
 
 @pytest.mark.timeout(60)
-async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> None:
-    """Twice on the same key, since it cannot be undone: flows and all."""
+async def test_one_that_was_added_is_taken_away_from_inside_what_it_holds(
+    theirs: Path,
+) -> None:
+    """Where a row opens onto what it is, being rid of it is a row in there: flows and all."""
     store.add(str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
         await onto(app, driver, "theirs")
-
-        await driver.press("d")
-        await until(lambda: "press d again" in _under(sheet), driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Holds), driver)
+        await onto(app, driver, _TAKES_AWAY)
         assert [one.name for one in flowverses()] == [
             "builtin",
             OFFICIAL,
@@ -279,26 +284,62 @@ async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> N
             USER,
         ]
 
-        await driver.press("d")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flowverses), driver)
         await until(lambda: "no longer here" in _under(sheet), driver)
 
         assert [one.name for one in flowverses()] == ["builtin", OFFICIAL, LOCAL, USER]
         assert rows(app) == ["builtin", OFFICIAL, LOCAL, USER]
+        # And the marker is on a row that is still there, rather than on the hole one left.
+        listing = sheet.query_one("#choices", OptionList)
+        assert listing.highlighted == 0
+
+
+@pytest.mark.timeout(60)
+async def test_the_key_that_used_to_take_one_away_takes_nothing_away(
+    theirs: Path,
+) -> None:
+    """Asking twice was for a key that acted on the spot, and there is no such key here now."""
+    store.add(str(theirs))
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await onto(app, driver, "theirs")
+
+        await driver.press("d")
+        await driver.press("d")
+        await driver.pause()
+
+        assert "press d again" not in _under(sheet)
+        assert [one.name for one in flowverses()] == [
+            "builtin",
+            OFFICIAL,
+            "theirs",
+            LOCAL,
+            USER,
+        ]
 
 
 @pytest.mark.timeout(60)
 @pytest.mark.parametrize("named", ["builtin", LOCAL])
-async def test_none_of_the_ones_always_here_may_be_taken_away(named: str) -> None:
-    """The package, where the rest come from, and the two your own flows live in."""
+async def test_none_of_the_ones_always_here_offer_to_be_taken_away(named: str) -> None:
+    """The package, where the rest come from, and the two your own flows live in.
+
+    The row is not there at all, and the sheet says why: a row somebody went looking for and
+    did not find is a menu that has not answered them.
+    """
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
+        await _open(app, driver)
         await onto(app, driver, named)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Holds), driver)
 
-        await driver.press("d")
-        await driver.press("d")
-        await until(lambda: "always here" in _under(sheet), driver)
+        assert _TAKES_AWAY not in rows(app)
+        assert "always here" in _under(app.screen)  # pyright: ignore[reportArgumentType]
 
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Flowverses), driver)
         assert rows(app) == ["builtin", OFFICIAL, LOCAL, USER]
 
 
@@ -314,8 +355,11 @@ async def test_what_happened_while_it_was_open_is_said_in_the_transcript(
     async with app.run_test() as driver:
         await _open(app, driver)
         await onto(app, driver, "theirs")
-        await driver.press("d")
-        await driver.press("d")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Holds), driver)
+        await onto(app, driver, _TAKES_AWAY)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flowverses), driver)
         await driver.press("escape")
         await until(lambda: not isinstance(app.screen, Flowverses), driver)
 

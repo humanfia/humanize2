@@ -18,9 +18,17 @@ from textual.widgets import Label, OptionList
 from hmz.coganchor import fallbacks
 from hmz.coganchor.backends import Model
 from hmz.tui import Humanize
-from hmz.tui.pick import Accounts, Catalogue, Clis, Failing, Fallbacks, Retries
+from hmz.tui.pick import (
+    _TAKES_AWAY,
+    Accounts,
+    Catalogue,
+    Clis,
+    Failing,
+    Fallbacks,
+    Retries,
+)
 
-from .test_app import keeps, onto, rows, until
+from .test_app import drops, keeps, onto, rows, until
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
@@ -144,8 +152,69 @@ async def test_a_place_cannot_fall_back_to_itself() -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_a_step_is_taken_away_on_the_key_everything_is_taken_away_on() -> None:
-    """D twice, which is what a day's work behind a key that is also pressed by mistake is."""
+async def test_a_step_is_taken_away_from_inside_what_it_says() -> None:
+    """Enter opens what a step is, and being rid of it is the last row of that.
+
+    Held until the menu is saved, like everything else the sheet is holding: what the row
+    says is what lands, and nothing has landed while the menu is still up.
+    """
+    fallbacks.points("claude/claude-opus-5", "codex/gpt-5.6-sol")
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _opens(app, driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Failing), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await onto(app, driver, _TAKES_AWAY)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Fallbacks), driver)
+
+        # Gone from the list, and nothing on disk until the menu is saved.
+        assert rows(app) == []
+        assert "falls back nowhere when this menu is saved" in _under(app)
+        assert fallbacks.falls()
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Fallbacks), driver)
+
+    assert fallbacks.falls() == []
+
+
+@pytest.mark.timeout(60)
+async def test_walking_out_of_a_step_taken_away_lands_nothing() -> None:
+    """It is a draft until the menu is saved, and a draft thrown away is a step left alone."""
+    fallbacks.points("claude/claude-opus-5", "codex/gpt-5.6-sol")
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _opens(app, driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Failing), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await onto(app, driver, _TAKES_AWAY)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Fallbacks), driver)
+
+        await drops(app, driver)
+        await until(lambda: not isinstance(app.screen, Fallbacks), driver)
+
+    assert fallbacks.falls() == [
+        fallbacks.Falls("claude/claude-opus-5", "codex/gpt-5.6-sol")
+    ]
+
+
+@pytest.mark.timeout(60)
+async def test_the_key_that_used_to_take_a_step_away_takes_nothing_away() -> None:
+    """Asking twice was for a key that acted on the spot, and there is no such key here now."""
     fallbacks.points("claude/claude-opus-5", "codex/gpt-5.6-sol")
     app = Humanize()
     async with app.run_test() as driver:
@@ -154,19 +223,11 @@ async def test_a_step_is_taken_away_on_the_key_everything_is_taken_away_on() -> 
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
         await driver.press("d")
-        await driver.pause()
-
-        assert "press d again" in _under(app)
-        assert fallbacks.falls()  # still there: one press says what the next one does
-
         await driver.press("d")
         await driver.pause()
 
-        assert rows(app) == []
-        await keeps(app, driver)
-        await until(lambda: not isinstance(app.screen, Fallbacks), driver)
-
-    assert fallbacks.falls() == []
+        assert "press d again" not in _under(app)
+        assert rows(app) == ["claude/claude-opus-5"]
 
 
 @pytest.mark.timeout(90)
@@ -183,7 +244,11 @@ async def test_how_often_a_failed_turn_is_taken_again_is_on_the_same_step() -> N
         await until(lambda: isinstance(app.screen, Failing), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
-        assert [str(one.id) for one in listing.options] == ["=goes", "=tried"]
+        assert [str(one.id) for one in listing.options] == [
+            "=goes",
+            "=tried",
+            f"={_TAKES_AWAY}",
+        ]
 
         await driver.press("down", "enter")
         await until(lambda: isinstance(app.screen, Retries), driver)
