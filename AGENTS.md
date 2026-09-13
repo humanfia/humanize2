@@ -16,6 +16,7 @@ For version control:
 
 - MUST adhere to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 - MUST NOT create new branches remotely unless explicitly instructed to do so.
+- MUST delete local branches or worktrees once merged.
 
 For docs:
 
