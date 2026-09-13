@@ -2195,14 +2195,14 @@ def catalogue() -> tuple[Capability, ...]:
     Returns:
       One capability apiece: the primitives every backend serves, then what only some do
       -- each moment outside `EVERYWHERE`, the shape a turn can be held to, the tools a
-      flow may offer, a turn that can be steered while it runs, the goal feature and the
-      fork -- and then where an agent's turns may land and how a turn's own commands are
-      reached there.
+      flow may offer, a turn that can be steered while it runs, the goal feature, the
+      fork and each kind of token a backend says what it spent on -- and then where an
+      agent's turns may land and how a turn's own commands are reached there.
     """
     import inspect
     import sys as running
 
-    from hmz.coganchor.agents import DRIVEN, EVERYWHERE, Moment
+    from hmz.coganchor.agents import DRIVEN, EVERYWHERE, KINDS, Moment
 
     agents = {name: held[0] for name, held in DRIVEN.items()}
     sessions: dict[str, type] = {}
@@ -2381,6 +2381,17 @@ def catalogue() -> tuple[Capability, ...]:
             "child = session.fork() -- which costs nothing until the child is used, and "
             "which session.forks says of a backend beforehand",
         )
+    )
+    held.extend(
+        Capability(
+            f"counts:{kind}",
+            frozenset(name for name, cls in agents.items() if kind in cls.counts),
+            f"the backend says what a turn spent on {kind} tokens -- "
+            f"agent.spent()['{kind}'] and session.rate()['{kind}'] answer for it, and a "
+            "backend not among these reports the kind not at all rather than as nothing, so "
+            "a run that mixes one in reads its figure for this kind as a floor",
+        )
+        for kind in KINDS
     )
     held.extend(_places())
     held.extend(_anchors(agents))

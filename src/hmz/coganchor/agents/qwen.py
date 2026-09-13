@@ -110,6 +110,24 @@ _REFUSED = re.compile(r"^\[API Error:(?P<said>.*)\]$", re.DOTALL)
 #: it cost rather than shown twice.
 _SAYS = {"text": "text", "thinking": "reasoning"}
 
+#: What each kind of token is called in the counts Qwen Code states, and what each of them
+#: is here. Humanize's own names rather than the CLI's, as everywhere else a kind is
+#: counted: the prices are per kind, so a usage written down under a spelling nothing else
+#: knows is a lump nobody can put a figure on -- which is what these were until this table.
+#: The cached counts sit beside the input rather than inside it, so the four added up are the
+#: whole of what crossed the wire.
+#:
+#: Its thinking is not a kind of its own. Qwen Code states no count for it on the protocol
+#: read here, and what it does state has the thinking inside it -- a turn asked to think at
+#: length and answer in one word came back with `output_tokens: 926` -- so a kind for it would
+#: be a column of noughts at best and the same tokens counted twice at worst.
+_KINDS = {
+    "input": "input_tokens",
+    "output": "output_tokens",
+    "cache_read": "cache_read_input_tokens",
+    "cache_write": "cache_creation_input_tokens",
+}
+
 #: How many milliseconds a second is, for the one field of Qwen Code's that is counted in
 #: them: it took the `timeout` of Claude Code's hook table and not the unit under it.
 _A_SECOND = 1000
@@ -592,15 +610,9 @@ class QwenCodeSession(StreamSessionBase):
         """
         return Usage(
             {
-                name: float(counted.get(name) or 0)
-                for name in (
-                    "input_tokens",
-                    "output_tokens",
-                    "cache_read_input_tokens",
-                    "cache_creation_input_tokens",
-                    "thoughts_tokens",
-                )
-                if counted.get(name) is not None
+                kind: float(counted.get(named) or 0)
+                for kind, named in _KINDS.items()
+                if counted.get(named) is not None
             }
         )
 
@@ -693,6 +705,10 @@ class QwenCodeAgentConfig(AgentConfig):
 
 class QwenCodeAgent(AgentBase):
     """Qwen Code, driven through its own command line, one run per turn."""
+
+    #: What it counts, read off the same table its driver reads a usage with, so that what
+    #: a run is told this backend reports is what its driver actually parses.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> QwenCodeSession:
         """Opens a new Qwen Code session, in the directory it is given or in this one."""

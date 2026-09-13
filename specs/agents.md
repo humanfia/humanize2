@@ -28,17 +28,22 @@
 
 ## `__init__.py`
 
-Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Saying`, `Stopped`, `Failed`,
-`Unrecoverable`, `Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, `Tool`,
-`Toolbox`, `Gate`, `Board`, `Item`, and all agent and session classes.
+Expose `KINDS`, `AgentConfig`, `AgentBase`, `Event`, `Question`, `Saying`, `Stopped`,
+`Failed`, `Unrecoverable`, `Usage`, `SessionBase`, `CommandSessionBase`,
+`StreamSessionBase`, `Tool`, `Toolbox`, `Gate`, `Board`, `Item`, and all agent and session
+classes.
 
 ## `event.py`
 
-`Event`, `Question`, `Stopped`, `Usage`, `Failed`, `Unrecoverable`, `Saying` and `say`: what a
-turn says while it runs, what it asks, what it cost, how it failed, and how the fragments it
-arrives in are put back together -- with no behaviour on the values themselves.
+`KINDS`, `Event`, `Question`, `Stopped`, `Usage`, `Failed`, `Unrecoverable`, `Saying` and
+`say`: the kinds of token there are, what a turn says while it runs, what it asks, what it
+cost, how it failed, and how the fragments it arrives in are put back together -- with no
+behaviour on the values themselves.
 
 ```python
+KINDS = ("input", "output", "cache_read", "cache_write", "reasoning")
+
+
 class Failed(subprocess.CalledProcessError):
     def __init__(
         self,
@@ -124,6 +129,24 @@ class Saying:
   tool call. A backend that says only one of the two halves would be one whose subagents never
   finish, so it MUST say both or neither.
 
+- `Usage` MUST be a mapping from kind of token to how many went on it, and the kinds MUST be
+  named out of `KINDS` -- `input`, `output`, `cache_read`, `cache_write`, `reasoning` --
+  wherever one is counted. A kind is the same thing whichever CLI counted it, the prices are
+  per kind, and a driver that wrote its backend's own spelling down would be reporting a lump
+  nothing can price and no `Usage.input` anybody can read. A kind no backend here has is
+  allowed, but it MUST be the same word in every driver that has it.
+- A kind that is not on a `Usage` MUST mean the backend did not report it, which is not the
+  same as reporting nothing on it. Which of the two it is MUST be answerable of the backend
+  rather than of the turn -- see `counts` -- because nothing about a turn that spent nothing
+  on a kind distinguishes it afterwards from a backend that never counts that kind at all.
+- The kinds MUST be counted so that adding them up is the whole of what crossed the wire, and
+  so no kind reported here may hold tokens another one here already holds. A backend that
+  counts its reasoning inside the output MUST NOT carry a `reasoning` beside the output as
+  well, and one that reports a cached read it also counts inside its input MUST have the read
+  taken back out of the input. A token counted twice is a token billed twice, and every figure
+  read off these is then wrong upwards, which is the one direction none of them may be wrong
+  in. Leaving a kind unreported is always allowed and is what a driver MUST do where it cannot
+  tell whether the count it is given overlaps another.
 - These MUST NOT name the base classes. Every backend needs them and none of them needs the
   base classes to say one, so a reader of somebody else's stream format imports this alone.
 
@@ -508,6 +531,9 @@ A turn that has stopped saying anything, noticed and dealt with rather than wait
 
 ```python
 class AgentBase(ABC):
+    #: Which kinds of token this backend reports, out of `KINDS`.
+    counts: ClassVar[frozenset[str]] = frozenset()
+
     def __init__(self, config: AgentConfig, *, name: str | None = None): ...
 
     @property
@@ -574,6 +600,17 @@ class AgentBase(ABC):
 - `id` MUST be the given name, or a codename from `codenames.py` when no name is given, so that
   two agents of the same config are two agents. `rename` MUST take a name from a flow only for
   an agent that was not named where it was made: a name given is a name kept.
+- Which kinds of token a backend reports MUST be declared on its driver as `counts`, out of
+  `KINDS`, and MUST be read off the same table the driver parses a usage with rather than
+  written down a second time beside it. It is a fact about the driver and not about the CLI,
+  so it belongs here with `moments` and `pursues` rather than in `hmz.coganchor.backends`; and
+  it MUST be answerable before the first turn, since what it is for is telling a kind nothing
+  was spent on from a kind nothing counts. A driver that reports nothing MUST declare nothing,
+  and whatever draws a run MUST then say its figures are a floor rather than leave that
+  backend out of them.
+- `counts` MUST be what the catalogue reads to say which backends serve each kind, under
+  `counts:<kind>`, so that a flow steering by what a turn cost can be refused an agent whose
+  backend never says it rather than reading nought and believing it.
 - `clone` MUST answer with another agent of this one's backend, differing in what the call
   names and in nothing else -- its config, its name, and the flow's skills it carries. It is
   the one way to have an agent that is not the one you were handed, and there MUST be nowhere

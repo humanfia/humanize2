@@ -1288,6 +1288,24 @@ spent.get("cache_read", 0)                   # for a backend that counts one
 dict(spent)                                  # everything it does count
 ```
 
+The five names are `hmz.coganchor.agents.KINDS`, and every driver reports under them rather
+than under its own CLI's spelling — a kind is the same thing whichever CLI counted it, and the
+prices are per kind. They add up to the whole of what crossed the wire and never to more: a
+backend counting its reasoning inside the output does not also carry it beside the output.
+
+**Which kinds a backend reports is declared rather than inferred**, on the agent class as
+`counts`, because a turn that spent nothing on a cache write is missing that kind exactly as a
+CLI that never counts one is:
+
+```python
+ClaudeCodeAgent.counts    # frozenset({"input", "output", "cache_read", "cache_write"})
+CodexAgent.counts         # frozenset({"input", "output"}) — cached reads are inside the input
+CursorAgent.counts        # frozenset() — a duration and no tokens
+```
+
+The catalogue serves each of them as `counts:<kind>`, so a place whose flow steers by one can
+say so with `Needs` and be refused an agent that would answer nought forever.
+
 **A rate is tokens a second over seconds on the clock**, not seconds an agent was talking: a
 flow sleeps between rounds, commits, reads what the last turn wrote, and that time is time the
 tokens were spent over. The window defaults to five minutes — `hmz.coganchor.agents.WINDOW`, the

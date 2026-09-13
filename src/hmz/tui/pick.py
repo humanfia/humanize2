@@ -56,7 +56,7 @@ from hmz.runtime.kept import Runs
 from hmz.runtime.telemetry import KEPT, SAYS, SENT
 
 from .discover import installed, machines, ready_to_open
-from .monitor import Shape, lasting, short, thousands
+from .monitor import Counted, Shape, lasting, short, thousands
 from .selecting import Choices
 
 if TYPE_CHECKING:
@@ -6726,6 +6726,28 @@ def elsewhere(drawn: Sequence[Drawn], shape: Shape) -> list[str]:
     ]
 
 
+def _kinds(counted: Sequence[Counted]) -> list[str]:
+    """What a run spent its tokens on, kind by kind, as the rows under the diagram say it.
+
+    Args:
+      counted: One entry per kind, as the monitor reckons them.
+
+    Returns:
+      A row per kind, and a last row saying what a `+` means where anything wears one. The
+      mark rather than a column of its own: it is on the figure it is about, and a legend
+      nobody has to read unless a figure has one.
+    """
+    if not counted:
+        return ["[$text-muted]nothing spent yet[/]"]
+    rows = [
+        f"{escape(one.kind):<26}{thousands(one.tokens):>8}{'' if one.whole else '+'}"
+        for one in counted
+    ]
+    if not all(one.whole for one in counted):
+        rows.append("[$text-muted]+ a floor: not every agent here reports that kind[/]")
+    return rows
+
+
 class Entry(Sheet[tuple[str, str]]):
     """One line of the board, typed: what it is called, and then what it says.
 
@@ -7079,6 +7101,7 @@ class Monitoring(Sheet[str]):
           shape: The run as a graph, taken at the same moment the boxes were.
         """
         spending = self._monitor.spending()
+        counted = self._monitor.reckoning()
         # Grouped as Claude Code groups its own: what is set up, what has happened that the
         # picture has no room for, what it has cost, a blank line between one and the next.
         groups: list[list[tuple[str, list[str]]]] = [
@@ -7107,11 +7130,21 @@ class Monitoring(Sheet[str]):
                         # bill is not known has still cost something, and `$0.00` would say
                         # it had not.
                         f"{money(spend.dollars) if spend.dollars is not None else '':>10}"
-                        f"   [$text-muted]{spend.rate:.0f}/s[/]"
+                        # Output alone: the input of a turn is the conversation so far, sent
+                        # again at every request, so a rate counting it says how long the
+                        # transcript has got rather than how fast the model is writing.
+                        f"   [$text-muted]{spend.rate:.0f} out/s[/]"
                         for spend in spending
                     ]
                     or ["[$text-muted]nothing spent yet[/]"],
                 ),
+                # Under the models rather than beside them, because it is a different
+                # question: what a model cost is per model, and what a run spent its tokens
+                # *on* is the run's, a cached read being the same thing whichever model made
+                # it. A `+` is a figure some agent of this run does not report and which is
+                # therefore a floor -- one drawn as though it were the total would be a claim
+                # about the run that nothing here can make.
+                ("Kinds", _kinds(counted)),
             ],
         ]
         lines: list[str] = []

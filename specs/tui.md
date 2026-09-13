@@ -686,6 +686,25 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   from. Nobody is watching a token count for its own sake. Where the money is not known the
   tokens MUST stand alone, and where only some of the models running are priced the figure
   MUST say that it is a floor rather than pass for the whole bill.
+- What has been spent MUST be said kind by kind and MUST NOT be said as one total over the
+  kinds, wherever the tokens are said. An input token, an output token, a cached read and a
+  cached write are four different things bought at four different prices, and one number over
+  the lot of them answers no question anybody has: a run that reads as a million tokens is a
+  run nobody can tell a long conversation from a lot of work.
+- Every kind an agent of the run reports MUST be drawn whether or not anything has gone on it
+  yet, and the order MUST NOT change as a run goes. A column that appeared the first time a
+  cache was written to is a readout that shuffles sideways while it is being read.
+- With one agent running, what is drawn MUST be that agent's own kinds. With several it MUST
+  be the union of theirs, and a kind some of their backends do not report at all MUST be
+  marked as a floor rather than passed off for what the run spent on it: the figure is short
+  by whatever the backends that do not count it spent there, and one drawn as though it were
+  the total is a claim about the run that nothing here can make. The same MUST hold where some
+  of what was spent was counted without saying what kind it went on -- those tokens went on
+  some kind, and there is nothing to say which.
+- The rate MUST be output tokens a second and MUST say so. The input of a turn is the
+  conversation so far, sent again at every request and mostly served out of a cache: a rate
+  counting it says how long the transcript has got rather than how fast the model is writing,
+  and doubles the moment a backend starts reporting what it read back out of its cache.
 
 ### The board
 
@@ -751,6 +770,14 @@ class Spend:
     tokens: int
     rate: float
     dollars: float | None = None
+    kinds: Mapping[str, float] = ...
+
+
+@dataclass(frozen=True, slots=True)
+class Counted:
+    kind: str
+    tokens: float
+    whole: bool
 
 
 def lasting(seconds: float) -> str: ...
@@ -769,6 +796,9 @@ class Monitor:
         kinds: Mapping[str, float] | None = None,
     ) -> None: ...
     def spending(self, now: float | None = None) -> list[Spend]: ...
+    def reckoning(self, now: float | None = None) -> list[Counted]: ...
+    def reporting(self, agent: str, kinds: Iterable[str]) -> None: ...
+    def stirring(self) -> None: ...
     def now_working(self) -> list[str]: ...
     def shape(self) -> Shape: ...
 ```
@@ -790,6 +820,32 @@ a flow being a Python file that may branch any way it likes.
 - `spending` MUST be per model rather than per agent, since two agents at one model are one
   bill, and MUST report a rate over a recent window only -- a flow that has stopped reads as
   stopped rather than as whatever it once averaged.
+- It MUST also report what each model spent by kind of token, from the same reckoning the
+  money is worked out from, so that whatever draws it draws the kinds rather than a lump. The
+  kinds were already parsed to work out the money; a `Spend` that carried only their sum would
+  be a breakdown thrown away between the two places that want it.
+- The rate MUST be output tokens a second. What a model is doing is what it writes: the input
+  of a turn is the conversation so far, sent again at every request and mostly served out of a
+  cache, so a rate over every kind measures the length of the transcript and jumps the moment
+  a backend starts reporting its cached reads.
+- `reckoning` MUST answer what the run spent on each kind, over every model, and MUST say of
+  each figure whether it is the whole of it. A figure MUST NOT be whole where an agent of the
+  run drives a backend that does not report that kind, nor where anything was counted without
+  its kind being said. Nothing MUST be marked where one agent is running, nor where nothing
+  has said what it reports: a mark against every figure of a run that is counting everything
+  is a warning nobody can act on.
+- Which kinds a backend reports MUST be said of the backend rather than read off what a turn
+  happened to spend. A kind nothing went on this turn is missing from that turn's reckoning
+  exactly as a kind the CLI never counts is, and nothing afterwards can tell the two apart.
+  `reporting` is what says it, and what it is told MUST be what the driver declares, together
+  with what that backend's own log says once such a log has actually been read here. Not
+  before: a rollout written on another machine is one nothing here reads, and a kind claimed
+  off a log nobody read would be a nought drawn as a fact.
+- What has been spent MUST be worked out again at least every five seconds, and again whenever
+  an agent does anything at all -- a tool, a word, an answer -- rather than only when a count
+  arrives. A turn is minutes long and spends most of them between the counts it reports, and a
+  rate is tokens over seconds on the clock: a figure moved only by a count stands still through
+  every tool call and then jumps, which reads as a run that stalled and recovered.
 - A backend that says what a turn cost MUST be believed over what its agent was configured
   with: a turn that reached for a sub-agent spent it on that model.
 - What has been spent MUST be reported in money as well as in tokens, from `hmz.coganchor.prices`. A
@@ -799,6 +855,11 @@ a flow being a Python file that may branch any way it likes.
   source has seen the most of them -- the same source the count itself is taken from, since
   two sources counting one spend are one bill. A source that reported no kinds MUST leave the
   money unanswered: a lump of tokens is a lump nobody can price.
+- That one source MUST be taken entire rather than the largest figure for each kind being
+  taken from whichever source gave it. Two sources differ in which kinds they name as well as
+  in how far each has read, so a cached read taken from the log beside an input taken from the
+  backend's own report is the same tokens counted twice -- and overstating a bill is the one
+  thing none of this may do.
 - `dollars` MUST be None rather than nought for a model nobody lists and for a spend nobody
   broke down, and whatever draws it MUST show the tokens alone. `$0.00` is a claim about a
   bill, and against an unpriced model it is a false one.
@@ -878,3 +939,12 @@ What a run has cost, read from the logs the agents keep for themselves.
   taken back out rather than billed as both.
 - A row that says what it cost without saying what kinds it went on MUST still be counted and
   MUST NOT be priced. Tokens with no bill beside them is the honest reading of it.
+- Which kinds each log here is read for MUST be answerable, so that what the interface says
+  it can show of a backend is what it can in fact show. A driver and the log its CLI keeps are
+  two sources and one may name a kind the other does not -- Codex's server counts its cached
+  reads inside the input and never names them, while the rollout it writes does name them --
+  and a figure marked as short of a kind the interface can see would be a warning about
+  nothing. What is said of a log MUST be said once that log has been read rather than when the
+  run started, a log this machine has none of being one nothing here can show anything from.
+- A backend whose logs are not read here MUST answer nothing rather than an empty reckoning,
+  and reads the same way: nothing claimed of it, so nothing of it passed off as counted.

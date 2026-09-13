@@ -18,7 +18,7 @@ import inspect
 import sys
 from typing import TYPE_CHECKING
 
-from hmz.coganchor.agents import DRIVEN, EVERYWHERE, Moment
+from hmz.coganchor.agents import DRIVEN, EVERYWHERE, KINDS, Moment
 from hmz.coganchor.backends import PROFILES, Bundled, Hooked, Profile, named
 from hmz.flows import Agent, Person, Session
 from hmz.flows.checking import briefed, catalogue, offered, surface
@@ -235,3 +235,50 @@ def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -
     assert told["anchor:preloaded"].backends == frozenset(
         {"kimi", "mimo", "pi", "qwen"}
     )
+
+
+#: What each backend's driver reports of what a turn cost, written out rather than read off
+#: the drivers -- what the drivers say is what is on trial. `reasoning` is there only for the
+#: three that count it beside the output rather than inside it; two say the input and the
+#: output alone, each of them counting its cached reads inside the input; and Cursor reports
+#: a duration and no tokens at all, which is a run whose every figure is a floor and which
+#: says so.
+_COUNTING: dict[str, set[str]] = {
+    "agy": {"input", "output", "cache_read", "reasoning"},
+    "claude": {"input", "output", "cache_read", "cache_write"},
+    "codex": {"input", "output"},
+    "cursor": set[str](),
+    "dsh": {"input", "output", "cache_read", "cache_write"},
+    "grok": {"input", "output", "cache_read", "cache_write"},
+    "kimi": {"input", "output", "cache_read", "cache_write"},
+    "mimo": {"input", "output", "cache_read", "cache_write", "reasoning"},
+    "opencode": {"input", "output", "cache_read", "cache_write", "reasoning"},
+    "pi": {"input", "output", "cache_read", "cache_write"},
+    "qwen": {"input", "output", "cache_read", "cache_write"},
+    "zcode": {"input", "output"},
+}
+
+
+def test_what_each_backend_counts_is_what_its_driver_says_it_counts() -> None:
+    """And every word of it is a kind humanize has, rather than one CLI's own spelling."""
+    assert {name: set(cls.counts) for name, (cls, _) in DRIVEN.items()} == _COUNTING
+    for name, (cls, _) in DRIVEN.items():
+        assert cls.counts <= set(KINDS), name
+
+
+def test_each_kind_of_token_is_a_capability_and_whose_is_the_drivers_own() -> None:
+    """A flow steering by what a turn cost has to be able to ask before it starts.
+
+    A backend that never counts a kind answers nought for it exactly as one that spent
+    nothing does, and a loop bounded by an output count on a backend that reports none is a
+    loop that never ends.
+    """
+    told = {one.name: one for one in catalogue() if one.name.startswith("counts:")}
+    assert set(told) == {f"counts:{kind}" for kind in KINDS}
+    for kind in KINDS:
+        assert told[f"counts:{kind}"].backends == frozenset(
+            name for name, (cls, _) in DRIVEN.items() if kind in cls.counts
+        )
+    # The one that reports nothing is in none of them rather than quietly in all of them.
+    for one in told.values():
+        assert "cursor" not in one.backends
