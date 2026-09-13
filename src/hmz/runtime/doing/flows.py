@@ -377,7 +377,7 @@ class Flows:
 
     def set_up_from(
         self, said: str | os.PathLike[str]
-    ) -> tuple[dict[str, Any], Allowance | None]:
+    ) -> tuple[dict[str, Any] | None, Allowance | None]:
         """Reads what a flow is to be set up with, and what a run of it may spend, out of YAML.
 
         Args:
@@ -385,8 +385,9 @@ class Flows:
 
         Returns:
           What it holds field by field with the run's own `budget:` taken out of it -- that
-          one being a setting of the run rather than of the flow -- and the allowance that
-          key said, or None where the file said nothing about one.
+          one being a setting of the run rather than of the flow -- or None where it left
+          nothing for the flow at all. And the allowance that key said, or None where the
+          file said nothing about one.
 
         Raises:
           ValueError: If the file cannot be read, holds something that is not a mapping, or

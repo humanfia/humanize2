@@ -171,7 +171,9 @@ def test_the_exec_line_carries_what_the_file_said_the_run_may_spend(
         ["-f", "flow", "-c", str(tmp_path / "b.yaml"), "-a", "claude/m:high", "go"]
     )
 
-    assert held == {}
+    # Nothing at all for the flow: a file saying only what the run may spend has not set the
+    # flow up, and a flow that takes no config must not be handed an empty one.
+    assert held is None
     assert budget == Allowance(hours=0.5)
 
 

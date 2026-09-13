@@ -168,9 +168,10 @@ def test_a_config_is_read_off_a_yaml_file_as_it_is_written(tmp_path: Path) -> No
     said.write_text("rounds: 7\nmode: slow\n")
 
     assert set_up_from(said) == ({"rounds": 7, "mode": "slow"}, None)
-    # An empty file is a flow left as it comes, which is what writing nothing means.
+    # An empty file is a flow left as it comes, which is what writing nothing means -- and
+    # `None` is what that is said with, since a flow taking no config takes no empty one.
     (tmp_path / "empty.yaml").write_text("")
-    assert set_up_from(tmp_path / "empty.yaml") == ({}, None)
+    assert set_up_from(tmp_path / "empty.yaml") == (None, None)
 
 
 @pytest.mark.parametrize(

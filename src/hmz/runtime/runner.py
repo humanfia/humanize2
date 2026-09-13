@@ -563,7 +563,7 @@ def _as_declared(
 
 def set_up_from(
     said: str | os.PathLike[str],
-) -> tuple[dict[str, Any], Allowance | None]:
+) -> tuple[dict[str, Any] | None, Allowance | None]:
     """Reads what a flow is to be set up with, and what the run may spend, out of a file.
 
     The file is what the flow menu would have asked, written down: one field per
@@ -580,8 +580,10 @@ def set_up_from(
       said: The path to the YAML.
 
     Returns:
-      What it holds field by field with the reserved key taken out, and the run's allowance
-      or None where the file said nothing about one.
+      What it holds field by field with the reserved key taken out, or None where it left
+      nothing for the flow at all -- an empty file, or one that says only what the run may
+      spend, which is not a flow set up with nothing but a flow left as it comes. And the
+      run's allowance, or None where the file said nothing about one.
 
     Raises:
       ValueError: If the file cannot be read, holds something that is not a mapping, or says
@@ -596,15 +598,13 @@ def set_up_from(
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as why:
         raise ValueError(f"cannot read {said}: {why}") from why
     if held is None:
-        return {}, None
+        return None, None
     if not isinstance(held, dict):
         raise ValueError(  # noqa: TRY004 -- a file to correct, not a caller's type error
             f"{said}: a flow is set up from a mapping, not a {type(held).__name__}"
         )
     fields = cast("dict[str, Any]", held)
-    if KEY not in fields:
-        return fields, None
     # Copied rather than popped in place: what was handed in is the caller's, and a reader
     # that emptied it would be a file that reads differently the second time it is read.
     rest = {name: value for name, value in fields.items() if name != KEY}
-    return rest, written(fields[KEY], str(said))
+    return rest or None, written(fields[KEY], str(said)) if KEY in fields else None
