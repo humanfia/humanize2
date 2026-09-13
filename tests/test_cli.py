@@ -52,6 +52,14 @@ COMMANDS = [
         },
     ),
     ("internal anchor", {"hmz.coganchor"}),
+    # The other three the door opens onto, each of which must cost its own module and
+    # nothing else at all. They are here rather than left to the anchor's entry because a
+    # budget nobody wrote is a budget nothing enforces: `cred` reaches the accounts and
+    # `tools` and `hook` reach a socket, and any of the three could grow an import at the top
+    # of its module that the one measured command would never notice.
+    ("internal cred", set[str]()),
+    ("internal hook", set[str]()),
+    ("internal tools", set[str]()),
 ]
 
 
@@ -241,7 +249,10 @@ def test_the_internal_listing_names_all_four(
 
     assert stopped.value.code == 0
     shown = capsys.readouterr().out
-    assert all(spawned in shown for spawned in cli.INTERNAL)
+    # Written out rather than read off the table the help is built from: an assertion that
+    # iterates `INTERNAL` cannot fail whatever is in it, which is a check that would go on
+    # passing through the very change it exists to catch.
+    assert all(spawned in shown for spawned in ("anchor", "cred", "hook", "tools"))
 
 
 def test_a_line_naming_no_internal_command_is_a_usage_error(

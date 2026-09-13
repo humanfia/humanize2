@@ -35,7 +35,9 @@ def tools(argv: list[str]) -> int:
     """
     parser = argparse.ArgumentParser(
         prog="hmz internal tools",
-        description="relay the tool protocol to the flow whose callbacks these are",
+        description="relay the tool protocol to the flow whose callbacks these are. "
+        "humanize writes this line into a coding agent's own tool configuration and the "
+        "agent spawns it; it is not one to type by hand",
     )
     parser.add_argument(
         "--at",

@@ -32,8 +32,13 @@ def parser() -> ArgumentParser:
 
     built = argparse.ArgumentParser(
         prog="hmz internal anchor",
-        description="Run a coding agent on this machine that acts on another one.",
-        epilog="Example: hmz internal anchor --target ssh://build-box claude --model opus",
+        # Wrapped by hand: the raw formatter below keeps the epilog's own line breaks,
+        # and pays for that by not re-wrapping the description either.
+        description="Run a coding agent on this machine that acts on another one.\n"
+        "humanize renders this line for every turn whose work lands\n"
+        "elsewhere; it is not one to type by hand.",
+        epilog="What humanize renders looks like this:\n"
+        "  hmz internal anchor --target ssh://build-box claude --model opus",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     built.add_argument(

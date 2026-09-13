@@ -114,8 +114,8 @@ Three edges are worth explaining:
 - **`epic → tracing`**, because a profiled run samples the programs its agents start. `tracing`
   itself knows how to *drive* nothing; it needs the home directories and log globs, and
   nothing else.
-- **`cli` reaches `coganchor` directly**, for `hmz internal anchor`. That command is the only line the
-  target half is ever started by, and it must cost nothing else of humanize on the way.
+- **`cli` reaches `coganchor` directly**, for `hmz internal anchor`. That command is the only
+  line the target half is ever started by, and it must cost nothing else of humanize on the way.
 
 And one edge deliberately absent: **`coganchor` does not name `epic`.** A run is written out
 of the agents it drove, so naming the run from an agent would be a circle. What an agent needs
@@ -143,8 +143,8 @@ checked at all.
 3. **Every top-level module is in the table.** One left out is unchecked, and reads exactly like
    one deliberately exempt. `cli` is the only exemption, and it is checked differently:
 4. **Serving loads only what it may** — against a real target half, not statically. The bundle
-   is built, `hmz internal anchor serve` is run out of it with an empty `PYTHONPATH`, and what it loaded
-   is compared with the table.
+   is built, `hmz internal anchor serve` is run out of it with an empty `PYTHONPATH`, and what
+   it loaded is compared with the table.
 
 That last one is why `coganchor/serve/` may import nothing but `proto` — not even the package it sits in, whose name would be leave to name every driver in it. It is also why the bundle carries the anchor half alone: `DRIVING` in `coganchor/transport.py` names what a target has no use for, and `test_the_bundle_carries_nothing_that_drives_an_agent` is what notices a new one. The serving half runs on
 the target, which may be any architecture, while `coganchor/linux/` picks a register map at
