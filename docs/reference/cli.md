@@ -437,7 +437,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/epics/<workspace>/<datetime>-<hex>/sessions/<session>/` | the same | A link per file each session was logged to, for reading a run back. humanize reads and writes the logs where the backend keeps them. |
 | `~/.humanize/epics/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows) flow | What that flow left behind, which the next run of it picks up. |
 | `~/.humanize/epics/<workspace>/<datetime>-<hex>/profile.jsonl` | a run of a workspace that asked to be profiled | The programs the run started, sampled while it ran. |
-| `~/.humanize/epics/<workspace>/<datetime>-<hex>/traces/<datetime>.trace.json` | `/epics` | The trace of that run. |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/traces/export.trace.json` | exporting on `/epics` | The trace of that run, gathered as it was exported. One gathered by hand is named for the moment instead. |
 | `~/.humanize/providers/<cli>/<name>/provider.json` | **a** in `/providers` | What a [provider](/reference/providers) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/providers/<cli>/<name>/models.json` | **a** in `/providers`, **r** | What that account may name: what its endpoint serves where it has one, and what the CLI said where it has not. Never the credential either was asked under. Goes when the account does. |

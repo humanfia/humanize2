@@ -207,10 +207,11 @@ hmz
 ```
 
 `/epics` is every run of a flow in this directory, newest first. Press **enter** on the one at
-the top — the loop you have just stopped — and take *collect a trace*: it gathers that run's
-own sessions into `traces/` inside the run, and says under the list where the file went.
+the top — the loop you have just stopped — to go into it, and take *export it*: it gathers that
+run's own sessions into `traces/` inside the run, packs the whole run up around that trace, and
+says under the list where both went.
 
-Open that file in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process and each
+Open the trace in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process and each
 of its turns is a track, so the two appear as two lanes taking it in turns. Click any slice to
 see the prompt, the reasoning, the tool call and the tool output that produced it.
 

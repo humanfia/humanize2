@@ -83,6 +83,8 @@ if TYPE_CHECKING:
 __all__ = [
     "DETACHES",
     "EVERY",
+    "EXPORTED",
+    "RESUMES",
     "STAYS",
     "STOPS",
     "Account",
@@ -119,7 +121,6 @@ __all__ = [
     "Speaks",
     "Ways",
     "called",
-    "carries_on",
     "config_of",
     "model_of",
     "opens_on",
@@ -5922,16 +5923,19 @@ class Providers(Drafts[list[str]]):
         self.asks_to_save()
 
 
-#: What can be done with a run that has already happened: pick it up where it stopped, for a
-#: flow that says it can be, gather what it left behind into a trace, package the whole of it
-#: up to send somewhere, and say where it is written down. The first is answered outside this
-#: module -- starting a flow is the interface's -- so it is named where it is read.
-carries_on, _COLLECTS, _EXPORTS, _WHERE_IT_IS = (
-    "carry-on",
-    "collect",
-    "export",
-    "where",
-)
+#: What can be done with a run that has already happened, once somebody is inside it: pick it
+#: up where it stopped, for a flow that says it can be, and package the whole of it up --
+#: trace and all -- to send to somebody who was not there. The first is answered outside this
+#: module -- starting a flow is the interface's -- so it is named where it is read, and it is
+#: named after the command it is, since a row and a command that did the same thing under two
+#: names would be two things to learn.
+RESUMES, _EXPORTS = "resume", "export"
+
+#: What the trace an export gathers is filed as, inside the run's own `traces/`. Named for
+#: what made it rather than for the moment it was made: a trace gathered by hand keeps both
+#: when it is gathered twice, and this one is of a run that is over and will not read any
+#: differently tomorrow.
+EXPORTED = "export.trace.json"
 
 #: How much of a task a row of the runs shows, before it is what a run is rather than a line.
 _ENOUGH_TASK = 60
@@ -5945,8 +5949,8 @@ class Doing(NamedTuple):
         sheet has to say on the way out.
       doing: What to do with it, which is what the menu under it answered, and "" where the
         sheet did it itself.
-      said: What happened while the sheet was open, for the transcript: a menu that gathered
-        a trace and said nothing afterwards is one nobody can read back.
+      said: What happened while the sheet was open, for the transcript: a menu that wrote an
+        archive and said nothing afterwards is one nobody can read back.
     """
 
     epic: Path | None = None
@@ -5996,16 +6000,20 @@ def _when(said: str) -> str:
 
 
 class Does(Picks):
-    """What to do with one run that has already happened.
+    """One run that has already happened, gone into: what it was, and what there is to do.
 
-    Which is a second question rather than more keys on the first: a list of runs is a list
+    Which is a second sheet rather than more keys on the first: a list of runs is a list
     somebody is reading, and what there is to do with one of them depends on the one under
     the cursor -- a flow that says it can be picked up is picked up, and one that says
     nothing is a run to read rather than a run to continue.
+
+    Going into a run is how its directory is reached, so that is said here rather than
+    fetched: where a run is written down was a row of its own that printed a path, which is
+    an errand to send somebody on for something the sheet was already about.
     """
 
     def __init__(self, ran: Ran, *, resumable: bool) -> None:
-        """Asks about one run.
+        """Goes into one run.
 
         Args:
           ran: The run, as it was written down.
@@ -6016,42 +6024,36 @@ class Does(Picks):
         self._ran = ran
         self._resumable = resumable
         self.asked = f"{_when(ran.began)}{_DOT}{ran.flow}"
+        #: Where it is written first, on a line of its own: it is the long part and the part
+        #: somebody copies, and a path wrapped into the middle of a sentence is one that has
+        #: to be picked back out of it.
         self.about = (
-            f"What to do with this run. It {_how(ran)}, driving "
+            f"{escape(str(ran.at))}\nIt {_how(ran)}, driving "
             f"{_many(len(ran.agents), 'agent')} through "
             f"{_many(len(ran.sessions), 'session')}."
         )
 
     def rows(self) -> list[tuple[str, str, str]]:
-        """Carrying on where it stopped, where that is a thing this flow can do, and reading."""
+        """Carrying on where it stopped, where that is a thing this flow can do, and sending it.
+
+        Two rather than four. Gathering a trace wrote a file into the run that an export
+        would have carried anyway, so exporting gathers one and packs it: a bundle read by
+        somebody who was not there is a bundle with the timeline already in it.
+        """
         held: list[tuple[str, str, str]] = []
         if self._resumable:
             held.append(
                 (
-                    carries_on,
-                    "carry on from here",
+                    RESUMES,
+                    "resume this run",
                     "run the flow again on what this run left behind",
                 )
             )
         held.append(
             (
-                _COLLECTS,
-                "collect a trace",
-                "its sessions, and the programs it ran, as one trace to read",
-            )
-        )
-        held.append(
-            (
                 _EXPORTS,
                 "export it",
-                "the whole run as one archive, session logs and all",
-            )
-        )
-        held.append(
-            (
-                _WHERE_IT_IS,
-                "where it is",
-                "the directory this run is written in, sessions and all",
+                "the whole run as one archive, with a trace of it in",
             )
         )
         return held
@@ -6083,13 +6085,20 @@ def _how(ran: Ran) -> str:
     }.get(ran.how, "was left unfinished")
 
 
-def collected(ran: Ran) -> tuple[Path, str]:
-    """Gathers what one run left behind into a trace file, and says what is in it.
+def exported(ran: Ran) -> tuple[Path, int, str]:
+    """Gathers one run's trace, and packages the whole run up with it as one archive.
 
-    That run's own sessions and no others: a directory may have been run in a hundred times,
-    and a trace filed under one of those runs while holding the other ninety-nine is a trace
-    of nothing anybody asked about. They are asked for by the ids the run wrote down rather
-    than by directory, so a flow that worked in a machine's mirror is in its own trace too.
+    One thing rather than two rows. A trace gathered here lands in the run's own `traces/`,
+    which is part of what an export carries -- so the two were a row that wrote a file and a
+    row that would have packed it anyway, and the one anybody sends is the archive. Whoever
+    opens it can read the run as a timeline without gathering anything themselves, which is
+    what a bundle sent to somebody who was not there has to be good for.
+
+    The trace is of that run's own sessions and no others: a directory may have been run in a
+    hundred times, and a trace filed under one of those runs while holding the other
+    ninety-nine is a trace of nothing anybody asked about. They are asked for by the ids the
+    run wrote down rather than by directory, so a flow that worked in a machine's mirror is
+    in its own trace too.
 
     Beside the run rather than in this directory: an epic is what a run was, and the trace of
     that run belongs with the sessions it points at and the state it left. A trace of what a
@@ -6097,18 +6106,51 @@ def collected(ran: Ran) -> tuple[Path, str]:
     named, and a trace written somewhere else is its `output`: both are Python, there being no
     run here to hang either on.
 
+    No screen goes in. What is drawn is the run that is going and this is a run out of the
+    list, often one from last week, so a transcript here would be a bundle saying something
+    about that run that is not true of it.
+
     Args:
       ran: The run.
 
     Returns:
-      Where the trace was written, and a line saying what it holds.
+      Where the archive was written, how big it came out, and a line saying what the trace
+      inside it holds.
     """
-    where, document = _hmz().epics.traced(ran.at)
+    from hmz.runtime.epic import TRACES
+
+    runs = _hmz().epics
+    # Under a name of its own rather than the moment it was gathered, so that exporting one
+    # run twice leaves one trace rather than a pile of identical ones -- a finished run does
+    # not change, the archive replaces itself for the same reason, and an epic that grew a
+    # trace every time somebody sent it would make every later archive bigger than the last.
+    _, document = runs.traced(ran.at, output=ran.at / TRACES / EXPORTED)
+    at, _ = runs.bundled(ran.at)
     said = document["otherData"]
-    held = f"{said.get('sessions', '0')} sessions, {said.get('slices', '0')} slices"
-    if said.get("programs"):
-        held += f", {said['programs']} programs"
-    return where, held
+    held = f"{_many(_counted(said, 'sessions'), 'session')}, "
+    held += _many(_counted(said, "slices"), "slice")
+    # Only where the run was profiled: a trace that reported nought programs on every run
+    # would be one more thing to read past on the traces that are only ever sessions.
+    if _counted(said, "programs"):
+        held += f", {_many(_counted(said, 'programs'), 'program')}"
+    return at, at.stat().st_size, held
+
+
+def _counted(said: dict[str, Any], of: str) -> int:
+    """How many of something a trace says it holds, out of the strings it says it in.
+
+    Args:
+      said: What the trace says about itself.
+      of: Which count.
+
+    Returns:
+      It as a number, and nought for one that is missing or is not one -- a line about an
+      export is not worth failing an export over.
+    """
+    try:
+        return int(said.get(of, 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 class Epics(Sheet[Doing]):
@@ -6119,8 +6161,9 @@ class Epics(Sheet[Doing]):
     two things: reading one back afterwards, which is what the links to its sessions are, and
     carrying one on, which is what a flow that says it can be picked up is for.
 
-    Read rather than chosen from, so enter opens what there is to do with the run under the
-    cursor rather than doing any of it.
+    Read rather than chosen from, so enter goes into the run under the cursor rather than
+    doing anything to it: what there is to do is what that run is, and the sheet it opens is
+    where the run says where it is written down.
     """
 
     LETTERS: ClassVar = frozenset({"search"})
@@ -6130,13 +6173,20 @@ class Epics(Sheet[Doing]):
         Binding("s", "search", "search", priority=True),
     ]
 
-    def __init__(self, workspace: Path | None = None, *, running: bool = False) -> None:
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        *,
+        running: Callable[[], bool] | None = None,
+    ) -> None:
         """Reads every run of this directory.
 
         Args:
           workspace: Which directory's, defaulting to this one.
-          running: Whether a flow is running now, which is what makes carrying one on a
-            thing to say no to rather than a thing to offer.
+          running: Whether a flow is going, asked rather than answered once -- a list is
+            read while a run goes and outlives it, and one that had taken the answer down
+            as it opened would refuse to pick a run up in the name of a flow that has since
+            finished. None for nothing to ask, which is nothing running.
         """
         super().__init__()
         from hmz.sdk import Hmz
@@ -6149,7 +6199,7 @@ class Epics(Sheet[Doing]):
             for one in (runs.read(at) for at in reversed(runs.all()))
             if one is not None
         ]
-        self._underway = running
+        self._underway = running or (lambda: False)
         #: Which run the cursor is on, by the directory it is written in: rows are narrowed
         #: by a search, so a row number is not a run.
         self._was = ""
@@ -6166,7 +6216,7 @@ class Epics(Sheet[Doing]):
         self.query_one("#asked", Label).update("Epics")
         self.query_one("#about", Label).update(
             "Every run of a flow in this directory, newest first: what it was, how it went, "
-            "and how many sessions it opened. Enter says what there is to do with one."
+            "and how many sessions it opened. Enter goes into the one under the cursor."
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()
@@ -6219,7 +6269,7 @@ class Epics(Sheet[Doing]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            f"Enter for what to do with one · Esc to close{self.searching()}"
+            f"Enter to go into one · Esc to close{self.searching()}"
         )
 
     def leaving(self) -> None:
@@ -6230,39 +6280,13 @@ class Epics(Sheet[Doing]):
         """What an empty list says, which is that nothing has been run here yet."""
         return "no flow has been run in this directory yet"
 
-    async def _collects(self, ran: Ran) -> None:
-        """Gathers what one run left behind into a trace, beside the run itself.
+    async def _exports(self, ran: Ran) -> None:
+        """Gathers one run's trace and packages the whole run up around it, as one archive.
 
         Off the event loop: reading a run's sessions back is every log every backend wrote
-        for it, which is seconds on a long run -- and an interface that stopped redrawing
-        while it ran would be one that looked as though it had gone away.
-
-        Args:
-          ran: The run.
-        """
-        import asyncio
-
-        self._said = f"collecting {escape(ran.name)}…"
-        self._fill()
-        try:
-            at, held = await asyncio.to_thread(collected, ran)
-        except (OSError, ValueError) as why:
-            self._said = escape(str(why))
-            self._fill()
-            return
-        self._said = f"{escape(str(at))}{_DOT}{escape(held)}"
-        self._told.append(f"[dim]{escape(str(at))} — {escape(held)}[/dim]")
-        self._fill()
-
-    async def _exports(self, ran: Ran) -> None:
-        """Packages one run up as one archive, to send to somebody who was not there.
-
-        No transcript in this one. What is on the screen is the run that is going, and this
-        is a run out of the list -- often one from last week, whose screen is long gone.
-
-        Off the event loop, for the reason a trace is gathered off it: following a day's logs
-        and compressing them is seconds, and an interface that stopped redrawing for them
-        would look as though it had gone away.
+        for it, and following and compressing them after that is seconds more on a long run
+        -- and an interface that stopped redrawing while it ran would be one that looked as
+        though it had gone away.
 
         Args:
           ran: The run.
@@ -6271,16 +6295,15 @@ class Epics(Sheet[Doing]):
 
         from hmz.runtime.exporting import sized
 
-        self._said = f"packaging {escape(ran.name)}…"
+        self._said = f"exporting {escape(ran.name)}…"
         self._fill()
         try:
-            at, _ = await asyncio.to_thread(_hmz().epics.bundled, ran.at)
-            size = await asyncio.to_thread(lambda: at.stat().st_size)
+            at, size, held = await asyncio.to_thread(exported, ran)
         except (OSError, ValueError) as why:
             self._said = escape(str(why))
             self._fill()
             return
-        said = f"{escape(str(at))}{_DOT}{sized(size)}"
+        said = f"{escape(str(at))}{_DOT}{sized(size)}{_DOT}{escape(held)}"
         self._said = said
         self._told.append(f"[dim]{said}[/dim]")
         self._fill()
@@ -6320,7 +6343,7 @@ class Epics(Sheet[Doing]):
 
     @on(OptionList.OptionSelected)
     def _took(self, event: OptionList.OptionSelected) -> None:
-        """Opens what there is to do with the run under the cursor.
+        """Goes into the run under the cursor.
 
         Args:
           event: What was chosen.
@@ -6332,7 +6355,7 @@ class Epics(Sheet[Doing]):
 
     @work
     async def _doing(self, ran: Ran) -> None:
-        """Asks what to do with one run, and does it or answers with it.
+        """Goes into one run, and does what was asked there or answers with it.
 
         Args:
           ran: The run.
@@ -6346,17 +6369,10 @@ class Epics(Sheet[Doing]):
         )
         if said is None:
             return  # walked out of it, which does nothing to the run
-        if said == _WHERE_IT_IS:
-            self._said = escape(str(ran.at))
-            self._fill()
-            return
-        if said == _COLLECTS:
-            await self._collects(ran)
-            return
         if said == _EXPORTS:
             await self._exports(ran)
             return
-        if said == carries_on and self._underway:
+        if said == RESUMES and self._underway():
             # Said here rather than on the way out: the question this sheet is asking is
             # still worth answering, and a flow is stopped with esc rather than from here.
             self._said = "a flow is running; ctrl+c twice stops it before another can be picked up"

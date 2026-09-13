@@ -9,25 +9,29 @@ session is one call away.
 ## Collecting
 
 `/epics` is every run of a flow in this directory, newest first. Put the cursor on the one you
-want, press **enter**, and **collect a trace** gathers it:
+want, press **enter** to go into it, and **export it** gathers the trace and packs the run
+around it:
 
 ```console
-~/.humanize/epics/-home-you-code/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json · 3 sessions, 412 slices
+/home/you/code/.humanize/20260809T014455.212Z-9f21ab.epic.tar.gz · 812 kB · 3 sessions, 412 slices
 ```
 
-Drag that file into [ui.perfetto.dev](https://ui.perfetto.dev), or open `chrome://tracing` and
-load it. It is a Chrome JSON trace, so anything that reads one will do.
+The trace itself goes into the run's own directory, as `traces/export.trace.json`, and into the
+archive beside it. Drag that file into [ui.perfetto.dev](https://ui.perfetto.dev), or open
+`chrome://tracing` and load it. It is a Chrome JSON trace, so anything that reads one will do.
 
 A trace goes with the run it is a trace of. An [epic](#epics) already holds what happened, a
 link to every log each session was written to, and whatever the flow left behind, so the trace
 belongs there rather than in whatever directory you happened to be standing in. The default
-name is the UTC moment it was collected, so collecting twice keeps both traces rather than
+name is the UTC moment it was collected, so gathering one by hand twice keeps both rather than
 writing over the first; an `output` puts it somewhere else, its directory created if it is not
-there.
+there. The one **export it** writes has a name of its own — `export.trace.json` — so exporting
+a run twice leaves one trace, as it leaves one archive.
 
-What is said under the list is that path and then what went into it, and the transcript keeps
-the same line. A run that was [profiled](#profiling-a-run) has a third count — `1 session, 10
-slices, 3 programs` — and one that was not stops at the slices.
+What is said under the list is where the archive landed, how big it came out and then what went
+into the trace inside it, and the transcript keeps the same line. A run that was
+[profiled](#profiling-a-run) has a third count — `1 session, 10 slices, 3 programs` — and one
+that was not stops at the slices.
 
 From Python the same gathering is [`Hmz().epics.traced(epic)`](/reference/sdk#epics), which is
 the call that row makes. What else the menu offers on a run is in the
@@ -94,7 +98,8 @@ Every run of a flow is one **epic**, written as it happens, and an epic is a dir
     state.json                      what a flow that can be picked up again left behind
     profile.jsonl                   the programs it ran, for a run that was profiled
     sessions/<session>/…            a link per file the backend logged that session to
-    traces/<datetime>.trace.json    what was gathered of it afterwards
+    traces/export.trace.json        the trace exporting the run gathers, replaced each time
+    traces/<datetime>.trace.json    one gathered by hand afterwards, which keeps every one
 ```
 
 `<workspace>` is the absolute path with everything that is not a letter or a digit flattened to
@@ -139,9 +144,9 @@ That is what `state.json`, `resumable` and `picked_up` are for. A flow that says
 `state.json` in the epic of the run that wrote it, keyed by the name the flow was run under.
 Running that flow again here carries on from the last run of it that left anything — into an
 epic of its own, whose `began` line says which run it was `picked_up` from, so a week of stops
-and starts reads as the week it was. `/epics` picks a named run up: enter on a row offers
-*carry on from here*, which is asked of the flow rather than of the run, a flow being a file
-that may have been rewritten since. See [Picking a run up](/user/resuming) and
+and starts reads as the week it was. `/epics` picks a named run up: enter goes into a run and
+offers *resume this run*, which is asked of the flow rather than of the run, a flow being a
+file that may have been rewritten since. See [Picking a run up](/user/resuming) and
 [a flow that can be picked up](/reference/flows#a-flow-that-can-be-picked-up).
 
 An agent stopped by hand makes the run `stopped` rather than `failed`, whatever the turn under
@@ -264,8 +269,9 @@ flow that ran on a [machine of its own](/reference/machines)** — working in a 
 under a path this workspace has never heard of — is in its own trace all the same.
 
 A run is named by the directory it is written in — what `all()` lists, oldest first, and what
-*where it is* says under `/epics`. There is no name to spell and no leading part of one to
-match, because a run is picked out of the runs there are before there is anything to trace.
+`/epics` draws at the top once you are inside the run. There is no name to spell and no leading
+part of one to match, because a run is picked out of the runs there are before there is
+anything to trace.
 
 **Or of a directory**, whoever opened its sessions, which is how an afternoon at a coding agent
 that no flow ever drove is read back:

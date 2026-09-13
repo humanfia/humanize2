@@ -232,9 +232,9 @@ exactly `on` or `off`.
 
 ### `no such command: /foo`
 
-Type `/` to see the list. `hmz internal anchor` is deliberately not a command here: it is not a
-thing to do to a flow that is running. `/epics` is where the runs of this directory are, and where one
-of them is collected into a trace.
+Type `/` to see the list. `hmz internal anchor` is deliberately not a command here: it is not
+a thing to do to a flow that is running. `/epics` is where the runs of this directory are:
+going into one is where it is exported, trace and all.
 
 ### A line I typed did not reach the agent
 

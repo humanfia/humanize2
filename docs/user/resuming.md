@@ -119,35 +119,40 @@ in silence.
 | `no picking a run up while the flow is still stopping` | ctrl+c twice was pressed and the flow has not gone yet — it is closing out the turn it was in, and still writing down where it got to. |
 
 `/resume` takes nothing after it: a line that names a run is said back rather than dropped.
-To carry on a run that is **not** the last one, open the list — which is the next section.
+To carry on a run that is **not** the last one, open the list and go into that run — which is
+the next section.
 
 ## Carrying an older one on
 
 `/epics` is every run of a flow in this directory, newest first: when it happened, which flow
 it was, what it was asked to do, how many sessions it opened, and a mark on the runs whose flow
-says it can be picked up. Enter opens what there is to do with the run under the cursor:
+says it can be picked up. Enter goes **into** the run under the cursor — which says where that
+run is written down, and offers what there is to do with it:
 
-![the /epics list with the run that can be picked up marked, and the menu that opens under one
-run with carrying it on at the top](/demo/epics.gif)
+![the /epics list with the run that can be picked up marked, and what opens inside one run:
+its directory, over resuming it and exporting it](/demo/epics.gif)
 
 | | |
 | --- | --- |
-| **carry on from here** | Run the flow again on what this run left behind |
-| **collect a trace** | Its sessions, and the [programs it ran](/user/tracing#profiling-a-run), as one [trace](/user/tracing) |
-| **where it is** | The directory the run is written in, sessions and all |
+| **resume this run** | Run the flow again on what this run left behind |
+| **export it** | The whole run as one archive, its [trace](/user/tracing) and its session logs in it — see [Exporting a run](/user/export) |
+
+**It is `/resume` with the run already named.** The same three reasons a run cannot be carried
+on are said here in the same words, so the table above holds inside a run as well as at the
+prompt.
 
 The mark in the list and that first row are one question, asked of the **flow** rather than of
 the run. The weaver may have rewritten it since, so what can happen next is what it says today:
 
 - A flow marked `resumable=True` after a run of it has that older run marked and offered too.
-  Carrying that one on runs its flow, its agents and its task on nothing — taken while the flow
-  still said nothing, it left no state to pick up.
+  Taking the row on one of those says `left nothing behind`: it ran while the flow still said
+  nothing, so there is no state to pick up and nothing to carry on from.
 - A flow that has since dropped the mark has neither the mark nor the row, whatever the run
   wrote down at the time; where the row is gone, the reason stands under the list.
 - A flow that will not load at all reads as one that says no — a flow that cannot be read
   cannot be run.
 
-Collecting a trace is offered for every run, whatever its flow says.
+Exporting is offered for every run, whatever its flow says.
 
 Carrying one on is refused while a flow is running, on the sheet rather than on the way out;
 [stopping](/user/stopping) is what stops a flow.
@@ -160,8 +165,8 @@ from hmz.runtime.runner import Runner
 Runner("nightly", agents, resume=at).run("keep the tests green")
 ```
 
-`at` is that run's own directory: what *where it is* prints, and what
-[`hmz.runtime.epic.epics()`](/reference/tracing#epics) lists.
+`at` is that run's own directory: the path drawn at the top once you are inside the run, and
+what [`hmz.runtime.epic.epics()`](/reference/tracing#epics) lists.
 
 ## What carrying on runs
 

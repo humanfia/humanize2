@@ -3,7 +3,7 @@
 A run is written down as it happens and until now nothing showed them. What they are for is
 two things: reading one back afterwards, which is what the links to its sessions are, and
 carrying one on, which is what a flow that says it can be picked up is for. So this is a list
-of runs, newest first, and a menu under each of them.
+of runs, newest first, and a way into each of them.
 
 Driven headlessly, as every test of the interface is, so what is checked is where a keystroke
 lands rather than how it is drawn.
@@ -60,20 +60,58 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     Path("plain.txt").write_text(task)
 '''
 
+#: One that opens a session and says one thing, so that there is a run with a trace in it.
+SPEAKS = '''"""Takes one turn, and says nothing about being picked up."""
+
+from hmz.coganchor.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    agents[0].new()(task)
+'''
+
 #: A `claude` that answers whatever it is told, since what is being tested is the run rather
-#: than what the agent said.
+#: than what the agent said. It logs the session where Claude Code logs one, so that a trace
+#: gathered of the run has the run's own sessions in it rather than only their ids.
 QUIET = """
-import json, sys
+import datetime, json, os, pathlib, sys
 
 flags = dict(zip(sys.argv, sys.argv[1:]))
-print(json.dumps({"type": "system", "session_id": flags["--session-id"]}), flush=True)
+ident = flags["--session-id"]
+under = pathlib.Path(os.environ["CLAUDE_CONFIG_DIR"]) / "projects" / "-a-project"
+under.mkdir(parents=True, exist_ok=True)
+now = datetime.datetime.now(datetime.UTC)
+(under / (ident + ".jsonl")).write_text(
+    "\\n".join(
+        json.dumps(one)
+        for one in (
+            {
+                "type": "user",
+                "timestamp": now.isoformat(),
+                "message": {"role": "user", "content": "what the agent was told"},
+            },
+            {
+                "type": "assistant",
+                "timestamp": (now + datetime.timedelta(seconds=1)).isoformat(),
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "done"}],
+                },
+            },
+        )
+    )
+    + "\\n"
+)
+print(json.dumps({"type": "system", "session_id": ident}), flush=True)
 print(json.dumps({"type": "result", "result": "done"}), flush=True)
 """
 
 
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A directory with the two flows in it and a fake `claude` to drive them."""
+    """A directory with the flows in it and a fake `claude` to drive them."""
     binaries = tmp_path / "bin"
     binaries.mkdir()
     fake = binaries / "claude"
@@ -86,6 +124,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     where.mkdir(parents=True)
     written(where, "counts", COUNTS)
     written(where, "plain", PLAIN)
+    written(where, "speaks", SPEAKS)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -151,7 +190,7 @@ async def test_a_run_of_a_flow_that_can_be_picked_up_says_so(workspace: Path) ->
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["carry-on", "collect", "export", "where"]
+        assert rows(app) == ["resume", "export"]
 
 
 @pytest.mark.timeout(60)
@@ -167,30 +206,30 @@ async def test_a_run_of_a_flow_that_says_nothing_is_a_run_to_read(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["collect", "export", "where"]
+        assert rows(app) == ["export"]
         assert "does not say it can be picked up" in str(
             app.screen.query_one("#tuning", Label).render()
         )
 
 
 @pytest.mark.timeout(60)
-async def test_where_a_run_is_written_down_is_said_under_the_list(
-    workspace: Path,
-) -> None:
-    """Which is where its sessions are linked, and what somebody analysing a run opens."""
+async def test_going_into_a_run_says_where_it_is_written_down(workspace: Path) -> None:
+    """Which is where its sessions are linked, and what somebody analysing a run opens.
+
+    Said by the sheet rather than fetched from it: it was a row that printed the path under
+    the list, which is an errand to send somebody on for what being inside a run is about.
+    """
     _ran("plain", "go")
 
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
+        await _open(app, driver)
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
-        await onto(app, driver, "where")
-        await driver.press("enter")
-        await until(lambda: app.screen is sheet, driver)
 
         (epic,) = epics(workspace)
-        assert str(epic) in str(sheet.query_one("#tuning", Label).render())
+        assert str(epic) in str(app.screen.query_one("#about", Label).render())
+        assert "where" not in rows(app)
 
 
 @pytest.mark.timeout(90)
@@ -207,7 +246,7 @@ async def test_carrying_a_run_on_runs_the_flow_again_on_what_it_left(
         sheet = await _open(app, driver)
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
-        await onto(app, driver, "carry-on")
+        await onto(app, driver, "resume")
         await driver.press("enter")
         await until(lambda: app.screen is not sheet, driver)
         await until(lambda: len(epics(workspace)) == 2, driver)
@@ -232,37 +271,70 @@ async def test_a_directory_nothing_has_been_run_in_says_so(workspace: Path) -> N
 
 
 @pytest.mark.timeout(90)
-async def test_a_trace_of_a_run_is_gathered_from_the_menu_under_it(
+async def test_exporting_a_run_carries_its_own_trace_in_the_archive(
     workspace: Path,
 ) -> None:
-    """Every run has one to gather, whatever its flow says about being picked up.
+    """Gathering a trace and exporting were two rows, and the archive held what the other wrote.
 
-    And it lands beside the run rather than in this directory: an epic already holds what
-    happened and what each session was logged to, and the trace is one of those.
+    So there is one row, and what it writes is a bundle somebody who was not there can read
+    the run out of without gathering anything themselves. Every run has one, whatever its
+    flow says about being picked up: a run that cannot be continued is still a run to read.
+
+    The trace lands beside the run as well, since that is where an export picks it up from:
+    an epic already holds what happened and what each session was logged to.
     """
+    import json
+    import tarfile
+
+    from hmz.runtime.epic import opened
+
     from .test_app import _transcript
 
-    _ran("plain", "go")
+    _ran("speaks", "go")
 
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
-        await onto(app, driver, "collect")
+        await onto(app, driver, "export")
         await driver.press("enter")
         await until(lambda: app.screen is sheet, driver)
-        await until(lambda: "sessions" in _under(sheet), driver)
+        await until(lambda: "epic.tar.gz" in _under(sheet), driver)
 
         (epic,) = epics(workspace)
         (written,) = (epic / "traces").glob("*.trace.json")
-        assert str(written) in _under(sheet)
+        at = workspace / ".humanize" / f"{epic.name}.epic.tar.gz"
+        assert str(at) in _under(sheet)
+
+        # And again, which is the same run again: one trace rather than a pile of identical
+        # ones, as the archive it goes in replaces itself rather than piling up beside.
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Does), driver)
+        await onto(app, driver, "export")
+        await driver.press("enter")
+        await until(lambda: app.screen is sheet, driver)
+        await until(lambda: "epic.tar.gz" in _under(sheet), driver)
+        assert list((epic / "traces").glob("*.trace.json")) == [written]
 
         await driver.press("escape")
         await until(lambda: not isinstance(app.screen, Epics), driver)
         # And said where it can be read back afterwards, rather than only under a list that
         # has since been closed.
-        assert str(written) in _transcript(app)
+        assert str(at) in _transcript(app)
+
+    with tarfile.open(at) as opened_up:
+        (inside,) = [one for one in opened_up.getnames() if one.endswith(".trace.json")]
+        assert inside == f"{epic.name}/traces/{written.name}"
+        handle = opened_up.extractfile(inside)
+        assert handle is not None
+        document = json.loads(handle.read().decode("utf-8"))
+    # And it is a trace of this run: the ids this run wrote down and no others, which is
+    # what the document says it was narrowed to.
+    ids = [one for opened_by in opened(epic).values() for one in opened_by]
+    assert ids
+    assert document["otherData"]["selected"] == ", ".join(ids)
+    assert document["otherData"]["sessions"] == str(len(ids))
 
 
 def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
@@ -279,7 +351,7 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     import unittest.mock
 
     from hmz.runtime.epic import Epic, read
-    from hmz.tui.pick import collected
+    from hmz.tui.pick import exported
 
     del workspace
     epic = Epic("plain", [], "go")
@@ -290,7 +362,7 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     ran = read(epic.path)
     assert ran is not None
 
-    collected(ran)
+    exported(ran)
 
     assert collect.call_args.args == (None,)
     assert collect.call_args.kwargs["sessions"] == ["one", "two"]
@@ -298,7 +370,7 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
 
 
 def _under(sheet: Epics) -> str:
-    """What is said under the list, which is where a collection reports itself."""
+    """What is said under the list, which is where an export reports itself."""
     from textual.widgets import Label
 
     return str(sheet.query_one("#tuning", Label).content)
@@ -335,4 +407,74 @@ async def test_a_run_of_a_flow_marked_since_can_be_picked_up_too(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["carry-on", "collect", "export", "where"]
+        assert rows(app) == ["resume", "export"]
+
+
+@pytest.mark.timeout(60)
+async def test_resuming_from_inside_a_run_is_what_the_command_is(
+    workspace: Path,
+) -> None:
+    """Same question, same answer: the row is `/resume` with the run already named.
+
+    A flow marked resumable since the run is a flow whose older runs are offered -- and one
+    of those left nothing to pick up, since it ran while the flow still said nothing. Carried
+    on it would be a run starting from the top wearing a line saying which run it came from,
+    so it is turned down here in the words the command turns it down in.
+    """
+    from .test_app import _transcript
+
+    _ran("plain", "go")
+    written(workspace / ".humanize/flows", "plain", COUNTS)
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Does), driver)
+        await onto(app, driver, "resume")
+        await driver.press("enter")
+        await until(lambda: app.screen is not sheet, driver)
+        await until(lambda: "left nothing behind" in _transcript(app), driver)
+
+        assert "starts from the top" in _transcript(app)
+
+    assert len(epics(workspace)) == 1  # and nothing was started
+
+
+@pytest.mark.timeout(60)
+async def test_carrying_one_on_is_refused_while_a_flow_runs_and_not_after(
+    workspace: Path,
+) -> None:
+    """Said where it was asked for, and asked when it is asked rather than when this opened.
+
+    A list of runs is worth having open while a flow works -- what has already happened does
+    not change under one -- so it outlives the run it was opened during, and one that had
+    taken the answer down as it opened would go on refusing in the name of a flow that has
+    since finished.
+    """
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    _ran("counts", "keep going")
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._agents = [ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))]
+        sheet = await _open(app, driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Does), driver)
+        await onto(app, driver, "resume")
+        await driver.press("enter")
+        await until(lambda: app.screen is sheet, driver)
+        await until(lambda: "a flow is running" in _under(sheet), driver)
+
+        assert len(epics(workspace)) == 1  # and nothing was started
+
+        # And the same list, once the flow is over, picks the run up rather than repeating
+        # itself about a run that has gone.
+        app._agents = []
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Does), driver)
+        await onto(app, driver, "resume")
+        await driver.press("enter")
+        await until(lambda: app.screen is not sheet, driver)
+        await until(lambda: len(epics(workspace)) == 2, driver)
