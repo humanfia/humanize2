@@ -66,7 +66,7 @@ whole task there. It is disabled where the reporter starts. Everything the SDK c
 ## Sending a run on purpose
 
 None of the above is a way of getting a run to us. When something goes wrong and the shape of
-the failure is not enough, [`/export`](/user/export) packages the whole run up as one archive —
+the failure is not enough, [exporting a run](/user/export) packages the whole of it up as one archive —
 every record, every session log in full, and a manifest saying what each backend was — for you
 to attach to an issue. It is the other half of this page: what a report never takes, an export
 carries, because you chose to send it. Credentials are struck out of it all the same.

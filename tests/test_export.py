@@ -6,9 +6,10 @@ with nothing in it. So a bundle is the run with every link followed -- and with 
 credential taken out, since the one thing a person sending their own run must not also send is
 the key it ran on.
 
-`hmz.runtime.exporting` itself, and no command line: there is none any more. `/export` in the
-interface is what asks for a bundle now, and this is the layer under it, held to what a bundle
-holds and what it must never carry rather than to how a line said so.
+`hmz.runtime.exporting` itself, and no command line: there is none any more. What asks for a
+bundle now is `/epics` in the interface, on the run under its cursor, and this is the layer
+under that -- held to what a bundle holds and what it must never carry rather than to how
+anything asked for one.
 """
 
 from __future__ import annotations

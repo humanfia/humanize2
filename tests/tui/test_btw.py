@@ -11,7 +11,7 @@ import pytest
 from hmz.coganchor.agents import AgentBase, AgentConfig, Event, SessionBase
 from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
-from hmz.tui.app import _OWN
+from hmz.tui.app import _COMMANDS
 from hmz.tui.btw import format_snapshot
 from hmz.tui.selecting import Transcript
 
@@ -123,9 +123,9 @@ def test_btw_snapshot_format_includes_runtime_progress() -> None:
 
 
 def test_btw_is_listed_as_a_command() -> None:
-    from hmz.tui.complete import about, offered, takes
+    from hmz.tui.app import _BY_NAME
+    from hmz.tui.complete import offered
 
-    assert "btw" in _OWN
-    assert about("btw")
-    assert takes("btw") == "<question>"
-    assert "/btw" in offered("/b", _OWN)
+    assert _BY_NAME["btw"].about
+    assert _BY_NAME["btw"].takes == "<question>"
+    assert "/btw" in offered("/b", _COMMANDS)

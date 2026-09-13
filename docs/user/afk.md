@@ -29,6 +29,19 @@ turns them back on. See [Security](/user/security) and [Permissions](/user/permi
 Asking starts **allowed**. An agent that really needs a person gets one, unless you have said
 that nobody is there.
 
+**You can see which way it is set.** While it is on, the status line under the editor says
+`afk`, in the colour of a warning, in front of everything else on that line:
+
+```
+afk · ◉ chat · ~/work/api                         / commands · esc monitor · ctrl+c exit
+```
+
+The line the switch writes in the transcript has scrolled away by the time an agent wants to
+ask you something, and nothing else on the screen changes — so without the marker the first
+sign that a question went unanswered would be a run that finished early. It is in front of the
+flow and the directory rather than beside them because that is the one part of the row a narrow
+terminal cannot push off the end.
+
 While a question is up, the status line shows `enter answer`. The next line you type becomes
 the answer, rather than a word in the turn. The agent's offer appears with it, but an answer is
 not limited to those options — every backend that offers them also takes something else.

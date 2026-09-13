@@ -35,6 +35,13 @@ Both settings draw from the same [events](/reference/agents#watching-a-turn-as-i
 discarded. Turning it back on does not recover what scrolled past, but the
 [trace](/user/tracing) has all of it either way, always.
 
+**You can see which way it is set.** While it is on, the status line under the editor says
+`details`, in front of the flow and the directory:
+
+```
+details · ◉ chat · ~/work/api                     / commands · esc monitor · ctrl+c exit
+```
+
 ## It is a screen setting, not an agent setting
 
 `/details` changes nothing about the run. The agent is not told about the setting, and it does
@@ -69,7 +76,7 @@ agent.watch(looking)
 - **On**, the first time you run an unfamiliar flow, to find out what shape its turns are.
 - **On**, when a turn is taking far longer than it should.
 - **Off**, which is where it starts: for a run you are reading rather than debugging, and for
-  anything you will [`/export`](/user/export) and show somebody.
+  anything you will [export](/user/export) and show somebody.
 
 ## See also
 

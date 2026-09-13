@@ -2,8 +2,9 @@
 
 Closing the interface and stopping the run are two things wherever the run is being held
 somewhere a terminal closing cannot reach: the flow goes on taking its turns, and `hmz` in
-this directory opens it again. So `/exit` asks and `/detach` says it outright, and what is
-checked here is that each of them does what it says and leaves the other alone.
+this directory opens it again. So `/exit` asks, and letting go of the terminal is one of the
+answers rather than a command of its own -- what is checked here is that each answer does what
+it says, and that the one command says outright that a flow can be left running.
 """
 
 from __future__ import annotations
@@ -91,49 +92,36 @@ async def _says(app: Humanize, driver: Pilot[None], line: str) -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_detach_is_offered_as_a_command() -> None:
-    """Since nothing here is chosen from a dialog: a `/` offers what there is."""
-    from hmz.tui.app import _OWN
-    from hmz.tui.complete import about
+async def test_letting_go_of_the_terminal_is_not_a_command_of_its_own() -> None:
+    """It is an answer to `/exit`, which is the one question about leaving there is.
 
-    assert "detach" in _OWN
-    assert about("detach")
+    Two words for two halves of one decision is one of them typed by somebody who meant the
+    other, so there is one: `/exit` asks, and what it asks is what `/detach` used to say.
+    """
+    from hmz.tui.app import _BY_NAME, _COMMANDS
+    from hmz.tui.complete import offered
 
+    assert "detach" not in _BY_NAME
+    assert "/detach" not in offered("/", _COMMANDS)
 
-@pytest.mark.timeout(60)
-async def test_detach_lets_go_of_the_terminal_and_leaves_the_run() -> None:
-    holding = Holding()
-    app = Humanize(session=holding)
+    app = Humanize(session=Holding())
     async with app.run_test() as driver:
         await _says(app, driver, "/detach")
+        await until(lambda: "no such command" in transcript(app), driver)
 
-        assert holding.let_go == 1
-        assert app.is_running  # the interface is not closed: the terminal is let go of
-
-
-@pytest.mark.timeout(60)
-async def test_detach_says_so_where_nothing_is_holding_the_run() -> None:
-    """Closing the terminal it was opened in is what closes it, so there is nothing to do."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _says(app, driver, "/detach")
-        await until(lambda: "nothing to" in transcript(app), driver)
-
-        assert "closing the terminal closes the run" in transcript(app)
         assert app.is_running
 
 
-@pytest.mark.timeout(60)
-async def test_detach_says_so_where_nothing_is_reading() -> None:
-    holding = Holding(reading=0)
-    app = Humanize(session=holding)
-    async with app.run_test() as driver:
-        await _says(app, driver, "/detach")
-        await until(lambda: "nothing is reading" in transcript(app), driver)
+def test_the_one_way_out_says_that_a_flow_goes_on_running() -> None:
+    """The list is where somebody reads what a command does before they type it.
 
-        assert "nothing is reading this run" in transcript(app)
-        assert holding.let_go == 0
-        assert app.is_running
+    Leaving with a flow running is the one thing here that does not end what it closes, so
+    the line beside `/exit` has to say so: a person who reads `Exit humanize` and means to
+    leave the run going has no way of knowing from there that they can.
+    """
+    from hmz.tui.app import _BY_NAME
+
+    assert "running" in _BY_NAME["exit"].about
 
 
 @pytest.mark.timeout(120)
@@ -227,6 +215,21 @@ async def test_leaving_it_running_lets_go_of_the_terminal_instead(
         assert holding.let_go == 1
         assert app.is_running  # the flow is still going, where nothing is reading it
         assert app._agents
+
+
+@pytest.mark.timeout(120)
+async def test_letting_go_says_so_where_nothing_is_reading(workspace: Path) -> None:
+    """The reader went while the question was up, so there is nothing left to let go of."""
+    written(workspace, "flow", FLOW)
+    holding = Holding(reading=0)
+    app = Humanize(session=holding)
+    async with app.run_test() as driver:
+        await _asks(app, driver)
+        app.screen.dismiss(DETACHES)
+        await until(lambda: "nothing is reading" in transcript(app), driver)
+
+        assert holding.let_go == 0
+        assert app.is_running
 
 
 def test_the_second_answer_is_whichever_one_is_true_here() -> None:
