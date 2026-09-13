@@ -13,7 +13,7 @@ from collections import Counter, deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from hmz import prices
+from hmz.coganchor import prices
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

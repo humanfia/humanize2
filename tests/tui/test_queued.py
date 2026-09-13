@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Static
 
-from hmz.agents import AgentBase, AgentConfig, Event
-from hmz.kept import Runs
+from hmz.coganchor.agents import AgentBase, AgentConfig, Event
+from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _PINNED
 from hmz.tui.monitor import short
@@ -62,7 +62,7 @@ FLOW = """
 import time
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

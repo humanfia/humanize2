@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.tracing import chrome
-from hmz.tracing.profile import PROFILE, Process, Profiler, Thread, read
+from hmz.runtime.tracing import chrome
+from hmz.runtime.tracing.profile import PROFILE, Process, Profiler, Thread, read
 from tests.sampling import sampled
 
 if TYPE_CHECKING:
@@ -165,7 +165,7 @@ def test_the_programs_are_drawn_as_processes_with_a_track_apiece() -> None:
 
 def test_a_trace_of_sessions_alone_says_nothing_about_programs() -> None:
     """One more field to read past on every trace that was never profiled is one too many."""
-    from hmz.tracing.session import Action, Session
+    from hmz.runtime.tracing.session import Action, Session
 
     session = Session(
         key="claude:one",

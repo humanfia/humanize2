@@ -19,7 +19,14 @@ from typing import Any
 
 import pytest
 
-from hmz.agents import Failed, Moment, Occasion, Verdict, ZcodeAgent, ZcodeAgentConfig
+from hmz.coganchor.agents import (
+    Failed,
+    Moment,
+    Occasion,
+    Verdict,
+    ZcodeAgent,
+    ZcodeAgentConfig,
+)
 
 #: A `zcode app-server --stdio` of our own. It speaks ZCode's protocol rather than JSON-RPC --
 #: the frames carry no `jsonrpc`, and the real one refuses any that does -- and it asks its

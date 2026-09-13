@@ -413,8 +413,8 @@ The layers under it are reachable directly where that is what you want — the S
 and restates none of them:
 
 ```python
-from hmz.runner import Runner          # hmz exec
-from hmz.tracing import collect        # the trace /epics gathers
+from hmz.runtime.runner import Runner          # hmz exec
+from hmz.runtime.tracing import collect        # the trace /epics gathers
 from hmz.coganchor import connect      # hmz anchor
 from hmz.coganchor import check        # hmz anchor --check
 from hmz.daemon import running, start  # the run hmz holds apart from the terminal

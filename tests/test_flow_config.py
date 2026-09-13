@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentConfig
+from hmz.coganchor.agents import AgentConfig
 from hmz.flows import NotAFlow, configures
-from hmz.runner import Runner, flow_and_agents, set_up_from
+from hmz.runtime.runner import Runner, flow_and_agents, set_up_from
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -55,7 +55,7 @@ PLAIN = """
 import json
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -66,7 +66,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 #: A flow whose third argument is not a model, which is a flow that takes no setting up.
 NOT_A_MODEL = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

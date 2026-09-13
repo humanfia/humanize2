@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import codex as codex_backend
+from hmz.coganchor.agents import codex as codex_backend
 
 if TYPE_CHECKING:
     from pathlib import Path

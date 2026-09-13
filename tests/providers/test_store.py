@@ -18,8 +18,9 @@ from pathlib import Path
 
 import pytest
 
-from hmz import backends, home, providers
-from hmz.providers import store
+from hmz import home
+from hmz.coganchor import backends, providers
+from hmz.coganchor.providers import store
 
 #: The moment a provider was made, as it is written down: UTC, to the second.
 _MADE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")

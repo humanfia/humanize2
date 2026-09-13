@@ -1,10 +1,10 @@
 """What a flow drives: an agent, the conversations it opens, and the person at the prompt.
 
-Interfaces and nothing else. A flow is written against what it may ask of an agent -- a turn,
-a session, a goal, what the turn cost -- and not against the class that answers: which CLI is
-behind it, how a turn is spelled to that CLI, where its logs go and how it is stopped are all
-:mod:`hmz.agents`'s business and none of the flow's. So the contract is written here, where a
-flow can import it beside the mark that makes it a flow, and the drivers implement it.
+Interfaces and nothing else. A flow is written against what it may ask of an agent -- a turn, a
+session, a goal, what the turn cost -- and not against the class that answers: which CLI is behind
+it, how a turn is spelled to that CLI, where its logs go and how it is stopped are all
+:mod:`hmz.coganchor.agents`'s business and none of the flow's. So the contract is written here,
+where a flow can import it beside the mark that makes it a flow, and the drivers implement it.
 
 Structurally rather than by inheritance, which is what keeps the arrow pointing one way: a
 flow names what it drives, and a driver is written without ever naming a flow. What holds the
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import (
+    from hmz.coganchor.agents import (
         AgentConfig,
         Board,
         Budget,
@@ -42,9 +42,9 @@ if TYPE_CHECKING:
         Tool,
         Usage,
     )
-    from hmz.agents.base import Journal
-    from hmz.agents.skills import Loaded
-    from hmz.machines import MachineConfig
+    from hmz.coganchor.agents.base import Journal
+    from hmz.coganchor.agents.skills import Loaded
+    from hmz.coganchor.machines import MachineConfig
 
 __all__ = ["Agent", "Driven", "Person", "Session"]
 
@@ -607,7 +607,7 @@ class Driven(Agent, Protocol):
     be a flow rewriting the choice it was started with. So they are not on :class:`Agent`,
     and a flow that wants one set up differently makes one with :meth:`Agent.clone`.
 
-    They are still on something, because somebody does settle them: `hmz.runner` before the
+    They are still on something, because somebody does settle them: `hmz.runtime.runner` before the
     first turn, `hmz.flows.driving` around a flow that called another, and the interface when
     somebody watching a run says this agent is to go on as something else. That is this.
     """
@@ -670,14 +670,13 @@ class Person(Agent, Protocol):
 
 
 if TYPE_CHECKING:
-    from hmz.agents import AgentBase, HumanAgent, SessionBase
+    from hmz.coganchor.agents import AgentBase, HumanAgent, SessionBase
 
-    #: The one line that says :mod:`hmz.agents` answers to the interfaces above. Written as
-    #: an assignment rather than as inheritance because the arrow points the other way: a
-    #: flow names what it drives, and a driver is written without ever naming a flow -- so
-    #: what joins the two is checked here, where a type checker reads it, and a driver that
-    #: stops answering to this reads as a driver to correct rather than as a flow that fails
-    #: on its first turn.
+    # : The one line that says :mod:`hmz.coganchor.agents` answers to the interfaces above. Written
+    # as : an assignment rather than as inheritance because the arrow points the other way: a : flow
+    # names what it drives, and a driver is written without ever naming a flow -- so : what joins
+    # the two is checked here, where a type checker reads it, and a driver that : stops answering to
+    # this reads as a driver to correct rather than as a flow that fails : on its first turn.
     _implemented: tuple[type[Agent], type[Driven], type[Session], type[Person]] = (
         AgentBase,
         AgentBase,

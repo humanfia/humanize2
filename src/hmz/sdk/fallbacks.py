@@ -1,9 +1,9 @@
 """Where a turn goes when the place taking it cannot take it at all, as one object.
 
-A place is a CLI, an account and a model, and a step is written between two of them. How many
-times over a failed turn is taken again is written on the same row, both being answers to the
-one thing that happened. The file is :mod:`hmz.fallbacks`; this is what every way in asks, so
-that a step written from a command line is one the interface's own menu reads back.
+A place is a CLI, an account and a model, and a step is written between two of them. How many times
+over a failed turn is taken again is written on the same row, both being answers to the one thing
+that happened. The file is :mod:`hmz.coganchor.fallbacks`; this is what every way in asks, so that a
+step written from a command line is one the interface's own menu reads back.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hmz.fallbacks import Falls, Policy
+    from hmz.coganchor.fallbacks import Falls, Policy
 
 __all__ = ["Fallbacks"]
 
@@ -21,50 +21,50 @@ class Fallbacks:
 
     def all(self) -> list[Falls]:
         """Every step, in the order they were written down in."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.falls()
 
     @property
     def default(self) -> str:
         """How a failed turn waits unless somebody said otherwise."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.DEFAULT
 
     def policies(self) -> tuple[Policy, ...]:
         """How long a failed turn waits before it is taken again, hardest last."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.POLICIES
 
     def named(self, policy: str) -> Policy | None:
         """The wait one name means, or None for a name none of them goes by."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.named(policy)
 
     def reads(self, said: str) -> str:
         """One place as it is written down, and "" for a spelling no place answers to."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.reads(said)
 
     def spec(self, backend: str, model: str, provider: str = "") -> str:
         """One place, out of the three things a place is."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.spec(backend, model, provider)
 
     def tried(self, said: str) -> Falls:
         """What is written down against one place, which says nothing where nothing is."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.tried(said)
 
     def chain(self, said: str) -> list[str]:
         """The places one turn would walk, the one it starts at first."""
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.chain(said)
 
@@ -81,7 +81,7 @@ class Fallbacks:
         Raises:
           ValueError: If either is not a place, or a step would point at itself.
         """
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.points(said, at)
 
@@ -100,7 +100,7 @@ class Fallbacks:
         Raises:
           ValueError: If it is not a place, or the numbers are not ones to try again by.
         """
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.retrying(said, tries, policy, timeout)
 
@@ -113,6 +113,6 @@ class Fallbacks:
         Returns:
           Whether there was anything written down about it.
         """
-        from hmz import fallbacks
+        from hmz.coganchor import fallbacks
 
         return fallbacks.clear(said)

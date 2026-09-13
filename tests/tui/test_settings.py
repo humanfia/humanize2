@@ -9,8 +9,8 @@ import yaml
 from textual.widgets import Label, OptionList
 
 from hmz import home
-from hmz.kept import Runs
-from hmz.settings import Settings
+from hmz.runtime.kept import Runs
+from hmz.runtime.settings import Settings
 
 from .test_app import until
 
@@ -258,7 +258,7 @@ async def test_the_first_start_asks_whether_humanize_reports_itself(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Asked once, with what it means beside it, and answered for every project after that."""
-    from hmz import telemetry
+    from hmz.runtime import telemetry
     from hmz.tui import Humanize
     from hmz.tui.pick import Reports
 
@@ -286,7 +286,7 @@ async def test_walking_away_from_the_question_is_being_asked_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Silence is not a no and is not a yes: it is a question still to ask."""
-    from hmz import telemetry
+    from hmz.runtime import telemetry
     from hmz.tui import Humanize
     from hmz.tui.pick import Reports
 
@@ -305,7 +305,7 @@ async def test_walking_away_from_the_question_is_being_asked_again(
 async def test_a_machine_that_has_answered_is_not_asked_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from hmz import telemetry
+    from hmz.runtime import telemetry
     from hmz.tui import Humanize
     from hmz.tui.pick import Reports
 
@@ -324,7 +324,7 @@ async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """One page for what is true of this machine, one for what this directory is set up as."""
-    from hmz.kept import Runs
+    from hmz.runtime.kept import Runs
     from hmz.tui import Humanize
     from hmz.tui.pick import Adjusts
 

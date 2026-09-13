@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
-from hmz.epic import epics, state
+from hmz.coganchor.agents import AgentConfig
 from hmz.flows import PROPHECY, NotAFlow, configures, kept, resumes, wanted
 from hmz.flows.prophesying import prophesied
-from hmz.runner import Runner
+from hmz.runtime.epic import epics, state
+from hmz.runtime.runner import Runner
 from hmz.sdk import Hmz
 from tests.stubs import ShellAgent, written
 

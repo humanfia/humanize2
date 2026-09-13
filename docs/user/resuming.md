@@ -155,13 +155,13 @@ Carrying one on is refused while a flow is running, on the sheet rather than on 
 Naming a run rather than taking the last one is the same thing from Python:
 
 ```python
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 
 Runner("nightly", agents, resume=at).run("keep the tests green")
 ```
 
 `at` is that run's own directory: what *where it is* prints, and what
-[`hmz.epic.epics()`](/reference/tracing#epics) lists.
+[`hmz.runtime.epic.epics()`](/reference/tracing#epics) lists.
 
 ## What carrying on runs
 

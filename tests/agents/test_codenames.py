@@ -16,8 +16,8 @@ import threading
 
 import pytest
 
-from hmz.agents import AgentConfig, codenames
-from hmz.agents.codenames import HEIRS, JOINS, STEMS, WORDS, codename
+from hmz.coganchor.agents import AgentConfig, codenames
+from hmz.coganchor.agents.codenames import HEIRS, JOINS, STEMS, WORDS, codename
 from tests.stubs import ShellAgent
 
 CONFIG = AgentConfig(model="m", effort="high")

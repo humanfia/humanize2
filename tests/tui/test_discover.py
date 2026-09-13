@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from hmz import backends
+from hmz.coganchor import backends
 from hmz.tui import discover
 
 if TYPE_CHECKING:
@@ -105,7 +105,7 @@ def test_the_backend_that_arrives_with_humanize_is_asked_whether_it_is_set_up(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Its SDK arrives whatever happens, so being installed says nothing about being usable."""
-    from hmz.agents import dsh
+    from hmz.coganchor.agents import dsh
 
     def set_up(where: Path) -> bool:
         return where == tmp_path

@@ -17,10 +17,10 @@ from typing import Any
 
 import pytest
 
-from hmz.agents import PERMISSIONS, AgentConfig
 from hmz.cli import main
+from hmz.coganchor.agents import PERMISSIONS, AgentConfig
 from hmz.flows import ENTRY, NotAFlow
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
 #: A flow that drives nothing and writes down what it was handed, next to its own file. AGENTS
@@ -30,7 +30,7 @@ import json
 import os
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -56,7 +56,7 @@ ACCOUNTS = """
 import json
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -74,7 +74,7 @@ import json
 from pathlib import Path
 from typing import Annotated
 
-from hmz.agents import AgentBase, AgentDefaults
+from hmz.coganchor.agents import AgentBase, AgentDefaults
 from hmz.flows import flow
 
 
@@ -96,7 +96,7 @@ import os
 from pathlib import Path
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -132,7 +132,7 @@ from typing import TYPE_CHECKING
 from hmz.flows import flow
 
 if TYPE_CHECKING:
-    from hmz.agents import AgentBase
+    from hmz.coganchor.agents import AgentBase
 
 
 @flow
@@ -434,7 +434,7 @@ import os
 from pathlib import Path
 from typing import NamedTuple
 
-from hmz.agents import AgentBase, HumanAgent
+from hmz.coganchor.agents import AgentBase, HumanAgent
 from hmz.flows import flow
 
 
@@ -486,7 +486,7 @@ import json
 from pathlib import Path
 from typing import NamedTuple
 
-from hmz.agents import HumanAgent
+from hmz.coganchor.agents import HumanAgent
 from hmz.flows import flow
 
 
@@ -554,7 +554,7 @@ import json
 from pathlib import Path
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Moment, Verdict
+from hmz.coganchor.agents import AgentBase, Moment, Verdict
 from hmz.flows import flow
 
 
@@ -574,7 +574,7 @@ def run(agents: Agents, task: str) -> None:
 
 def test_a_flow_says_what_each_agent_has_to_be_able_to_do(tmp_path: Path) -> None:
     """Beside the type, where the flow declares the place -- and read back before the run."""
-    from hmz.agents import Moment
+    from hmz.coganchor.agents import Moment
     from hmz.flows import drives, wanted
 
     flow = _flow(tmp_path, DEMANDING)
@@ -603,7 +603,7 @@ def test_an_agent_that_cannot_do_what_its_place_asks_is_refused_before_the_run(
 
 
 def test_what_a_place_asks_for_is_said_where_it_is_refused(tmp_path: Path) -> None:
-    from hmz.agents import KimiCodeCLIAgent, KimiCodeCLIAgentConfig
+    from hmz.coganchor.agents import KimiCodeCLIAgent, KimiCodeCLIAgentConfig
 
     flow = _flow(tmp_path, DEMANDING)
     agents = [
@@ -850,7 +850,7 @@ def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Talking to a coding agent, with no loop around it: the turns are a conversation."""
-    from hmz.agents import HumanAgent
+    from hmz.coganchor.agents import HumanAgent
     from hmz.flows.builtin.chat import Chat
     from hmz.flows.builtin.chat import run as chat
 
@@ -873,7 +873,7 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Nobody is at a prompt there, so there is nothing to wait for and it returns."""
-    from hmz.agents import HumanAgent
+    from hmz.coganchor.agents import HumanAgent
     from hmz.flows.builtin.chat import Chat
     from hmz.flows.builtin.chat import run as chat
 

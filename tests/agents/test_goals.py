@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,

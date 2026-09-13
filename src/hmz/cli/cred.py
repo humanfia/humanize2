@@ -48,7 +48,7 @@ def cred(argv: list[str]) -> int:
     )
     args = parser.parse_args(argv)
 
-    from hmz.providers import redirect
+    from hmz.coganchor.providers import redirect
 
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:

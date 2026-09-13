@@ -25,18 +25,18 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig, Stopped, Usage
-from hmz.epic import STATE, epics, state
+from hmz.coganchor.agents import AgentConfig, Stopped, Usage
 from hmz.flows import resumes
 from hmz.flows.builtin import chat, ralph_loop, stateful_ralph
-from hmz.runner import Runner
+from hmz.runtime.epic import STATE, epics, state
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
     from pathlib import Path
     from types import ModuleType
 
-    from hmz.agents import AgentBase, Event, SessionBase
+    from hmz.coganchor.agents import AgentBase, Event, SessionBase
 
 CONFIG = AgentConfig(model="m", effort="high")
 

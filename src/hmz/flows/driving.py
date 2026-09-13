@@ -20,8 +20,8 @@ call made from inside either lands under the one it was made from, a session ope
 is written into that one's record, and what is running, read from inside a flow, is the
 branch that flow is on and not everything the run happens to be doing.
 
-Nothing here reads a command line and nothing here opens an epic: :mod:`hmz.runner` does both,
-and asks this what the flow it was named says about itself. A call asks the epic already open
+Nothing here reads a command line and nothing here opens an epic: :mod:`hmz.runtime.runner` does
+both, and asks this what the flow it was named says about itself. A call asks the epic already open
 for a record to be written into, which is not a second epic: it is part of the one run.
 """
 
@@ -45,14 +45,14 @@ from typing import (
     get_type_hints,
 )
 
-from hmz import telemetry
+from hmz.runtime import telemetry
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Generator, Mapping, Sequence
 
     from pydantic import BaseModel
 
-    from hmz.agents import (
+    from hmz.coganchor.agents import (
         AgentBase,
         AgentConfig,
         AgentDefaults,
@@ -61,10 +61,10 @@ if TYPE_CHECKING:
         Needs,
         Remote,
     )
-    from hmz.agents.base import Journal
-    from hmz.agents.skills import Loaded
-    from hmz.epic import Epic, Sub
-    from hmz.machines import MachineBase, MachineConfig, Mapped
+    from hmz.coganchor.agents.base import Journal
+    from hmz.coganchor.agents.skills import Loaded
+    from hmz.coganchor.machines import MachineBase, MachineConfig, Mapped
+    from hmz.runtime.epic import Epic, Sub
 
     from . import Flow as Marked
     from .agent import Agent, Driven
@@ -337,7 +337,7 @@ def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None
     if not image:
         yield None
         return
-    from hmz.machines import AnchoredConfig, DockerConfig, Mapped
+    from hmz.coganchor.machines import AnchoredConfig, DockerConfig, Mapped
 
     with _ENTERING:
         if _INSIDE or _COMING:
@@ -387,8 +387,8 @@ def lands_in(agents: Sequence[Agent], where_: MachineConfig) -> None:
       RuntimeError: If one of them has already opened a conversation, which is a conversation
         that cannot be moved.
     """
-    from hmz.agents import HumanAgent
-    from hmz.machines import DockerConfig
+    from hmz.coganchor.agents import HumanAgent
+    from hmz.coganchor.machines import DockerConfig
 
     for one in agents:
         if isinstance(one, HumanAgent) or isinstance(one.config.machine, DockerConfig):
@@ -1100,7 +1100,7 @@ def _writes(driven: Sequence[Agent]) -> Epic | None:
       The record, or None for a call from a flow nothing is keeping a record of -- one run
       from a test, one called from nothing.
     """
-    from hmz.epic import Epic
+    from hmz.runtime.epic import Epic
 
     at = _ON.get()
     if at is None:
@@ -1534,7 +1534,7 @@ def _handed(
         place needs, if one is somewhere the flow does not put it, or if `drives` names
         something the flow does not drive.
     """
-    from hmz.agents import HumanAgent
+    from hmz.coganchor.agents import HumanAgent
 
     given = list(agents)
     asked = [place for place in places if not place.person]
@@ -1636,7 +1636,7 @@ def _differently(
         answer to, or the person at the prompt -- who runs nothing anybody chose and so has
         nothing to be driven at.
     """
-    from hmz.agents import HumanAgent
+    from hmz.coganchor.agents import HumanAgent
 
     made = list(driven)
     where: dict[str, int | None] = {}
@@ -1691,7 +1691,7 @@ def _holding(under: Epic | None, named: str) -> dict[str, Any]:
     Returns:
       What it left behind last time, as something to write this time's into.
     """
-    from hmz.epic import resumed, state
+    from hmz.runtime.epic import resumed, state
 
     if under is None:
         return {}
@@ -1765,7 +1765,7 @@ def comes_to(
       no backend against those because they are true of all of them, and a place that asked
       for one would otherwise be refused every agent there is.
     """
-    from hmz.backends import named
+    from hmz.coganchor.backends import named
 
     from .checking import catalogue
 
@@ -1814,7 +1814,7 @@ def lands(
         where it works does not come to what the flow says that place needs, or if it has
         already opened a session, which is a conversation that cannot be moved.
     """
-    from hmz.agents import Isolated, isolated
+    from hmz.coganchor.agents import Isolated, isolated
 
     called = place.name or "the agent"
     if isinstance(place.where, Isolated):
@@ -1857,7 +1857,7 @@ def _run_in(image: str) -> MachineConfig | None:
     Returns:
       The settings every agent of that run will be pointed at, or None for a run here.
     """
-    from hmz.agents import isolated
+    from hmz.coganchor.agents import isolated
 
     return isolated(image) if image else None
 
@@ -1933,7 +1933,7 @@ def runs_at(flow: str | os.PathLike[str], agent: Agent, place: Place) -> AgentCo
     """
     from dataclasses import replace
 
-    from hmz.agents import PERMISSIONS
+    from hmz.coganchor.agents import PERMISSIONS
 
     was = agent.config
     wanted = replace(
@@ -2159,7 +2159,7 @@ def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
       What it wrote beside the type -- `Remote`, or an `Isolated` naming an image -- and None
       for a place it annotated with the type alone, which is one that works here.
     """
-    from hmz.agents import Isolated, Remote
+    from hmz.coganchor.agents import Isolated, Remote
 
     if get_origin(kind) is not Annotated:
         return None
@@ -2179,7 +2179,7 @@ def _needs(kind: object) -> Needs | None:
       The `Needs` it wrote beside the type, and None for a place it wrote none beside --
       which is one any backend may fill, working wherever the rest of the annotation allows.
     """
-    from hmz.agents import Needs
+    from hmz.coganchor.agents import Needs
 
     if get_origin(kind) is not Annotated:
         return None
@@ -2199,7 +2199,7 @@ def _goal(kind: object) -> bool:
       True if it wrote `Goal` beside the type, and False for a place annotated with the type
       alone -- which is one driven by turns like every other.
     """
-    from hmz.agents import Goal
+    from hmz.coganchor.agents import Goal
 
     if get_origin(kind) is not Annotated:
         return False
@@ -2217,7 +2217,7 @@ def _runs(kind: object) -> AgentDefaults:
       on, the web readable -- for a place it wrote none beside, which settles nothing: those
       are the loosest of each, and what an agent carries is never loosened.
     """
-    from hmz.agents import AgentDefaults
+    from hmz.coganchor.agents import AgentDefaults
 
     if get_origin(kind) is Annotated:
         for said in get_args(kind)[1:]:
@@ -2236,7 +2236,7 @@ def _moments(kind: object) -> tuple[Moment, ...]:
       Whatever moments it wrote beside the type, in the order it wrote them, and nothing at
       all for a place it annotated with the type alone.
     """
-    from hmz.agents import Moment
+    from hmz.coganchor.agents import Moment
 
     if get_origin(kind) is not Annotated:
         return ()
@@ -2255,7 +2255,7 @@ def _is_person(kind: object) -> bool:
       answers to that interface is taken for it too: a flow written before there was one names
       the driver, and the place it meant is the same place.
     """
-    from hmz.agents import HumanAgent
+    from hmz.coganchor.agents import HumanAgent
 
     from .agent import Person
 

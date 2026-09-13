@@ -16,16 +16,16 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.coganchor import AnchorConfig
+from hmz.coganchor.machines import Mapped
 from hmz.coganchor.proto import Channel
 from hmz.coganchor.serve.exports import ExportTable
 from hmz.coganchor.serve.server import Server
-from hmz.machines import Mapped
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from hmz.machines import Ran
+    from hmz.coganchor.machines import Ran
 
 #: The workspace both sides name. It is on neither of them, so anything read or run under it
 #: came back through the target rather than out of this directory.

@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig, Stopped
 from hmz.cli import main
-from hmz.epic import epics, opened
+from hmz.coganchor.agents import AgentConfig, Stopped
 from hmz.flows import NotAFlow, configures, drives, wanted
-from hmz.runner import Runner
+from hmz.runtime.epic import epics, opened
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, events
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ import json
 from pathlib import Path
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -63,7 +63,7 @@ FANNED = """
 import json
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -81,7 +81,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -102,7 +102,7 @@ async def run(agents: tuple[AgentBase], task: str, config: Config | None = None)
 
 #: A coroutine flow that fails partway, which is a flow that failed and not a flow to correct.
 FAILING = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -115,7 +115,7 @@ async def run(agents: tuple[AgentBase], task: str) -> None:
 #: A coroutine flow stopped by hand: the agent is told to take no further turn, and the turn
 #: after that raises where the flow is waiting for it.
 STOPPED = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -135,7 +135,7 @@ import json
 from pathlib import Path
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -162,7 +162,7 @@ async def run(agents: Agents, task: str) -> None:
 #: A flow whose agents are a tuple of any length, which is no answer to how many it drives --
 #: refused for a coroutine exactly as it is for a function.
 UNCOUNTED = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -367,7 +367,7 @@ def test_a_flow_that_is_not_a_coroutine_is_run_exactly_as_it_was(
 import json
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

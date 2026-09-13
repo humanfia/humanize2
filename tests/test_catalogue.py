@@ -2,7 +2,7 @@
 
 Honesty tests: every name the catalogue uses is a real moment, a real backend or a real
 member of the interfaces a flow is written against, and every backend set is exactly what
-the live driver classes declare or what the facts in `hmz.backends` say. The catalogue is
+the live driver classes declare or what the facts in `hmz.coganchor.backends` say. The catalogue is
 what a compiler steers by, and a capability it invented -- or one that drifted from the
 drivers -- is a generated flow that asks for what nothing serves.
 
@@ -18,13 +18,13 @@ import inspect
 import sys
 from typing import TYPE_CHECKING
 
-from hmz.agents import DRIVEN, EVERYWHERE, Moment
-from hmz.backends import PROFILES, Bundled, Hooked, Profile, named
+from hmz.coganchor.agents import DRIVEN, EVERYWHERE, Moment
+from hmz.coganchor.backends import PROFILES, Bundled, Hooked, Profile, named
 from hmz.flows import Agent, Person, Session
 from hmz.flows.checking import briefed, catalogue, offered, surface
 
 if TYPE_CHECKING:
-    from hmz.agents.base import SessionBase
+    from hmz.coganchor.agents.base import SessionBase
 
 #: The backends whose turns can be talked to while they are running, which is the whole of
 #: what `steers` claims: each holds its turn open somewhere a later word can reach -- a
@@ -142,7 +142,7 @@ def test_a_backend_that_steers_a_running_turn_says_so_and_one_that_cannot_says_s
 def test_the_catalogue_says_which_backends_steer_and_which_fork() -> None:
     told = {one.name: one.backends for one in catalogue()}
     assert told["steer"] == frozenset(_STEERING)
-    # Read off `hmz.backends` rather than off the drivers: a fork is the CLI's own, so the
+    # Read off `hmz.coganchor.backends` rather than off the drivers: a fork is the CLI's own, so the
     # one place a fact about a CLI is written is where the catalogue asks.
     assert told["fork"] == frozenset(
         name for name in DRIVEN if (one := named(name)) is not None and one.forks

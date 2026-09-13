@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
-from hmz.agents.event import Event, Usage
 from hmz.cli import main
 from hmz.cli.output import Out, Shown, colours, terminal
-from hmz.prices import money
+from hmz.coganchor.agents import AgentConfig
+from hmz.coganchor.agents.event import Event, Usage
+from hmz.coganchor.prices import money
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:

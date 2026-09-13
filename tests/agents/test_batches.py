@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, ClassVar
 import pytest
 from pydantic import BaseModel
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     WINDOW,
     AgentBase,
     AgentConfig,

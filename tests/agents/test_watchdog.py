@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING
 import psutil
 import pytest
 
-from hmz import backends
-from hmz.agents import (
+from hmz.coganchor import backends
+from hmz.coganchor.agents import (
     AgentBase,
     AgentConfig,
     CommandSessionBase,
@@ -28,7 +28,7 @@ from hmz.agents import (
     SessionBase,
     StreamSessionBase,
 )
-from hmz.agents.watchdog import WATCHDOG, Watchdog, held, silence
+from hmz.coganchor.agents.watchdog import WATCHDOG, Watchdog, held, silence
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -204,7 +204,7 @@ def test_a_wedged_turn_fails_as_a_turn_rather_than_as_a_stop() -> None:
     against the same conversation, which is what the retry ladder above this does with a
     `Failed` and does not do with anything else.
     """
-    from hmz.agents import Failed, Stopped, Unrecoverable
+    from hmz.coganchor.agents import Failed, Stopped, Unrecoverable
 
     session = _agent(_Stream).new()
     with pytest.raises(Failed) as failed:
@@ -334,7 +334,7 @@ def test_the_window_is_the_backend_s_own_and_the_environment_outranks_it(
 
 
 def test_what_survives_a_transport_going_down_is_written_where_the_facts_are() -> None:
-    """Which backends resume, said in `hmz.backends` rather than guessed at by a watchdog."""
+    """Which backends resume is said where the facts are, not guessed at by a watchdog."""
     assert all(one.resumes for one in backends.PROFILES)
     assert all(one.restarts for one in backends.PROFILES)
     # An app server is one per agent: putting it down for one wedged turn ends its siblings,

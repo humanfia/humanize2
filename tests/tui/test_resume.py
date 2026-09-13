@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.epic import epics, state
+from hmz.runtime.epic import epics, state
 from hmz.tui import Humanize
 from tests.stubs import written
 from tests.tui.conftest import transcript, until
@@ -35,7 +35,7 @@ COUNTS = '''"""Counts the runs of itself."""
 from pathlib import Path
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -50,7 +50,7 @@ PLAIN = '''"""Runs once, and says nothing about being picked up."""
 
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -66,7 +66,7 @@ BLANK = '''"""Says it can be picked up, and never writes down where it got to.""
 from pathlib import Path
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -81,7 +81,7 @@ EMPTIES = '''"""Writes down where it got to, and then says the next run starts c
 
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -130,8 +130,8 @@ def _ran(flow: str, task: str) -> None:
     is carried on as a command line naming what each of its agents runs, so the agents of a
     run have to be agents something can name.
     """
-    from hmz.agents import driver
-    from hmz.runner import Runner
+    from hmz.coganchor.agents import driver
+    from hmz.runtime.runner import Runner
 
     agent, config = driver("claude")
     Runner(flow, [agent(config(model="m", effort="high"))]).run(task)
@@ -227,7 +227,7 @@ async def test_a_record_that_cannot_be_read_back_says_so(workspace: Path) -> Non
     Which is the very case this command is for -- a turn that took the process with it -- so
     it says so rather than raising out of the prompt.
     """
-    from hmz.epic import under
+    from hmz.runtime.epic import under
 
     half = under(workspace) / "20260101T000000.000Z-halfway"
     half.mkdir(parents=True)
@@ -283,7 +283,7 @@ async def test_a_flow_marked_since_the_run_is_asked_of_the_flow(
 @pytest.mark.timeout(60)
 async def test_carrying_on_is_refused_while_a_flow_is_running(workspace: Path) -> None:
     """A run picked up is a flow started, and there is one going. `ctrl+c` twice stops it."""
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     _ran("counts", "keep going")
 
@@ -308,7 +308,7 @@ async def test_carrying_on_is_refused_while_the_flow_is_still_unwinding(
     a round the stopped run had already recorded. And `ctrl+c twice` is not the answer here,
     since that is what was just pressed.
     """
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     _ran("counts", "keep going")
 

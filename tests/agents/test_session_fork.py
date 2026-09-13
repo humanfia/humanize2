@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     AgentConfig,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
@@ -40,8 +40,8 @@ from hmz.agents import (
     SessionBase,
     StreamSessionBase,
 )
-from hmz.agents.skills import Loaded
-from hmz.epic import Epic, sessions
+from hmz.coganchor.agents.skills import Loaded
+from hmz.runtime.epic import Epic, sessions
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:

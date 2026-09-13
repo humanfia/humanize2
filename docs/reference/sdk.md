@@ -29,7 +29,7 @@ a workspace is what loads the tracer.
 | --- | --- |
 | `workspace` | The project directory, as a `Path`. |
 | `home` | Where humanize keeps what outlives one run — `~/.humanize`, or `$HUMANIZE_HOME`. |
-| `settings` | [What humanize remembers](/reference/tui#what-it-remembers) about this workspace, as `hmz.settings.Settings`. |
+| `settings` | [What humanize remembers](/reference/tui#what-it-remembers) about this workspace, as `hmz.runtime.settings.Settings`. |
 | `flows` | [The flows there are](#flows), and the places they come from. |
 | `verses` | [Where flows come from](#flowverses) — the same object as `hmz.flows.verses`. |
 | `accounts` | [The accounts an agent may be run as](#accounts), and what each backend runs as one. |
@@ -38,10 +38,10 @@ a workspace is what loads the tracer.
 
 | Method | |
 | --- | --- |
-| `backends()` | Every coding agent CLI humanize drives, as `hmz.backends.Profile`. |
+| `backends()` | Every coding agent CLI humanize drives, as `hmz.coganchor.backends.Profile`. |
 | `reports()` | Starts [reporting humanize's own failures](/user/reporting) where that has been answered yes. Returns whether anything is being reported. |
 | `read(argv)` | Reads an `hmz exec` line into `(flow, agents, task, config, container)`. |
-| `runner(flow, agents, config=None, resume=None, container="")` | Loads a flow and hands it the agents it was written for, as `hmz.runner.Runner`. |
+| `runner(flow, agents, config=None, resume=None, container="")` | Loads a flow and hands it the agents it was written for, as `hmz.runtime.runner.Runner`. |
 | `run(flow, agents, task, config=None, resume=None, container="")` | The same, as a [`Run`](#run). |
 | `exec(argv)` | The whole of `hmz exec`: reads the line, loads the flow, runs it to its return. |
 
@@ -143,7 +143,7 @@ backend runs as one of them.
 
 ## Fallbacks
 
-`hmz.fallbacks` — [where a turn goes](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken)
+`hmz.coganchor.fallbacks` — [where a turn goes](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken)
 when the place taking it cannot take it at all.
 
 | | |

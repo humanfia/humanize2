@@ -19,10 +19,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig, Isolated, Needs, Remote, anchored
+from hmz.coganchor.agents import AgentConfig, Isolated, Needs, Remote, anchored
+from hmz.coganchor.machines import DockerConfig
 from hmz.flows import NotAFlow, wanted
-from hmz.machines import DockerConfig
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ CONFIG = AgentConfig(model="m", effort="high")
 DECLARED = '''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated, Remote
+from hmz.coganchor.agents import AgentBase, Isolated, Remote
 from hmz.flows import flow
 
 
@@ -55,7 +55,7 @@ def run(agents: Agents, task: str) -> None:
 ELSEWHERE = '''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs, Remote
+from hmz.coganchor.agents import AgentBase, Needs, Remote
 from hmz.flows import flow
 
 
@@ -74,7 +74,7 @@ def run(agents: Agents, task: str) -> None:
 CONTAINED = '''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated, Needs
+from hmz.coganchor.agents import AgentBase, Isolated, Needs
 from hmz.flows import flow
 
 
@@ -95,7 +95,7 @@ def run(agents: Agents, task: str) -> None:
 MANAGED = '''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs, Remote
+from hmz.coganchor.agents import AgentBase, Needs, Remote
 from hmz.flows import flow
 
 
@@ -114,7 +114,7 @@ def run(agents: Agents, task: str) -> None:
 IMPOSSIBLE = '''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated, Needs
+from hmz.coganchor.agents import AgentBase, Isolated, Needs
 from hmz.flows import flow
 
 
@@ -133,7 +133,7 @@ def run(agents: Agents, task: str) -> None:
 ANYWHERE_ELSE = '''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs, Remote
+from hmz.coganchor.agents import AgentBase, Needs, Remote
 from hmz.flows import flow
 
 
@@ -150,7 +150,7 @@ def run(agents: Agents, task: str) -> None:
 
 #: A flow that says nothing about where its one agent works, which is most flows.
 PLAIN = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

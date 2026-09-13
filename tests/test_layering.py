@@ -1,20 +1,23 @@
 """The structural rules of the package tree, in one table.
 
-Two things nothing else can check. The layers keep the dependencies the merged projects had:
-`agents` names the machine its turns land on, so it reads `machines`, and a machine hands back
-an anchor, so `machines` reads `coganchor`. A flow is written against `flows` and names nothing
-else, which is what makes `flows` the layer that names the agents rather than the flow doing
-it; `runner` is what reads a command line into one and writes the run down as `epic`.
-`tracing` reads the logs back afterwards and needs only where they are. Nothing points both
-ways, which is checked here too.
+Two things nothing else can check. The layers keep the dependencies the merged projects had,
+gathered now into the directories the tree is made of: `coganchor` is everything humanize
+knows about driving a coding agent CLI -- what each one is, driving it, the account it runs
+as, the machine its turns land on and the anchor onto that machine -- and it is the layer
+`flows` and `runtime` are written against. A flow is written against `flows` and names
+nothing else, which is what makes `flows` the layer that names the agents rather than the
+flow doing it; `runtime` is what reads a command line into a run, drives it, writes it down
+as an epic and reads the whole of it back afterwards. Nothing points both ways, which is
+checked here too.
 
 And the target half runs on the target, which may be any architecture, while
 :mod:`hmz.coganchor.linux` picks a register map at import time and refuses any architecture it
-has not got one for -- so the serving half must not reach the agent half, nor may anything a
-caller imports to configure one.
+has not got one for -- so the serving half must not reach the rest of `coganchor`, nor may
+anything a caller imports to configure one.
 
-The rules are on the layers alone. Above them sits the command line, which joins them and so
-may name any of them -- and which is checked instead by what a run of it actually loads.
+The rules are on the layers alone. Above them sit the ways in, and above those the command
+line, which joins them and so may name any of them -- and which is checked instead by what a
+run of it actually loads.
 """
 
 from __future__ import annotations
@@ -32,129 +35,90 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 #: What each layer may import besides its own subtree and :mod:`hmz` itself. Longest
 #: matching layer wins, and a layer it may name covers the modules inside that layer.
 ALLOWED: dict[str, set[str]] = {
-    # Driving a backend is acting on the facts about it -- where it keeps the skills it
-    # would load, so that an agent given some can be told about the rest -- and `backends`
-    # is the leaf those are written down in. It names nothing itself, so this widens the DAG
-    # without bending it, exactly as it does for a flow below.
-    "hmz.agents": {
-        "hmz.backends",
-        "hmz.coganchor",
-        # A turn that has walked its accounts to the end asks where the agent itself falls
-        # back to, and builds the agent that is named. It names only `backends`, so this
-        # widens the DAG without bending it.
-        "hmz.fallbacks",
-        "hmz.machines",
-        # Which account a turn runs as is a setting of the agent, so driving one reads the
-        # providers. They name nothing above themselves, so this widens the DAG without
-        # bending it -- as `backends` does below.
-        "hmz.providers",
-        # A skill a flow brought that a session will not read because something of that name
-        # is already there is noticed here and nowhere else. The reporter names nothing above
-        # itself, so this widens the DAG without bending it.
-        "hmz.telemetry",
-    },
-    "hmz.backends": set(),
-    "hmz.coganchor": set(),
-    # Where a turn goes when the agent taking it cannot take it at all, which is written
-    # between two agents. An agent is named the way a command line names one, so this reads
-    # `backends` to read one -- the leaf those facts are written down in, which names nothing
-    # itself and so widens the DAG without bending it. It names no agent and no account: what
-    # is written down is two lines of text, and whoever walks the chain builds what it names.
-    "hmz.fallbacks": {"hmz.backends"},
-    "hmz.coganchor.serve": {"hmz.coganchor", "hmz.coganchor.proto"},
-    # A run writes down which sessions its agents opened, and points a link at each of the
-    # logs the backend is writing them to. Where those logs are is a fact about the CLI, and
-    # `backends` is the leaf those are written down in: it names nothing, so this widens the
-    # DAG without bending it. And a run that is being profiled samples the programs its
-    # agents start, which is `tracing`: what a run left behind, read back.
-    "hmz.epic": {"hmz.agents", "hmz.backends", "hmz.tracing"},
-    # One run packaged up to send somewhere, which is that run read back with every link
-    # followed. It names what a run is, the facts about the CLIs that ran it -- where each
-    # keeps its logs, what each is installed as -- the accounts, whose values it strikes out
-    # of everything it carries, and where a profile of a run is written. None of those names
-    # it back, so this widens the DAG without bending it.
-    "hmz.exporting": {
-        "hmz.backends",
-        "hmz.epic",
-        "hmz.providers",
-        "hmz.tracing",
-    },
-    # What a flow is written against, which is why it is also the one import a flow needs:
-    # the agents it drives, and the facts a loop steers by. A flow that has to know where
-    # its own agent keeps its tasks, or what models that account runs, is reading a fact
-    # rather than a log -- `backends` is the leaf those are written down in and `models` is
-    # what asks a CLI, and neither names anything above itself, so both widen the DAG
-    # without bending it. The run one flow makes when it calls another is written into the
-    # epic of the run that called it, and a failure in any of them is reported by the one
-    # reporter every layer may reach for.
-    "hmz.flows": {
-        "hmz.agents",
-        "hmz.backends",
-        "hmz.epic",
-        # Where a flow says one of its agents works, which is a container of the flow's own
-        # naming. It names only the anchor under it, so this widens the DAG without bending
-        # it.
-        "hmz.machines",
-        "hmz.models",
-        "hmz.telemetry",
-    },
+    # Everything humanize knows about driving a coding agent CLI, which is one layer because
+    # it is one capability: the facts about each CLI, the drivers, the accounts a turn runs
+    # as, the machine it lands on, where a turn goes when the place taking it cannot, what a
+    # token costs, and the anchor that puts an agent's work on another machine. What is
+    # inside it names what is beside it freely -- as the insides of `flows`, `tui` and `sdk`
+    # do -- and the one edge out is the reporter every layer may reach for, which names
+    # nothing above itself and so widens the DAG without bending it.
+    "hmz.coganchor": {"hmz.runtime.telemetry"},
+    # Except the target half, which is held apart from the rest of its own package. It runs
+    # on the target, which may be any architecture and has only what the bundle carried, so
+    # it may name the wire and nothing else -- not even the package it sits in, whose name
+    # would be leave to name every driver in it.
+    "hmz.coganchor.serve": {"hmz.coganchor.proto"},
+    # What a run is: driving one, writing it down as it happens, and reading it back
+    # afterwards. Held open as its own modules rather than closed as one layer, because what
+    # humanize reports about itself lives here and every layer may reach for it -- including
+    # the one this names.
+    "hmz.runtime": set(),
     # What an agent is written down as, which is a shape and a file and nothing else: the
     # interface keeps them and a command line reads the same ones, so it sits under both.
-    "hmz.kept": set(),
+    "hmz.runtime.kept": set(),
     # What humanize remembers: what each workspace was set up to run, and the handful of
     # settings that are not a workspace's. A leaf for the reason `kept` is one -- the
     # interface writes them and a command line has to be able to read them without loading
     # the interface to do it -- and it names `kept` because an agent is written down the
     # same way wherever it is written down.
-    "hmz.settings": {"hmz.kept"},
+    "hmz.runtime.settings": {"hmz.runtime.kept"},
     # What humanize reports about itself, which every layer may do and none of them may be
     # reached into to do: what goes with a report is handed over as a callable by whoever
     # knows it. So this names only the setting that says whether to report at all.
-    "hmz.telemetry": {"hmz.settings"},
-    "hmz.machines": {"hmz.coganchor"},
-    # What a backend runs is asked of that backend as the account whose it would be, so the
-    # asking reads the facts about the CLI and the providers it could be run as. Neither
-    # names it back, so this widens the DAG without bending it.
-    "hmz.models": {"hmz.backends", "hmz.providers"},
-    # What a token costs in money, fetched from a list somebody else keeps and kept under
-    # humanize's own home. A leaf for the reason `backends` is one: it is read where a
-    # figure is drawn, and reading a price must cost nothing of the layer the price is about.
-    "hmz.prices": set(),
-    "hmz.runner": {
-        "hmz.agents",
-        "hmz.backends",
-        "hmz.epic",
-        "hmz.flows",
-        # Whether a run here is profiled as well as traced, which is a workspace's own
-        # setting. A leaf, like the agents kept under a name beside it.
-        "hmz.settings",
-        # What a run is, said where a report of a failure in one can reach it. The reporter
-        # names nothing above itself, so this widens the DAG without bending it.
-        "hmz.telemetry",
+    "hmz.runtime.telemetry": {"hmz.runtime.settings"},
+    # One run of one flow as a directory: the journal, the links to each session's log, and
+    # what a flow that can be picked up left behind. It names the agents it drove and the
+    # facts about the CLIs they are, and points a link at each of the logs the backend is
+    # writing them to -- and a run that is being profiled samples the programs its agents
+    # start, which is `tracing`: what a run left behind, read back.
+    "hmz.runtime.epic": {"hmz.coganchor", "hmz.runtime.tracing"},
+    # Reading the backends' logs back, which needs only where they are.
+    "hmz.runtime.tracing": {"hmz.coganchor"},
+    # One run packaged up to send somewhere, which is that run read back with every link
+    # followed. It names what a run is, the facts about the CLIs that ran it, the accounts
+    # whose values it strikes out of everything it carries, and where a profile of a run is
+    # written. None of those names it back.
+    "hmz.runtime.exporting": {
+        "hmz.coganchor",
+        "hmz.runtime.epic",
+        "hmz.runtime.tracing",
     },
-    # A provider is credentials for one backend, kept apart from that backend's own, and it
-    # is run under the same interception a session on another machine is: the facts about the
-    # CLI, and the ptrace layer that answers a path. Neither of those names it back.
-    "hmz.providers": {"hmz.backends", "hmz.coganchor"},
-    "hmz.tracing": {"hmz.backends"},
-    # humanize as one object, which is what the command line, the daemon and the interface
-    # all hold. It is above the layers and below the four ways in, so it may name any of
-    # them and none of them may name it -- which is what keeps `hmz exec` from paying for a
-    # tracer: everything here is reached from inside the call that needs it.
-    "hmz.sdk": {
-        "hmz.agents",
-        "hmz.backends",
-        "hmz.epic",
-        "hmz.exporting",
-        "hmz.fallbacks",
+    # Handing a flow the agents it declared, naming them, and running it under an epic. Also
+    # reads the `hmz exec` line, which the interface starts a flow from too. What the flow
+    # says it drives is `flows`'s to answer.
+    "hmz.runtime.runner": {
+        "hmz.coganchor",
         "hmz.flows",
-        "hmz.kept",
-        "hmz.models",
-        "hmz.providers",
-        "hmz.runner",
-        "hmz.settings",
-        "hmz.telemetry",
-        "hmz.tracing",
+        "hmz.runtime.epic",
+        "hmz.runtime.settings",
+        "hmz.runtime.telemetry",
+    },
+    # What a flow is written against, which is why it is also the one import a flow needs:
+    # the agents it drives, and the facts a loop steers by. A flow that has to know where
+    # its own agent keeps its tasks, or what models that account runs, is reading a fact
+    # rather than a log, and those are `coganchor`'s. The run one flow makes when it calls
+    # another is written into the epic of the run that called it, and a failure in any of
+    # them is reported by the one reporter every layer may reach for.
+    "hmz.flows": {
+        "hmz.coganchor",
+        "hmz.runtime.epic",
+        "hmz.runtime.telemetry",
+    },
+    # humanize as one object, which is what the command line, the daemon and the interface
+    # all hold. It is above the layers and below the ways in, so it may name any of them and
+    # none of them may name it -- which is what keeps `hmz exec` from paying for a tracer:
+    # everything here is reached from inside the call that needs it.
+    "hmz.sdk": {
+        "hmz.coganchor",
+        "hmz.flows",
+        "hmz.runtime",
+        "hmz.runtime.epic",
+        "hmz.runtime.exporting",
+        "hmz.runtime.kept",
+        "hmz.runtime.runner",
+        "hmz.runtime.settings",
+        "hmz.runtime.telemetry",
+        "hmz.runtime.tracing",
     },
     # The run held where a terminal closing cannot end it, which knows nothing of what a run
     # is: it is handed something that opens one and returns when it is over. A leaf, so that
@@ -162,53 +126,41 @@ ALLOWED: dict[str, set[str]] = {
     # half that drives coding agents.
     "hmz.daemon": set(),
     "hmz.tui": {
-        "hmz.agents",
-        "hmz.backends",
-        # The runs of this directory, which `/epics` lists and picks one up from. It names
-        # the agents and the facts about them, both of which are under the interface too.
-        "hmz.epic",
-        # How big a bundle came out, which `/export` says of the run on the screen and
-        # `/epics` says of a run out of the list. Writing one is asked of `sdk` like
-        # everything else the interface does rather than draws; how many bytes it came to is
-        # said in words, and one archive said two ways would be two ways to say it.
-        "hmz.exporting",
-        # `/fallback` is where it is said what a turn does when the agent taking it cannot,
-        # which is the other half of what `/providers` says about an account. It names only
-        # `backends`, so this widens the DAG without bending it.
-        "hmz.fallbacks",
+        # The agents, the facts about them, the accounts they run as, what a turn falls back
+        # to and what a token costs -- all of which are one layer now, and all of which the
+        # sheets read to draw what they are about.
+        "hmz.coganchor",
         "hmz.flows",
+        # The runs of this directory, which `/epics` lists and picks one up from, and how big
+        # a bundle of one came out. Writing one is asked of `sdk` like everything else the
+        # interface does rather than draws; how many bytes it came to is said in words.
+        "hmz.runtime.epic",
+        "hmz.runtime.exporting",
         # The agents written down under a name, which the Agents page of `/flow` walks and
         # `hmz exec` reads back. It names nothing, so this widens the DAG without bending it.
-        "hmz.kept",
-        # What a token costs in money, which is drawn everywhere a token count is. It names
-        # nothing above itself, so this widens the DAG without bending it.
-        "hmz.prices",
-        # `/providers` is where an account is made and `/agents` is where one is given to an
-        # agent, so the interface reads the same leaf the agents do. It names nothing above
-        # itself, so this widens the DAG without bending it.
-        "hmz.providers",
-        # humanize as one object, which is what starts a flow, gathers a trace of one that
-        # has ended, and walks every store the sheets show. Everything the interface does
-        # rather than draws is asked of it -- which is why the runner, what humanize
-        # remembers and what each CLI runs are not named here: the sheets reach all three
-        # through this and nothing here may reach past it to them.
-        "hmz.sdk",
+        "hmz.runtime.kept",
         # The interface is where humanize's own failures are answered for -- it is the one
         # thing here with somebody to ask -- and where what it does that nobody meant is
         # noticed. The reporter names nothing above itself.
-        "hmz.telemetry",
+        "hmz.runtime.telemetry",
+        # humanize as one object, which is what starts a flow, gathers a trace of one that
+        # has ended, and walks every store the sheets show. Everything the interface does
+        # rather than draws is asked of it -- which is why the runner and what humanize
+        # remembers are not named here: the sheets reach both through this and nothing here
+        # may reach past it to them.
+        "hmz.sdk",
     },
 }
 
 #: What reaching the target half costs besides: the two modules of the command line that route
-#: to it, and the settings module that coganchor's own `__init__` names on the way past. All
-#: are held to the same bar as the package itself and import their machinery only when it is
-#: used. Loaded rather than imported, so this widens what a run may load and not what the
-#: serving half may name.
+#: to it, and the front door of the package they route through. All are held to the same bar as
+#: the package itself and import their machinery only when it is used. Loaded rather than
+#: imported, so this widens what a run may load and not what the serving half may name.
 STARTUP = {
     "hmz",
     "hmz.cli",
     "hmz.cli.anchor",
+    "hmz.coganchor",
     "hmz.coganchor.anchor",
 }
 
@@ -242,7 +194,16 @@ def _imports(source: Path) -> set[str]:
             named.add(module)
             named.update(f"{module}.{alias.name}" for alias in node.names)
     # A from-import names a module only when one exists on disk; the rest are the objects in it.
-    return {name for name in named if name.split(".")[0] == "hmz" and _is_module(name)}
+    held = {name for name in named if name.split(".")[0] == "hmz" and _is_module(name)}
+    # And a package a submodule was taken out of is not a thing named: `from hmz.runtime
+    # import telemetry` names the reporter, not everything beside it. The package is there
+    # because that is how the spelling reads, and counting it would let one entry in the
+    # table say a whole directory the import never touched. Which is the same answer already
+    # given to `hmz` itself, whose name prefixes every other -- so that one stays carved out
+    # where it is, being the one package nothing is ever imported out of by module.
+    return {
+        name for name in held if not any(other.startswith(f"{name}.") for other in held)
+    }
 
 
 def _is_module(dotted: str) -> bool:

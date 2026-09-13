@@ -269,7 +269,7 @@ class Router:
         a credential is rotated, ``.tmp`` written and renamed over the real
         one, and leaving that unanswered would write the new token into the
         store being redirected away from.  The same rule as
-        :meth:`hmz.providers.redirect.Swaps.swap`, which the two halves of
+        :meth:`hmz.coganchor.providers.redirect.Swaps.swap`, which the two halves of
         a redirected run keep in step by saying it the same way.
         """
         for named, instead in self.redirects:

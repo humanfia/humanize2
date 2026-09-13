@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends
+from hmz.coganchor import backends
 
 if TYPE_CHECKING:
     from pathlib import Path

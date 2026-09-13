@@ -123,7 +123,7 @@ uv run pytest --run-agents
 
 That drives the coding agent CLIs actually installed on your machine, under your own accounts,
 and spends real tokens doing it. CI never runs it. Run it yourself when the change is a driver
-under `agents/`, and leave it alone otherwise: the rest of the suite drives
+under `coganchor/agents/`, and leave it alone otherwise: the rest of the suite drives
 [stand-in agents](/reference/flows#testing-a-flow), which is why it can run at all in CI.
 
 ## Commit it

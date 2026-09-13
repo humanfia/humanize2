@@ -17,7 +17,7 @@ that CLI's own. To see what one agent will be carrying, ask the CLI where it kee
 ask humanize from Python:
 
 ```python
-from hmz.agents.skills import skills
+from hmz.coganchor.agents.skills import skills
 
 for one in skills("claude"):
     print(one.name, one.whose)
@@ -31,7 +31,7 @@ on that name means your copy, and what it brings is yours to edit as its author.
 
 A skill you installed loads for every agent of that CLI. It switches off where that CLI
 switches one off, and it is not a setting of any agent. Where each CLI keeps them is written
-down in `hmz.backends`:
+down in `hmz.coganchor.backends`:
 
 | Backend | Yours | This project's |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ none: its command line reads skill directories, and the SDK humanize drives does
 The same list from Python:
 
 ```python
-from hmz.agents.skills import skills
+from hmz.coganchor.agents.skills import skills
 
 skills("claude")   # what it would load here: yours, and this project's
 ```

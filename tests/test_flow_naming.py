@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from hmz.agents import AgentConfig
+from hmz.coganchor.agents import AgentConfig
 from hmz.flows import (
     ENTRY,
     NotAFlow,
@@ -28,7 +28,7 @@ from hmz.flows import (
     inside,
     wanted,
 )
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
 CONFIG = AgentConfig(model="m", effort="high")
@@ -40,7 +40,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -82,7 +82,7 @@ def run(agents: Drafting, task: str) -> None:
 #: A file that is one flow, under a function name that says nothing about it.
 ONE = '''"""Just the one, and it says what it does here."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -95,7 +95,7 @@ def whatever_it_is_called(agents: tuple[AgentBase], task: str) -> None:
 #: And one that is both: the file's own flow, and another beside it.
 BOTH = '''"""One under its own name, and one beside it."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -117,7 +117,7 @@ def twice(agents: tuple[AgentBase], task: str) -> None:
 #: A public composition and the internal engine it calls by name.
 AUXILIARY = '''"""One flow to choose and one implementation detail."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -137,7 +137,7 @@ def engine(agents: tuple[AgentBase], task: str) -> None:
 #: A file with a `run` in it and nothing marked, which is what a flow used to be and is not.
 UNMARKED = '''"""A file that says nothing about which of its functions is a flow."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -435,7 +435,7 @@ BESIDE = '''"""Says what the module beside it says."""
 
 import beside
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

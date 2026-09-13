@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.epic import epics, state
+from hmz.runtime.epic import epics, state
 from hmz.tui import Humanize
 from hmz.tui.pick import Does, Epics
 from tests.stubs import written
@@ -36,7 +36,7 @@ COUNTS = '''"""Counts the runs of itself."""
 from pathlib import Path
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -51,7 +51,7 @@ PLAIN = '''"""Runs once, and says nothing about being picked up."""
 
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -97,8 +97,8 @@ def _ran(flow: str, task: str) -> None:
     run is picked up as is a command line naming what each agent runs, so the agents of a run
     have to be agents something can name.
     """
-    from hmz.agents import driver
-    from hmz.runner import Runner
+    from hmz.coganchor.agents import driver
+    from hmz.runtime.runner import Runner
 
     agent, config = driver("claude")
     Runner(flow, [agent(config(model="m", effort="high"))]).run(task)
@@ -278,7 +278,7 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     """
     import unittest.mock
 
-    from hmz.epic import Epic, read
+    from hmz.runtime.epic import Epic, read
     from hmz.tui.pick import collected
 
     del workspace
@@ -286,7 +286,7 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     epic.write("opened", agent="actor", backend="claude", session="one")
     epic.write("opened", agent="reviewer", backend="claude", session="two")
     collect = unittest.mock.Mock(return_value={"otherData": {}})
-    monkeypatch.setattr("hmz.tracing.collector.collect", collect)
+    monkeypatch.setattr("hmz.runtime.tracing.collector.collect", collect)
     ran = read(epic.path)
     assert ran is not None
 
@@ -316,7 +316,7 @@ async def test_a_run_of_a_flow_marked_since_can_be_picked_up_too(
     """
     _ran("plain", "go")
     (epic,) = epics(workspace)
-    from hmz.epic import read
+    from hmz.runtime.epic import read
 
     ran = read(epic)
     assert ran is not None

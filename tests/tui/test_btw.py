@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
-from hmz.agents import AgentBase, AgentConfig, Event, SessionBase
-from hmz.kept import Runs
+from hmz.coganchor.agents import AgentBase, AgentConfig, Event, SessionBase
+from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _OWN
 from hmz.tui.btw import format_snapshot

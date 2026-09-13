@@ -36,7 +36,7 @@ from collections.abc import Iterator
 
 from pydantic import BaseModel
 
-from hmz.agents import AgentBase, AgentConfig, Event, SessionBase
+from hmz.coganchor.agents import AgentBase, AgentConfig, Event, SessionBase
 
 
 class FakeSession(SessionBase):

@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz.agents import AgentConfig, Stopped
-from hmz.epic import JOURNAL, called, epics, linked, opened, read, sessions
-from hmz.runner import Runner
+from hmz.coganchor.agents import AgentConfig, Stopped
+from hmz.runtime.epic import JOURNAL, called, epics, linked, opened, read, sessions
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, events, written
 from tests.supervising import traced
 
@@ -28,7 +28,7 @@ CONFIG = AgentConfig(model="m", effort="high")
 
 #: A flow that opens one session per agent, each of which names itself as it lands.
 FLOW = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -40,7 +40,7 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
 
 #: The same, for a flow that drives one agent.
 ONE = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -133,7 +133,7 @@ def test_a_run_that_was_interrupted_says_so(
     written(
         tmp_path,
         "flow",
-        "from hmz.agents import AgentBase, Stopped\n"
+        "from hmz.coganchor.agents import AgentBase, Stopped\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -155,7 +155,7 @@ def test_a_run_that_failed_says_so(
     written(
         tmp_path,
         "flow",
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -226,7 +226,7 @@ def test_a_session_says_which_account_took_its_turns(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Two agents of one CLI are two accounts, and the backend's log says neither."""
-    from hmz import providers
+    from hmz.coganchor import providers
 
     monkeypatch.chdir(tmp_path)
     written(tmp_path, "flow", ONE)
@@ -291,7 +291,7 @@ def test_a_log_written_after_the_last_turn_is_linked_when_the_run_ends(
         "flow",
         "import os\n"
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"

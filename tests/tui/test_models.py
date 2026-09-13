@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.backends import Model
-from hmz.kept import Runs
+from hmz.coganchor.backends import Model
+from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Catalogue, Clis
 from tests.stubs import written
@@ -47,7 +47,7 @@ HERE = '''
 
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 from tests.stubs import written
 
@@ -68,8 +68,8 @@ GOALS_OFF = (
         "from typing import NamedTuple", "from typing import Annotated, NamedTuple"
     )
     .replace(
-        "from hmz.agents import AgentBase",
-        "from hmz.agents import AgentBase, AgentDefaults",
+        "from hmz.coganchor.agents import AgentBase",
+        "from hmz.coganchor.agents import AgentBase, AgentDefaults",
     )
     .replace(
         "builder: AgentBase",
@@ -171,7 +171,7 @@ async def test_opening_directly_uses_the_agent_place_goal_suggestion(
 def test_a_goal_choice_is_written_to_the_agent_config(
     flows: Path,
 ) -> None:
-    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize(
         flow="goals_off",
@@ -211,12 +211,12 @@ async def test_the_key_asks_the_cli_and_puts_up_what_it_says(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Which is the whole of what the key is for: the list was short, and now it is not."""
-    import hmz.models
+    import hmz.coganchor.models
 
     def says(cli: str, provider: str = "", seconds: float = 0.0) -> tuple[Model, ...]:
         return (Model("claude-ten", ("max", "high")),)
 
-    monkeypatch.setattr(hmz.models, "ask", says)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", says)
     app = Humanize()
     async with app.run_test() as driver:
         await _to_the_models(app, driver)
@@ -264,12 +264,12 @@ async def test_a_cli_that_will_not_say_says_so_under_the_list(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Said where it was asked for rather than raised at whoever opened the sheet."""
-    import hmz.models
+    import hmz.coganchor.models
 
     def refuses(cli: str, provider: str = "", seconds: float = 0.0) -> None:
         raise ValueError("claude exited 1: not logged in")
 
-    monkeypatch.setattr(hmz.models, "ask", refuses)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", refuses)
     app = Humanize()
     async with app.run_test() as driver:
         await _to_the_models(app, driver)
@@ -289,7 +289,7 @@ async def test_the_models_are_the_chosen_accounts_rather_than_this_machines(
     flows: Path,
 ) -> None:
     """Two accounts of one CLI are two catalogues, and the step before settles which."""
-    from hmz import models, providers
+    from hmz.coganchor import models, providers
 
     providers.add("claude", "mine", "key", {"ANTHROPIC_API_KEY": "sk-x"})
     kept = models.where("claude", "mine")
@@ -320,7 +320,7 @@ async def test_a_backend_that_has_never_been_asked_is_asked_as_the_interface_ope
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Before the first asking there is nothing to offer and nothing to open talking to."""
-    import hmz.models
+    import hmz.coganchor.models
 
     asked: list[str] = []
 
@@ -328,7 +328,7 @@ async def test_a_backend_that_has_never_been_asked_is_asked_as_the_interface_ope
         asked.append(cli)
         return (Model("claude-ten", ("max", "high")),)
 
-    monkeypatch.setattr(hmz.models, "ask", note)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", note)
     app = Humanize()
     async with app.run_test() as driver:
         await until(lambda: asked == ["claude"], driver)
@@ -339,7 +339,7 @@ async def test_an_unconfigured_advisory_backend_does_not_outrun_model_discovery(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """A bundled catalogue is not evidence that its local account can take a turn."""
-    import hmz.models
+    import hmz.coganchor.models
     import hmz.tui.app
 
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
@@ -359,7 +359,7 @@ async def test_an_unconfigured_advisory_backend_does_not_outrun_model_discovery(
         return CLAUDE["claude"] if cli == "claude" else ()
 
     monkeypatch.setattr(hmz.tui.app, "installed", here)
-    monkeypatch.setattr(hmz.models, "ask", note)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", note)
 
     app = Humanize()
     assert app._models == []
@@ -378,8 +378,8 @@ async def test_a_backend_that_has_already_said_is_not_asked_again_on_its_own(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Asking is a coding agent starting up, and the key on the models is what asks again."""
-    import hmz.models
-    from hmz import models
+    import hmz.coganchor.models
+    from hmz.coganchor import models
 
     kept = models.where("claude")
     kept.parent.mkdir(parents=True, exist_ok=True)
@@ -390,7 +390,7 @@ async def test_a_backend_that_has_already_said_is_not_asked_again_on_its_own(
         asked.append(cli)
         return ()
 
-    monkeypatch.setattr(hmz.models, "ask", note)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", note)
     app = Humanize()
     async with app.run_test() as driver:
         await driver.pause()

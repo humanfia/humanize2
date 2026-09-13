@@ -1,6 +1,6 @@
 """Whether the sampler can be run on the machine running the suite.
 
-:mod:`hmz.tracing.profile` watches what a run started by asking the operating system about
+:mod:`hmz.runtime.tracing.profile` watches what a run started by asking the operating system about
 every process under this one, a hundred times a second. On one cell of the matrix -- macOS
 under Python 3.13, and not the 3.12 or 3.14 beside it -- doing that wedges the whole
 interpreter: the call it is inside does not come back and does not let another thread run

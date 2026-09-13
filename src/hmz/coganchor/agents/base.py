@@ -1,0 +1,4405 @@
+"""The base classes: an agent is structure, a session is the history that structure runs on."""
+
+# A session and the agent holding it are two halves of one object declared in one
+# file, which is what the underscore keeps out of the package rather than out of them.
+# pyright: reportPrivateUsage=false
+
+from __future__ import annotations
+
+import contextlib
+import functools
+import json
+import os
+import queue
+import re
+import subprocess
+import sys
+import threading
+import time
+import uuid
+import weakref
+from abc import ABC, abstractmethod
+from collections import Counter, deque
+from concurrent.futures import ThreadPoolExecutor
+from typing import IO, TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Self, overload
+
+from .codenames import codename
+from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
+from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
+from .skills import Loaded, mount, unmount
+from .tools import Tool, Toolbox
+from .watchdog import Watchdog, held
+
+if TYPE_CHECKING:
+    import asyncio
+    from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+
+    from pydantic import BaseModel
+
+    from hmz.coganchor import AnchorConfig
+    from hmz.coganchor.backends import Profile
+    from hmz.coganchor.fallbacks import Answer
+    from hmz.coganchor.machines import MachineConfig
+    from hmz.coganchor.providers import Provider
+
+    from .config import AgentConfig, Budget
+
+
+class Journal(Protocol):
+    """Where an agent writes down a session it opened, which is the run it is part of.
+
+    Named rather than imported: a run is written out of the agents it drove, so naming the
+    run from here would be a circle. This is the whole of what an agent asks of one, and
+    :class:`hmz.runtime.epic.Epic` is what answers to it.
+    """
+
+    def opened(self, agent: AgentBase, session: str, parent: str = "") -> None:
+        """Writes down a session one of the agents has just opened, and what it came from."""
+        ...
+
+
+#: What a turn exits with when there was nothing to run. The shell's own status for a command
+#: it could not find, put on a spawn that came back as a `FileNotFoundError` instead of as a
+#: process -- so that a CLI which is not installed reads as one failure and not as two.
+_NOTHING_TO_RUN = 127
+
+
+def _tee(
+    source: IO[str],
+    sink: IO[str] | None,
+    captured: list[str],
+    said: queue.Queue[Event | None] | None = None,
+    reads: Callable[[str], Iterable[Event]] | None = None,
+) -> None:
+    """Copies `source` into `sink` line by line, keeping every line and announcing it.
+
+    A sink that has gone away stops the copying but not the reading: a pipe nobody drains
+    blocks the agent writing to it, and the turn would then be waiting on an agent that is
+    itself waiting. A sink of None is a stream that is not to be copied anywhere at all --
+    one carrying a protocol rather than the agent talking -- and is read and kept just the
+    same. The None at the end is how a turn reading `said` knows this stream is spent; a
+    stream nobody is reading events from is drained and kept all the same.
+    """
+    with contextlib.suppress(OSError, ValueError):
+        # A source closed under us is a process that has ended, which is not a failure here.
+        for line in source:
+            captured.append(line)
+            if said is not None and reads is not None:
+                for event in reads(line):
+                    said.put(event)
+            if sink is not None:
+                say(line, sink, end="")
+    with contextlib.suppress(OSError, ValueError):
+        source.close()  # the reader closes what it read, whoever else has finished with it
+    if said is not None:
+        said.put(None)
+
+
+#: How long a process cut off mid-turn is given to go quietly before it is killed. Short,
+#: because the whole point of cutting a turn off is that it is spending: a CLI that has not
+#: acted on a term signal in two seconds is one that is not going to.
+_CUT_SECONDS = 2.0
+
+
+def _ended(proc: subprocess.Popen[str]) -> None:
+    """Ends a process and everything it started, and takes all of their exit statuses.
+
+    The tree rather than the one process, because that is what these CLIs are: a launcher
+    that starts a runtime that starts the thing doing the work, and a provider's own wrapper
+    in front of all three. Killing only what we spawned would leave the half that is actually
+    talking to the model still talking to it -- a turn cut off that goes on spending.
+
+    Asked to stop and then made to, so that a CLI with a transcript to flush or a session file
+    to close gets the chance: whatever has not gone by then is killed. Waited on either way,
+    since a process nobody waits on stays in the table as a zombie.
+
+    Args:
+      proc: The process the turn is running in, which may already have ended.
+    """
+    import psutil
+
+    from hmz.coganchor.providers.redirect import swept
+
+    if proc.poll() is not None:
+        # Already gone and already reaped. Asking the operating system what is below that pid
+        # now is asking about whoever holds it next, and signalling that is signalling a
+        # stranger's work.
+        swept(proc.pid)
+        return
+    kin: list[psutil.Process] = []
+    with contextlib.suppress(psutil.Error):
+        # Read before anything is signalled: the children of a process that has already gone
+        # are children nothing can name any more.
+        kin = psutil.Process(proc.pid).children(recursive=True)
+    with contextlib.suppress(OSError):
+        proc.terminate()
+    for one in kin:
+        with contextlib.suppress(psutil.Error):
+            one.terminate()
+    try:
+        proc.wait(timeout=_CUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(OSError):
+            proc.kill()
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=_CUT_SECONDS)
+    # Ours is waited on through the handle that holds it and never through psutil: psutil
+    # would reap it as a stranger, and a status taken by a stranger is a status the turn's
+    # own reader never sees -- a turn killed mid-word would then read as one that exited
+    # cleanly. The rest are nobody's children by now and are only watched for.
+    _, alive = psutil.wait_procs(kin, timeout=_CUT_SECONDS)
+    for one in alive:
+        with contextlib.suppress(psutil.Error):
+            one.kill()
+    # And what the turn was answering its credential paths out of: a supervisor takes its own
+    # copies away when it is done, and a supervisor that was killed here never got to.
+    swept(proc.pid)
+
+
+def _reaped(proc: subprocess.Popen[str]) -> None:
+    """Ends a process and takes its exit status, so that neither is left behind.
+
+    Killed and then waited on, rather than killed: a process nobody waits on stays in the
+    table as a zombie until whoever started it exits, and a flow that opens a session per turn
+    would gather one per turn for as long as it runs. A process that has already ended is
+    waited on all the same, since that is what takes its status.
+
+    Args:
+      proc: The process to end, which may already have ended.
+    """
+    from hmz.coganchor.providers.redirect import swept
+
+    with contextlib.suppress(OSError):
+        proc.kill()
+    with contextlib.suppress(OSError):
+        proc.wait()
+    # A turn under an account is run inside a supervisor, and the copies it was answering
+    # credential paths out of are what it takes away when it exits. `SIGKILL` exits nothing.
+    swept(proc.pid)
+
+
+#: What a turn is told when its backend has no way of being held to a shape. The schema is the
+#: whole of the instruction: it says the fields, their types and which of them are required,
+#: and a sentence restating any of that would be a second place for it to be wrong.
+_IN_SHAPE = """
+
+Answer with JSON and nothing else -- no prose around it, no code fence -- matching this JSON \
+Schema exactly:
+
+{schema}
+"""
+
+#: What a model wraps an answer in when it is talking as well as answering.
+_FENCED = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+
+
+def _readings(said: str) -> Iterator[str]:
+    """Every part of an answer that might be the JSON it was asked for, likeliest first.
+
+    A backend held to a schema answers with the object and nothing else, and that is the first
+    of these. The rest are for one that was asked rather than held: a fenced block, and the
+    span from the first brace to the last, which is the object with the talking cut off.
+
+    Args:
+      said: The whole answer.
+
+    Yields:
+      What to try reading, in the order to try it.
+    """
+    held = said.strip()
+    yield held
+    for block in _FENCED.findall(held):
+        yield str(block).strip()
+    first, last = held.find("{"), held.rfind("}")
+    if 0 <= first < last:
+        yield held[first : last + 1]
+
+
+def _shaped[T: BaseModel](said: str, schema: type[T]) -> T:
+    """Reads what a turn answered as the model it was asked to answer with.
+
+    Args:
+      said: The whole answer.
+      schema: The shape it was asked for.
+
+    Returns:
+      The answer, as that model.
+
+    Raises:
+      ValueError: If none of the answer reads as one -- which is a turn that did not do what
+        it was asked, and is reported as such rather than passed on half-read.
+    """
+    from pydantic import ValidationError
+
+    for reading in _readings(said):
+        with contextlib.suppress(ValidationError, ValueError):
+            return schema.model_validate_json(reading)
+    raise ValueError(f"the turn did not answer as a {schema.__name__}: {said[:200]}")
+
+
+def _lands[T](landed: asyncio.Future[T], answered: T) -> None:
+    """Hands a thread's answer to whoever awaited it, unless nobody is waiting any more."""
+    if not landed.done():  # a task that was cancelled is not one to answer
+        landed.set_result(answered)
+
+
+def _failed(landed: asyncio.Future[Any], why: BaseException) -> None:
+    """Raises a thread's failure where it was awaited, unless nobody is waiting any more."""
+    if not landed.done():
+        landed.set_exception(why)
+
+
+def _posted(
+    loop: asyncio.AbstractEventLoop, what: Callable[..., None], *said: Any
+) -> None:
+    """Says something back to a loop from the thread that was working for it.
+
+    A loop that has gone takes nothing more: the flow that was awaiting this went with it,
+    and a thread that raised on its way to a closed loop would only put a traceback on the
+    terminal a run is watched from.
+
+    Args:
+      loop: The loop to say it to.
+      what: What to call there.
+      said: What to call it with.
+    """
+    with contextlib.suppress(RuntimeError):
+        loop.call_soon_threadsafe(what, *said)
+
+
+async def _awaited[T](call: Callable[[], T], named: str) -> T:
+    """Runs one blocking call on a thread of its own, so the loop is free while it takes.
+
+    A turn is minutes of waiting on a process, and a flow that ran one on its own event loop
+    would hold up every other turn it has going for as long as that one took. So a turn takes
+    a thread and gives the loop back: ten thousand of them at once are ten thousand coroutines
+    over as many threads as are actually running, which is what waiting on a process costs.
+
+    A thread cannot be taken back, so a task cancelled while it waits here stops waiting and
+    leaves the turn to finish -- which is what stopping the agent is for.
+
+    Args:
+      call: What to run, which is the turn as the flow asked for it.
+      named: What to call the thread, so that a wide run says whose turn each of them is.
+
+    Returns:
+      Whatever the call answered.
+    """
+    import asyncio
+
+    loop = asyncio.get_running_loop()
+    landed: asyncio.Future[T] = loop.create_future()
+
+    def carry() -> None:
+        try:
+            answered = call()
+        except BaseException as why:  # noqa: BLE001 -- carried across, not handled
+            _posted(loop, _failed, landed, why)
+        else:
+            _posted(loop, _lands, landed, answered)
+
+    threading.Thread(target=carry, name=named, daemon=True).start()
+    return await landed
+
+
+def _at_once(asked: int, of: int) -> int:
+    """How many of a batch run at once: what it asked for, or all of them where it said none.
+
+    Args:
+      asked: What the caller said, or 0 for as many as there are -- a flow that asks for a
+        thousand answers has asked for a thousand turns, and pacing them behind a number
+        nobody chose would be this library deciding how wide a fan-out may be.
+      of: How many there are.
+
+    Returns:
+      A count of at least one, since a pool of no threads runs nothing.
+    """
+    return max(min(asked, of) if asked > 0 else of, 1)
+
+
+#: How far back a rate is measured unless something asks for another window. Five minutes is
+#: long enough to carry across the gaps a flow leaves -- a turn that thinks, a round it sleeps
+#: off, a commit it makes -- and short enough that a run which has gone quiet reads as quiet.
+#: The same window the interface's own readout is over, so that a flow reading a rate and a
+#: person watching one are reading the same number.
+WINDOW = 300.0
+
+#: How long a `next-response` cut-off waits for the answer it is letting land. It is a wait
+#: for something that may never come: three of these backends state what a turn cost only
+#: once the turn is over, so nothing lands mid-turn to stop on -- and a turn that has gone
+#: quiet is exactly the one a clock was set for. A minute is longer than a model takes to
+#: finish an answer it had already started and short enough that a wedged turn is not left
+#: running for the sake of one that will never arrive.
+_LANDING = 60.0
+
+
+class Meter:
+    """What has been spent and when, so that a rate can be read off it.
+
+    Written from whichever thread a turn is running on and read from whichever thread is
+    asking, so every touch of it is under the lock. What goes in is what one request to the
+    model cost, as its backend reports it -- an addition rather than a total, since a total
+    read twice would count the first of it twice.
+    """
+
+    def __init__(self) -> None:
+        """Initializes a meter that has seen nothing spent."""
+        self._lock = threading.Lock()
+        self._total: Counter[str] = Counter()
+        #: Recent spending as (when, what, whether it was a turn of the model), bounded by
+        #: the window rather than by the length of the run: a flow going for days keeps five
+        #: minutes of it.
+        self._recent: deque[tuple[float, Usage, bool]] = deque()
+        self._began = time.monotonic()
+
+    def spend(
+        self, usage: Usage, now: float | None = None, *, turn: bool = True
+    ) -> None:
+        """Notes what one request to the model cost.
+
+        Args:
+          usage: What it cost, by kind.
+          now: When, defaulting to this moment. Given only so a test can say.
+          turn: Whether this is a turn of the model rather than a correction to the ones
+            already counted. A backend that states a turn's whole cost after having said what
+            each request in it came to is settling up, not taking another turn -- and counting
+            it as one would put a turn in the average that never happened.
+        """
+        if not usage.total:
+            return
+        moment = time.monotonic() if now is None else now
+        with self._lock:
+            self._total.update(usage)
+            self._recent.append((moment, usage, turn))
+            # Cut down as it is written rather than only when somebody reads a rate: an
+            # agent driving ten thousand sessions is told what every request of every one of
+            # them cost, and a run nobody is watching would otherwise keep all of it for as
+            # long as it ran. What is kept is the window, which is what this deque is.
+            while self._recent and self._recent[0][0] < moment - WINDOW:
+                self._recent.popleft()
+
+    def spent(self) -> Usage:
+        """Everything spent so far, by kind.
+
+        Returns:
+          The whole of it, `input` and `output` always among the kinds even where nothing has
+          gone on them: those two are what every backend counts, so a reader of one of these
+          need not ask whether they are there.
+        """
+        with self._lock:
+            return Usage({"input": 0.0, "output": 0.0} | dict(self._total))
+
+    def rate(self, over: float = WINDOW, now: float | None = None) -> Usage:
+        """How fast it is being spent, by kind, over the last stretch of it.
+
+        Seconds on the clock rather than seconds an agent was talking: a flow sleeps between
+        rounds, commits, reads what the last turn wrote, and that time is time the tokens were
+        spent over. A window longer than the run itself is the run itself, so a rate read a
+        minute in is what that minute came to rather than a fifth of it.
+
+        Args:
+          over: How far back to measure, in seconds.
+          now: The moment to measure at, defaulting to this one. Given only so a test can say.
+
+        Returns:
+          Tokens a second, by kind, with `input` and `output` always among them.
+        """
+        moment = time.monotonic() if now is None else now
+        window = max(over, 0.0)
+        with self._lock:
+            while self._recent and self._recent[0][0] < moment - window:
+                self._recent.popleft()
+            lately = Usage({"input": 0.0, "output": 0.0})
+            for _, usage, _ in self._recent:
+                lately = lately + usage
+            return lately / min(window, max(moment - self._began, 0.0))
+
+    def juice(self, over: float = WINDOW, now: float | None = None) -> float:
+        """What an average turn of the model came out with, over the last stretch of the run.
+
+        A turn of the model rather than a turn of the flow: one request and the answer to it,
+        of which the work a flow asks for is many. How much of an answer that comes to is what
+        the effort a model runs at moves -- so it is the number to steer by when what is being
+        held is how hard the thing is thinking, rather than how fast a bill is running up.
+
+        Args:
+          over: How far back to measure, in seconds.
+          now: The moment to measure at, defaulting to this one. Given only so a test can say.
+
+        Returns:
+          Output tokens per turn, and nothing at all where no turn has landed in the window --
+          which reads as nothing to go on rather than as a turn that said nothing.
+        """
+        moment = time.monotonic() if now is None else now
+        window = max(over, 0.0)
+        with self._lock:
+            while self._recent and self._recent[0][0] < moment - window:
+                self._recent.popleft()
+            turns = sum(1 for _, _, taken in self._recent if taken)
+            if not turns:
+                return 0.0
+            return sum(usage.output for _, usage, _ in self._recent) / turns
+
+
+class SessionBase(ABC):
+    """One conversation with one agent, kept alive across turns.
+
+    The first turn opens the backend session; every later one resumes it, so the agent
+    still has the earlier turns in context. Discarding the session is how a flow forgets:
+    a new instance starts from nothing. :meth:`fork` is how it branches instead -- a
+    second conversation carrying this one's history and going its own way from there.
+    """
+
+    #: Whether this backend can be held to a shape, rather than asked to keep to one. A
+    #: session that can is handed the schema itself, and answers with the object or not at
+    #: all; one that cannot is told about it in the prompt, which is the same question put
+    #: where the model is still free to answer around it.
+    shapes: ClassVar[bool] = False
+
+    #: Whether this backend can be given a tool it was not shipped with, for the length of a
+    #: session and without writing anything of the person at this machine's. False for one
+    #: with no way of being told, whose sessions refuse a callback rather than quietly never
+    #: offering it -- a tool the model never sees is a flow that does not do what it says.
+    takes_tools: ClassVar[bool] = False
+
+    #: Whether a turn of this backend can be talked to while it is running, rather than only
+    #: between turns. A session that can takes a later word into the turn already under way,
+    #: which is what :meth:`interject` does; one that cannot was handed the whole prompt up
+    #: front and has nowhere to put a second, so it refuses rather than queueing the word
+    #: behind as a turn of its own. Said on the class so that a flow which means to steer asks
+    #: beforehand rather than catching a `NotImplementedError` from a turn already an hour in.
+    steers: ClassVar[bool] = False
+
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
+        """Initializes an unopened session and registers it with its agent.
+
+        Args:
+          agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, or None for the one the flow is
+            running in. A directory rather than a turn's argument because that is what it is
+            to these backends: a session is opened at a directory and every turn of it is
+            there, which is what lets a flow drive one conversation per worktree at once. For
+            an agent whose turns land on another machine it is that machine's path, and must
+            be inside the workspace the anchor names.
+        """
+        self._agent = agent
+        #: Which of the flow's skills this conversation carries, by name, or None for every
+        #: one of them -- which is what a session nobody has said anything about carries. It
+        #: is the session's rather than the agent's because it is the one thing about what an
+        #: agent works by that changes while it is working: a conversation that has got as
+        #: far as writing the tests wants the skill about writing them and no longer wants
+        #: the eight about reading the codebase, and it is the same conversation either way.
+        self._skills: tuple[str, ...] | None = None
+        #: The flow's own callbacks this conversation is putting in front of the agent, which
+        #: it may say again between any two turns. Held here as well as in the agent's
+        #: toolbox so that a session can say what it is offering without asking the agent
+        #: what everything else is offering too.
+        self._tools: tuple[Tool, ...] = ()
+        #: And which of them are actually down in the workspace now, or None while none are.
+        #: The two differ for exactly as long as it takes the next turn to start, which is
+        #: where what was asked for is put where the backend reads it.
+        self._mounted: tuple[str, ...] | None = None
+        #: The conversation on the agent this one falls back to, once a turn of this one has
+        #: had to be taken there. Held for as long as this session is rather than opened per
+        #: turn: what this conversation was is lost at the move, and losing a second one
+        #: every turn after it would be a stateful loop started over every round.
+        self._moved_to: SessionBase | None = None
+        #: Where this conversation works, as it was given, or None for wherever the flow is.
+        self._cwd = os.fspath(cwd) if cwd is not None else None
+        self._id: str | None = None
+        #: The backend's id for the conversation this one was forked from, or None for one
+        #: that started from nothing -- which is every session but a fork. Read by the
+        #: driver as its first turn opens: that turn is the one that says fork this rather
+        #: than start one, and from the moment it lands this session has an id of its own and
+        #: this is only where it came from.
+        self._forked_from: str | None = None
+        #: That conversation itself, weakly, and how many turns it had taken when the fork
+        #: was asked for -- which is the boundary the child is to be cut at, and is checked
+        #: as the child opens. None for a session nobody forked.
+        self._forked_at: tuple[weakref.ref[SessionBase], int] | None = None
+        #: How many turns have been sent to this conversation. Only a fork reads it, and only
+        #: to know whether the conversation has moved since it was asked for.
+        self._turns = 0
+        #: What this conversation is to think at from its next turn on, where it has been
+        #: told something other than what its agent runs at, and None where it has not.
+        self._effort: str | None = None
+        #: What this conversation has cost and how fast, written as the backend says what
+        #: each request came to rather than once the turn is over: a turn is minutes long,
+        #: and a rate that stood still for all of them would be a rate of nothing.
+        self._meter = Meter()
+        #: A conversation is a sequence: one turn at a time, whoever asked for them. Held
+        #: for the whole of a turn -- the moments it fires and the events it says as well as
+        #: what the backend is told -- so that two threads on one session are two turns one
+        #: after the other rather than two halves of a turn each. Re-entrant because a
+        #: backend takes it again where it drives its own process, which is the same turn.
+        self._lock = threading.RLock()
+        #: Whether a turn has been started in this session, and whether it has been closed:
+        #: the two moments that bracket a conversation are each said once.
+        self._started = False
+        self._ended = False
+        #: Every word put into a turn that the agent has not yet said it has, under whatever
+        #: the backend will name it by when it does. Written by whoever is talking to the
+        #: agent and read by whoever is reading it back, which are two threads, so it is held
+        #: under a lock of its own rather than under the one that serializes turns.
+        self._steered: dict[str, str] = {}
+        self._steering = threading.Lock()
+        #: Which account whatever this session is holding open was started under, or None
+        #: while it is holding nothing. A process, a link or a runtime carries an account's
+        #: environment and its credential paths, and neither changes under one that is
+        #: already up -- so a session that has moved account starts another rather than
+        #: speaking to the one it has. Read and written on the thread taking the turn.
+        self._as: str | None = None
+        #: The shape the turn now running was asked to answer in, or None for one asked for
+        #: nothing in particular. Written under the lock that serializes the turns and read
+        #: by whatever builds the call, since a command line and a process's own arguments
+        #: are both built from a session that is already holding the turn.
+        self._shaping: type[BaseModel] | None = None
+        #: What takes away what this session mounted, once it has mounted anything. However
+        #: the session ends -- closed, or let go of by a flow that opens one a turn -- what it
+        #: put in the workspace goes with it, so it is a finalizer rather than a line in
+        #: `close`: a Ralph loop drops a session a turn and closes none of them.
+        self._unmounting: Callable[[], None] | None = None
+        #: What takes back what this session offered the agent, once it has offered anything,
+        #: and None for one that never has -- a session that offers nothing pays for none of
+        #: this. A finalizer for the reason the unmounting is one: a loop that opens a session
+        #: a round and drops it closes none of them, and a callback still in front of the
+        #: model after the round that wrote it is one the flow can no longer see the point of.
+        self._unoffering: Callable[[], None] | None = None
+        #: Whether a turn of this session is running now. Read by `close`, which is what a stop
+        #: reaches and so is called from another thread while a turn is under way: what the
+        #: turn is working by is not taken away underneath it.
+        self._working = False
+        #: What each turn of this conversation may spend, where it has been told something
+        #: other than what its agent was configured with, and None where it has not.
+        self._budget: Budget | None = None
+        #: And what the turn now running is actually held to, taken as that turn opened and
+        #: None between turns: a turn runs under the budget it started with, so a flow that
+        #: shortens the next round while this one is running shortens the next round.
+        self._capped: Budget | None = None
+        #: Why the turn now running is to stop short, or "" for one that is not. Two reasons
+        #: rather than one because they arrive from different directions and mean different
+        #: things: `_over` is this session's own budget spent, which says what a spent budget
+        #: leaves behind, and `_cut` is somebody outside -- a watchdog, a person -- ending the
+        #: turn, which always leaves what has been said. Written from whichever thread noticed
+        #: and read on the one taking the turn; both are cleared as a turn opens, so a session
+        #: cut off once is not a session that can never take another turn.
+        self._over = ""
+        self._cut = ""
+        #: And whether the one that cut it off was the watchdog, which is the one cut-off a
+        #: turn does not answer to. A budget spent and a person's `interrupt` both leave a
+        #: turn that landed -- half an answer is still an answer -- but a backend that had
+        #: stopped saying anything said nothing to answer with, and a `result` of "" handed
+        #: to a loop is an empty turn read as the agent's work. So that one fails, which is
+        #: what the flow driving it already knows how to catch. Cleared as a turn opens.
+        self._wedged = False
+        #: What the agent has said in the turn now running, kept so that a turn cut off part
+        #: way through can still answer with it. Cleared as each turn opens: what is held is
+        #: one turn's words, which its backend is holding anyway.
+        self._sofar: list[str] = []
+        #: What the turn now running had already spent when it started, and when it started,
+        #: which is what a per-turn budget is measured against: the meter counts the whole
+        #: conversation, and a tenth round cut off for what the first round wrote would be a
+        #: budget nobody could reason about.
+        self._paid = 0.0
+        self._since = 0.0
+        #: What stops a turn that has run out of clock, for a budget that caps one. A timer
+        #: rather than a thread watching: a turn under no budget starts nothing at all.
+        self._clock: threading.Timer | None = None
+        #: The process a turn is running in for a session driven as one command a turn, or
+        #: None between turns. Here rather than on `CommandSessionBase` because two backends
+        #: held open across their turns borrow that transport for the turns they cannot keep
+        #: warm -- and a turn cut off has to reach whichever process is actually holding it.
+        self._underway: subprocess.Popen[str] | None = None
+        #: The clock the turn now running is kept under, while one is running. Filed here so
+        #: that whatever knows this turn is waiting on a person rather than on its backend can
+        #: find that clock and stop it: fifteen minutes spent answering a permission prompt is
+        #: not a backend that has wedged.
+        self._watching: Watchdog | None = None
+        # A session drops itself from its agent when it is collected, so the agent neither holds
+        # a flow's discarded sessions nor has to prune them while someone is reading them.
+        agent._hold(self)
+
+    @property
+    def skills(self) -> tuple[str, ...]:
+        """The flow's skills this conversation carries, by name, in the flow's own order.
+
+        Every one the flow brought unless this session has been told otherwise, which is what
+        a session nobody has said anything about carries. A name this session was told to
+        carry that the flow does not bring is not among them: what a session may carry is the
+        flow's to say, and a name nothing answers to is a name to correct rather than a skill
+        to invent.
+        """
+        brought = self._agent.loaded
+        if self._skills is None:
+            return tuple(one.name for one in brought)
+        wanted = set(self._skills)
+        return tuple(one.name for one in brought if one.name in wanted)
+
+    def loads(self, skills: Iterable[str] | None) -> None:
+        """Says which of the flow's skills this conversation is to carry from its next turn.
+
+        The one thing about what an agent works by that a flow may change while it is
+        working, and it is a session's rather than an agent's: an agent is what it was set up
+        as, and a conversation is a thing that gets somewhere. A loop that has finished
+        reading and started writing says so here, and the turn after it is the turn that
+        carries the writing skill.
+
+        What is put where the backend reads it is settled at the start of the next turn
+        rather than now: a session is opened at a directory and may not have one yet, and a
+        turn already running must not have what it is working by moved underneath it.
+
+        Args:
+          skills: The names to carry, which are the names the flow brought them under, or
+            None for every one of them. Names the flow does not bring are ignored, so a
+            session that asked for one a fork of the flow no longer has is a session carrying
+            the rest rather than a turn that will not run.
+        """
+        self._skills = None if skills is None else tuple(dict.fromkeys(skills))
+
+    @property
+    def tools(self) -> tuple[Tool, ...]:
+        """The flow's own callbacks this conversation is putting in front of the agent."""
+        return self._tools
+
+    def offers(self, tools: Iterable[Tool] | None) -> None:
+        """Says which callbacks of the flow's the agent may reach for, from the next turn on.
+
+        A callback is a function of the flow's own, and the agent reaching for it is that
+        function running here -- in this process, on the thread serving the call -- with what
+        it answers going back to the model as the tool's result. Which is what makes an agent
+        able to start a flow: the callback is the flow's code, so it may do whatever the flow
+        may do.
+
+        Said on the conversation rather than on the agent because that is where a flow is
+        when it has something to offer: a loop that has just worked out what its agent may
+        need says so between two turns. What the CLI is actually told is the agent's, though
+        -- some of these are one process per agent -- so two conversations offering a tool of
+        one name are offering one tool.
+
+        Args:
+          tools: The callbacks, or None to take back whatever this conversation was offering.
+
+        Raises:
+          NotImplementedError: If this backend has no way of being given a tool it was not
+            shipped with. A callback quietly never offered is a flow that quietly does not do
+            what it says, so it is refused where it is said.
+        """
+        if tools and not type(self).takes_tools:
+            raise NotImplementedError(
+                f"{self._agent.backend} has no way of being given a tool of a flow's own"
+            )
+        self._tools = () if tools is None else tuple(tools)
+        box = self._agent.toolbox
+        if self._tools and self._unoffering is None:
+            # Registered the first time anything is said and not before: the toolbox is keyed
+            # by a number this session answers to for as long as it is alive, so what takes
+            # the entry back has to be whatever runs when it stops being alive -- a flow that
+            # opens a session a round and drops it closes none of them, and an entry nobody
+            # takes back is a callback the agent goes on being offered by a conversation that
+            # is over. It runs while this session is still being taken apart, which is before
+            # its number can be handed to another one.
+            self._unoffering = weakref.finalize(self, box.offers, id(self), ())
+        box.offers(id(self), self._tools)
+
+    @property
+    def id(self) -> str:
+        """The backend's id for this conversation, which every turn after the first resumes.
+
+        Raises:
+          RuntimeError: If no turn has landed yet, so the backend has not named the session.
+        """
+        if self._id is None:
+            raise RuntimeError("session has not run a turn yet")
+        return self._id
+
+    @property
+    def named(self) -> str | None:
+        """What the backend calls this conversation, as soon as it has called it anything.
+
+        Which is earlier than :attr:`id`: a session is opened by a turn that lands in it, and
+        the backend names it when the turn starts. Between those two is the whole of the first
+        turn -- the minutes of it, and the log the backend is writing all the while.
+
+        Returns:
+          The backend's id, or None before the backend has said one.
+        """
+        return self._id
+
+    def spent(self) -> Usage:
+        """What this conversation has cost so far, by the kind of token it went on.
+
+        Returns:
+          Every kind its backend counts, `input` and `output` among them whatever it counts
+          besides. What it comes to is the whole of what has crossed the wire for this
+          session, which is what the backend has said each request cost added up.
+        """
+        return self._meter.spent()
+
+    def rate(self, over: float = WINDOW) -> Usage:
+        """How fast this conversation is spending, by kind, over the last stretch of it.
+
+        `session.rate().output` is output tokens a second, over seconds on the clock rather
+        than seconds the agent was talking -- the same reckoning the interface's own readout
+        is, so that a flow and a person watching it are reading the same thing.
+
+        Args:
+          over: How far back to measure, in seconds. The whole run where it is younger than
+            that, so a rate read a minute in is what that minute came to.
+
+        Returns:
+          Tokens a second, by kind.
+        """
+        return self._meter.rate(over)
+
+    def juice(self, over: float = WINDOW) -> float:
+        """What an average turn of the model came out with, over the last stretch of it.
+
+        A turn of the model, not a turn of the flow: one request and the answer to it, of
+        which a turn a flow asks for is many. It is what an effort moves -- a model asked to
+        think harder writes more per answer, and takes longer over it -- so this is the number
+        to steer by when what is being held is how hard it is thinking.
+
+        Args:
+          over: How far back to measure, in seconds.
+
+        Returns:
+          Output tokens per turn, and 0.0 where no turn has landed in the window.
+        """
+        return self._meter.juice(over)
+
+    def _spends(self, usage: Usage, *, turn: bool = True) -> None:
+        """Notes what one request of the turn now running cost, as its backend says.
+
+        Told as the turn goes rather than once it is over: a turn is minutes long, and what a
+        flow steering by a rate needs is the rate while the turn is still running. Both meters
+        are told, so that an agent whose sessions a loop drops one a turn still has the run.
+
+        Args:
+          usage: What that request cost, by kind.
+          turn: Whether it is a turn of the model rather than a settling up of the ones
+            already counted, as for :meth:`Meter.spend`.
+        """
+        self._meter.spend(usage, turn=turn)
+        self._agent._meter.spend(usage, turn=turn)
+        # Read where it is written, which is why a budget is worth having at all: the meter
+        # moves as each request to the model comes back, so a turn that has written its
+        # thousand tokens is stopped in the middle of the turn rather than after it. A
+        # settling up is not a response landing, and a budget waiting for one is not paid
+        # out by the accounting.
+        self._checks(landed=turn)
+
+    @property
+    def budget(self) -> Budget | None:
+        """What each turn of this conversation may spend before it is cut off.
+
+        What the agent was configured with, unless this conversation has been told otherwise
+        -- and a flow may say so while the session is running, which is where a loop watching
+        what a round is costing is when it decides the next one is to be shorter. The turn
+        already under way keeps the budget it started with: what has been spent is measured
+        against the cap the turn opened on, and one swapped halfway through would cut a turn
+        off for tokens it was allowed when it wrote them.
+
+        None for an agent nobody has been asked about, which is a turn that runs until it is
+        done. To run this one conversation under no budget where its agent has one, give it
+        an empty `Budget()`: nothing named is nothing capped.
+        """
+        return self._budget if self._budget is not None else self._agent.config.budget
+
+    @budget.setter
+    def budget(self, budget: Budget | None) -> None:
+        """Has this conversation's turns run under something other than the agent's.
+
+        Args:
+          budget: What each turn may spend, or None to go back to the agent's own.
+        """
+        self._budget = budget
+
+    def interrupt(self, *, why: str) -> None:
+        """Cuts the turn now running off, wherever it has got to.
+
+        The one thing a turn could not otherwise be told. Stopping an agent prevents its
+        *next* turn, and a session that is one command per turn has nothing listening -- so
+        without this a turn gone wrong, wedged on a tool or six minutes into an answer nobody
+        wants or past the budget it was given, runs to the end whatever anybody does.
+
+        What it reaches is whatever is actually holding the turn: the process a command turn
+        is running in, or the one a session held open across its turns is spoken to. A
+        backend whose turn is held somewhere shared -- an app server serving every session of
+        an agent at once -- is not taken down for one of them, and stops at the next answer
+        instead: cutting one turn off must not end everybody else's.
+
+        The turn still ends the way every turn ends, on exactly one `result` or one failure.
+        A stream that stopped mid-sentence would leave whatever is reading it waiting for an
+        answer nobody is going to give.
+
+        Args:
+          why: What to say it was cut off for, which is what whoever is watching reads and
+            what a turn that fails for it says.
+        """
+        if not self._working:
+            # Nothing is running, so there is nothing to cut off -- and a reason left standing
+            # would end the next turn before it had said anything. A turn that has not started
+            # is prevented by stopping the agent, which is a different thing.
+            return
+        self._cut = why or "interrupted"
+        self._heard(Event(kind="tool", text=f"cutting the turn off: {self._cut}"))
+        self._cuts()
+        if self._moved_to is not None:
+            # And the conversation this one moved to, since the turn being cut off may be
+            # being taken there: this conversation carried on somewhere else is still this
+            # conversation, and cutting off only the half that is waiting cuts off nothing.
+            self._moved_to.interrupt(why=why)
+
+    def _cuts(self) -> None:
+        """Ends whatever is holding the turn now running, as roughly as it takes.
+
+        Roughly on purpose, and so not :meth:`_shut`: letting go politely is what that is,
+        and politeness is the thing being avoided here. A backend with nothing of its own to
+        end -- a turn held on an app server shared by every session of the agent -- does
+        nothing at all and stops at the next answer instead, since taking that server down
+        would end every other conversation on it.
+        """
+        self._ends_command()
+
+    def _ends_command(self) -> None:
+        """Ends the process a command turn is running in, where this session has one.
+
+        On :class:`SessionBase` rather than on the class whose turns are commands, because
+        two backends held open across their turns run the turns they cannot keep warm through
+        that same transport -- so both what cuts a turn off and what lets go of a session have
+        to reach it, and neither knows which of the two it is looking at.
+        """
+        proc, self._underway = self._underway, None
+        if proc is not None:
+            _ended(proc)
+
+    def _checks(self, *, landed: bool = False) -> None:
+        """Sees whether the turn now running has spent what it was given, and acts if it has.
+
+        Called from wherever a reading moves: the thread taking the turn, as each request to
+        the model comes back, and the turn's own clock where it has one. Idempotent, since
+        both may arrive at once and a turn is cut off the once. Against the budget the turn
+        opened with rather than whatever the session is carrying now: a flow that shortens
+        the next round while this one is running must not cut this one off for tokens it was
+        allowed when it wrote them.
+
+        Args:
+          landed: Whether a response from the model has just arrived. Which is the whole of
+            what `next-response` waits for: a budget that ran out of clock in the middle of
+            an answer lets that answer finish, and the next one to land is where the turn
+            stops. A budget that ran out of tokens ran out *on* a response landing, so it is
+            already at that moment and stops there.
+        """
+        budget = self._capped
+        if budget is None or not self._working:
+            return
+        if not self._over:
+            over = budget.over(
+                output=self._meter.spent().output - self._paid,
+                seconds=time.monotonic() - self._since,
+            )
+            if not over:
+                return
+            self._over = over
+            if not landed and budget.when != "immediately":
+                # Out of clock in the middle of an answer, which is what `next-response`
+                # waits for. Not forever, though: a backend that says what a turn cost only
+                # when the turn is over never lands anything to wait on, and a turn that has
+                # gone quiet is the one a clock was set for. So the wait has an end, and what
+                # is at the end of it is the cut-off.
+                self._waits(_LANDING, landed=True)
+                return
+        if not self._cut and self._capped is not None and self._working:
+            self.interrupt(why=f"{self._over} spent")
+
+    def _budgeting(self) -> None:
+        """Opens a turn's budget: the one it is held to, what it starts from, and its clock.
+
+        Taken once here rather than read as the turn goes, because a turn runs under the
+        budget it opened with -- and because the readings are differences: a baseline that
+        was never set would make the whole conversation's spending, and every second since
+        this machine started, count against the first cap anybody names mid-turn.
+        """
+        self._paid = self._meter.spent().output
+        self._since = time.monotonic()
+        budget = self.budget
+        self._capped = budget if budget is not None and budget.bounded else None
+        if self._capped is not None and self._capped.seconds > 0:
+            self._waits(self._capped.seconds)
+
+    def _waits(self, after: float, *, landed: bool = False) -> None:
+        """Has the turn's budget looked at again in a while, whatever else happens by then.
+
+        Args:
+          after: How long to wait, in seconds.
+          landed: What to say about a response having arrived when the time is up -- which
+            for the wait after a `next-response` budget ran out is yes, that being the wait
+            ending rather than an answer arriving to end it.
+        """
+        clock, self._clock = self._clock, None
+        if clock is not None:
+            clock.cancel()
+        # A daemon, because it is the turn's rather than the run's: an interpreter on its way
+        # out must not wait on the clock of a turn nobody is reading any more.
+        self._clock = threading.Timer(after, self._checks, kwargs={"landed": landed})
+        self._clock.daemon = True
+        self._clock.start()
+
+    def _budgeted(self) -> None:
+        """Closes it, whichever way the turn went, so no clock outlives the turn it was for.
+
+        What the turn was held to goes first, so that a clock which fired in the moment
+        before this reads a turn with no budget and lets a turn that answered stand.
+        """
+        self._capped = None
+        clock, self._clock = self._clock, None
+        if clock is not None:
+            clock.cancel()
+        self._sofar = []
+
+    def _cutting(self) -> str:
+        """Why the turn now running is to stop short, or "" while it is not."""
+        return self._over or self._cut
+
+    def _short(self, why: str, said: str) -> None:
+        """Says a turn was cut off, and fails it where that is what its budget asked for.
+
+        Args:
+          why: What it was cut off for.
+          said: What the agent had said by then, which is what a turn cut off answers with.
+
+        Raises:
+          Unrecoverable: If a spent budget asked for the turn to fail rather than to end.
+            Unrecoverable rather than an ordinary failure because trying it again spends the
+            same budget again: a loop that took the turn over on a schedule would be cut off
+            at the same word every round and never get anywhere.
+        """
+        self._heard(Event(kind="tool", text=f"turn cut off: {why}"))
+        budget = self._capped
+        if self._over and budget is not None and budget.then == "fail":
+            raise Unrecoverable(1, [self._agent.backend], said, f"turn cut off: {why}")
+        if self._id is None and (named := self.named) is not None:
+            # A turn cut off short is a turn that landed: what the agent did is on disk and
+            # the conversation is open to the next turn, which is the whole difference
+            # between a cap and a kill. So the session is opened by it wherever the backend
+            # had already said what to call it -- or the round after a short round would
+            # start a conversation from nothing and lose the work the short one did.
+            self._adopt(named)
+
+    @property
+    def effort(self) -> str:
+        """How hard the next turn of this conversation is to think.
+
+        What the agent runs at, unless this conversation has been told otherwise. A flow may
+        say so while the session is running -- an hour into a Ralph loop, watching what it is
+        costing -- and the backend is asked for it from the next turn on. The turn already
+        under way keeps the effort it started at: a model does not think harder halfway
+        through an answer, and a flow that changed it mid-turn would be describing a turn that
+        never happened.
+        """
+        return self._effort or self._agent.effort
+
+    @effort.setter
+    def effort(self, effort: str) -> None:
+        """Has this conversation think at something other than what its agent runs at.
+
+        Args:
+          effort: The backend's own word for it, or "" to go back to the agent's.
+        """
+        self._effort = effort or None
+
+    @overload
+    def __call__(self, prompt: str, *, suppress: bool = False) -> str: ...
+
+    @overload
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T]
+    ) -> T | None: ...
+
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
+        """Sends one turn, opening the session on the first call and resuming it after.
+
+        Args:
+          prompt: The input prompt for this turn.
+          suppress: Whether a turn that fails answers with nothing instead of raising. A flow
+            is a loop, and a loop that catches its own turns is `try` around every line of
+            it; this is the `|| true` that flowbench writes beside each one.
+          schema: The shape to answer in, as the pydantic model a flow reads the answer as, or
+            None to take what the agent says as it says it. A turn asked for one answers with
+            that model rather than with text, so a flow that needs a decision reads a field
+            instead of a marker at the end of a paragraph.
+
+        Returns:
+          The response generated by the agent, stripped -- or the model it was asked for,
+          where it was asked for one. Nothing at all for a turn that failed, or one whose
+          answer is not the shape it was asked for, while `suppress` was set: "" without a
+          schema, and None with one.
+
+        Raises:
+          subprocess.CalledProcessError: If the turn fails and `suppress` is not set, with
+            whatever the backend said about it attached as a diagnostic.
+          ValueError: If a turn asked for a shape did not answer in it, and `suppress` is not
+            set. An answer that is not what was asked for is a turn that did not do what it
+            was told, which is a failed turn however cleanly the backend exited.
+          Stopped: If the agent has been told to take no further turn -- which `suppress`
+            does not cover, since a loop that carried on past it would never end.
+          Unrecoverable: If the turn failed for a reason no other try could come out
+            differently on, which `suppress` does not cover either and for the same reason: a
+            loop that went round again would meet the same failure every time.
+        """
+        said = ""
+        try:
+            for event in self.stream(prompt, schema=schema):
+                if event.kind == "result":
+                    said = event.text
+        except Unrecoverable:
+            # Not covered by `suppress`, for the reason `Stopped` is not: a loop that carried
+            # on past a turn no other try could come out differently on would go round on the
+            # same failure until somebody stopped it. A conversation longer than the model
+            # takes is that long on the next round too.
+            raise
+        except subprocess.CalledProcessError as failed:
+            if not suppress:
+                raise
+            # Quiet on the answer, not on the reason. Suppressed, the turn answers with nothing
+            # so a loop catches it like any other line -- but an account that needs attention,
+            # a credential refused or a model not entitled, put its reason in two places a
+            # suppressed call throws away: the sentence a backend writes into its own protocol
+            # rather than onto stderr, and the non-zero exit itself. A live stderr tee shows
+            # the raw progress and not those, so the assembled diagnostic goes where that
+            # progress goes when nothing is watching the agent, which is stderr. It changes
+            # nothing about what the turn answers, only whether the reason it answered so can
+            # be read.
+            if not self._agent._watchers:
+                say(str(failed), sys.stderr)
+            return None if schema is not None else ""
+        if schema is None:
+            return said.strip()
+        try:
+            return _shaped(said, schema)
+        except ValueError:
+            if not suppress:
+                raise
+            return None
+
+    @overload
+    async def aturn(self, prompt: str, *, suppress: bool = False) -> str: ...
+
+    @overload
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T]
+    ) -> T | None: ...
+
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
+        """The same turn as :meth:`__call__`, awaited: `await session.aturn(prompt)`.
+
+        For a flow written as `async def run`, which is how one drives many conversations at
+        once: the turn runs on a thread of its own and the loop is handed back, so the other
+        conversations keep going while this one thinks. The session is still a sequence -- two
+        turns awaited on one session are one after the other, as two called on it are.
+
+        Args:
+          prompt: The input prompt for this turn.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
+          schema: The shape to answer in, as for :meth:`__call__`.
+
+        Returns:
+          What :meth:`__call__` would have answered with.
+        """
+        if schema is None:
+            return await _awaited(
+                lambda: self(prompt, suppress=suppress), f"{self._agent.id}-turn"
+            )
+        return await _awaited(
+            lambda: self(prompt, suppress=suppress, schema=schema),
+            f"{self._agent.id}-turn",
+        )
+
+    async def apursue(self, objective: str, *, suppress: bool = False) -> str:
+        """The same goal as :meth:`pursue`, awaited: `await session.apursue(objective)`.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+          suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+
+        Returns:
+          What :meth:`pursue` would have answered with.
+        """
+        return await _awaited(
+            lambda: self.pursue(objective, suppress=suppress), f"{self._agent.id}-goal"
+        )
+
+    def stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """Sends one turn, saying what the agent says as it says it.
+
+        The turn is over when the iterator is, and its last `result` event is what
+        :meth:`__call__` answers with. A caller that only wants the answer calls the session.
+
+        Everything said here reaches whoever is watching the agent, bracketed by the `begins`
+        and `ends` that say whose turn it was: a flow drives the sessions and answers to
+        nobody, so the turns going past are the only place a run can be watched from.
+
+        It is also where the moments of a turn are: the prompt going in, each tool the agent
+        reaches for, and the turn stopping. A hook hung on `Stop` that refuses is what sends
+        the agent on again, so one call here is as many turns of the model as the hooks allow
+        -- and still one `result` at the end of it, which is the last of them.
+
+        Args:
+          prompt: The input prompt for this turn.
+          schema: The shape to answer in, or None to take what the agent says. A backend that
+            can be held to one is handed it; one that cannot is asked for it in the prompt,
+            since a turn that has to be read as an object has to be asked somehow -- under
+            the flow's own words rather than in place of them, and not in what the hooks and
+            the transcript are shown, which is what the flow said.
+
+        Yields:
+          What the agent said, in the order it said it.
+
+        Raises:
+          subprocess.CalledProcessError: If the turn fails, as for :meth:`__call__`.
+        """
+        # The whole turn under the session's own lock, rather than only the part where the
+        # backend is spoken to: the moments a turn fires and the events it says are the turn
+        # as much as the process is, and two threads calling one session are two turns one
+        # after the other. A conversation is a sequence, however many are driving it.
+        with self._lock:
+            # Cleared before the turn is open to being cut off rather than as it opens: the
+            # moments a turn fires before the backend is spoken to can each take seconds, and
+            # a reason set in that window and cleared afterwards is a cut-off that quietly
+            # never happened.
+            self._over = self._cut = ""
+            self._wedged = False
+            self._sofar = []
+            self._working = True
+            try:
+                yield from self._turning(prompt, schema=schema)
+            finally:
+                self._working = False
+                if self._ended:
+                    # Closed while this turn was running -- a stop does not wait for a turn,
+                    # and the turn's own process is still reading the skills it was given.
+                    # So what the session mounted goes now, which is the first moment nothing
+                    # is working by it.
+                    self._unmounted()
+
+    def _turning(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """One turn, from the moments it opens on to the answer it ends with.
+
+        Args:
+          prompt: The input prompt for this turn.
+          schema: The shape to answer in, or None to take what the agent says.
+
+        Yields:
+          What the agent said, in the order it said it.
+        """
+        if self._agent._stopped:
+            raise Stopped(f"{self._agent.id} was stopped")
+        # Before anything else, for a session that is a fork and has not opened yet: this
+        # turn is the fork, and where it cuts is settled by where the conversation it came
+        # from is now rather than by where it was.
+        if self._id is None:
+            self._at_the_boundary()
+        self._turns += 1  # what a fork of this conversation checks it against
+        # Anything said while nobody was working goes into this turn. A flow's own prompt is
+        # the only way into a turn that has not started, so it is asked for here rather than
+        # written to the session: a session between turns would answer it on its own.
+        held = self._agent.waiting() if self._agent.waiting is not None else []
+        if held:
+            prompt = "\n\n".join([prompt, *held])
+        # Before the moments rather than only on the first turn: a session closed and then
+        # spoken to again -- which is what a stopped flow that carries on does -- had what it
+        # was working by taken away when it closed, and a turn without the flow's skills is a
+        # turn asked to do what it no longer has the means to do. A no-op for a session that
+        # is holding them already, which is every turn but the first.
+        self._mounts()
+        if not self._started:
+            self._started = True
+            self._fire(Moment.SESSION_START, prompt=prompt)
+        submitted = self._fire(Moment.USER_PROMPT_SUBMIT, prompt=prompt)
+        if submitted.adds:
+            prompt = f"{prompt}\n\n{submitted.adds}"
+        self._heard(Event(kind="begins", text=prompt))
+        # From here to the `ends` below is the turn, which is what a budget is over: every
+        # turn starts with the whole of what it was given, and what is measured is the rise
+        # across this one.
+        self._budgeting()
+        try:
+            if submitted.refused:
+                # The turn does not run, and what the hook said instead is what it answers
+                # with: a turn that was refused still has to end on one `result`, or a flow
+                # reading it would be waiting for an answer nobody is going to give.
+                yield self._heard(Event(kind="result", text=submitted.because))
+                return
+            again = 0
+            while True:
+                answered = Event(kind="result", text="")
+                # Asked for afresh each time round, because each time round is a turn: a
+                # hook that sends the agent on says what to say next, and a shape that was
+                # only on the first prompt would be a shape the last turn was never asked
+                # for. On the prompt as it is sent rather than on the one the hooks and the
+                # transcript see, which is the flow's own words: a schema in the transcript
+                # is the plumbing showing through.
+                try:
+                    for event in self._falling_back(prompt, schema=schema):
+                        if event.kind == "result":
+                            # Held back: a hook may yet send the agent on, and a turn that
+                            # was sent on has not answered.
+                            answered = event
+                            continue
+                        self._heard(event)
+                        if event.kind == "text":
+                            # Kept as it goes, so that a turn cut off in the middle of a
+                            # sentence can still answer with what the agent got as far as
+                            # saying: there is no `result` to read it off once the thing
+                            # saying it has been taken away.
+                            self._sofar.append(event.text)
+                        if event.kind == "tool":
+                            # Read off the stream only where the backend has no table of its
+                            # own pointed back here. A CLI says what it reached for and then
+                            # reaches for it, so a moment fired from here has already
+                            # happened, and a hook refusing it is watching rather than
+                            # gating. Where a gate is up the CLI asks first and waits, so the
+                            # moment fires from there instead -- and firing it here as well
+                            # would be one tool call putting the same hook twice.
+                            if not self._agent.hooks.gated(Moment.PRE_TOOL_USE):
+                                named, _, about = event.text.partition(" ")
+                                self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
+                        elif event.kind in ("subagent", "subagent-ends"):
+                            # An agent this one started of its own, bracketed the way a turn
+                            # is: a fleet under a turn is something a flow may want a word
+                            # about, and the id is what makes the one that started and the
+                            # one that ended one agent rather than two lines.
+                            named, _, about = event.text.partition(" ")
+                            self._fire(
+                                Moment.SUBAGENT_START
+                                if event.kind == "subagent"
+                                else Moment.SUBAGENT_STOP,
+                                tool=named,
+                                about=about,
+                                under=event.whose,
+                            )
+                        yield event
+                except (subprocess.CalledProcessError, OSError, ValueError):
+                    # A turn taken away underneath its own reader comes back as whatever the
+                    # backend makes of that -- a nonzero exit, a pipe closed while something
+                    # was reading it. Only ours to answer for when something was actually
+                    # taken away, which is what `_cut` says and a spent budget on its own
+                    # does not: anything else is a turn that failed on its own account, and
+                    # is raised as one.
+                    #
+                    # A watchdog is raised as one too. It ends a turn whose backend had
+                    # stopped saying anything, so what it leaves behind is whatever the agent
+                    # had got as far as saying and usually nothing at all -- and a `result`
+                    # of "" is a loop running on an empty turn as the work of the turn before
+                    # it. What the watchdog put in place of the wreckage says what happened,
+                    # and a flow that catches a failed turn is what acts on it.
+                    if not self._cut or self._wedged:
+                        raise
+                    why = self._cutting()
+                    # A line apiece, which is what each of these is: a block of the
+                    # message, a line the command wrote. Run together they would be one
+                    # word where the agent said two.
+                    said = "\n".join(self._sofar).strip()
+                    self._short(why, said)
+                    yield self._heard(Event(kind="result", text=said))
+                    return
+                # Heard whether or not it is passed on, because what a turn cost is on it.
+                self._heard(answered)
+                if why := self._cutting():
+                    # The answer that was in flight has landed, and the turn stops on it
+                    # rather than going round again -- which is what `next-response` is, and
+                    # what an `immediately` that arrived a moment too late comes to. A hook
+                    # that would have sent the agent on is not asked: a budget spent is not a
+                    # question.
+                    self._short(why, answered.text)
+                    yield answered
+                    return
+                stopping = self._fire(
+                    Moment.STOP, said=answered.text, prompt=prompt, again=again
+                )
+                if not (stopping.refused and stopping.because):
+                    yield answered
+                    return
+                prompt, again = stopping.because, again + 1
+        finally:
+            self._budgeted()
+            self._heard(Event(kind="ends", text=""))
+
+    def _falling_back(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """One turn, tried again and then run under the next account, until one lands.
+
+        A turn fails for a kind of reason, and each kind has an answer of its own. A gateway
+        that answered 503 is the same call away from working; a subscription that said "too
+        many requests" is that call away once it has been left alone for a while, and then
+        away under an account that has not spent its quota; a key that was refused is refused
+        a minute later too, so the account chain is the whole of the answer and none of the
+        waiting is; a model that has been retired is retired under every account of that CLI,
+        so nothing but another place answers it; opencode's own store being busy is two turns
+        of it racing and is gone in a second. Retried identically -- which is what they all
+        were -- three of those are a flow that makes no progress and one is a flow hammering
+        a service that has just asked it to stop.
+
+        So which kind it was is worked out here, out of what the CLI said, how it exited and, for
+        the one backend that keeps it there, its own log: `hmz.coganchor.backends.trouble` reads it
+        against signatures written down beside everything else that is true of a backend.
+        `hmz.coganchor.fallbacks.answers` then says what that kind gets -- how few goes it is worth,
+        how long the shortest wait is, whether another account answers it, whether to reopen the
+        transport first -- and the place says the rest, as it always did. Every step of it is
+        narrated as an event, because a recovery nobody can see is indistinguishable from a hang.
+
+        A backend that already knows says so itself, and is believed: `Unrecoverable` for a
+        failure no place could come out of differently, which is raised on rather than
+        counted as an attempt, and `Failed(fault=...)` for one it can name. Guessing is only
+        what is left when the backend has said nothing.
+
+        All of it inside the session that was running: the conversation is the backend's own
+        and is named by an id, so the same session carries on under the next account -- and a
+        transport that was reopened resumes that same conversation, what was lost having been
+        the socket rather than the session. What a failed try already put on the transcript
+        stays there -- it is how somebody reading it finds out that the account went down and
+        where the turn went next.
+
+        Args:
+          prompt: The input prompt for this turn, as the backend is to be given it.
+          schema: The shape to answer in, or None.
+
+        Yields:
+          What the agent said, in the order it said it.
+
+        Raises:
+            subprocess.CalledProcessError: If every try under every account of the chain
+              failed, which is the last of them raised as the turn's own failure, carrying
+              which kind of failure it was and what a person does about it -- or at once,
+              without another try or another account, for an `Unrecoverable`: a turn that
+              failed for a reason no other try could come out differently on is a turn that
+              has failed, and trying it again is a loop rather than a recovery.
+        """
+        from hmz.coganchor import fallbacks, providers
+
+        # How this place is tried again, read once for the whole walk: it is a file, and a
+        # turn that failed under four accounts must not read it four times.
+        again_ = fallbacks.tried(self._agent.spec)
+        last: subprocess.CalledProcessError | None = None
+        # What the last failure was and what it is owed. A turn that has not failed yet is
+        # owed what a turn has always been owed: the goes the place asked for, the place's
+        # own wait, and the account chain after them.
+        answer = fallbacks.answers("")
+        # Which accounts this turn has been under, so that a chain read again between two of
+        # them -- another session of this agent moved it, somebody rewrote a fallback -- is
+        # walked forwards rather than back onto one that has already failed here.
+        tried: set[str] = set()
+        while True:
+            account = self._agent.node()
+            if account.name in tried:
+                break
+            tried.add(account.name)
+            since = time.monotonic()
+            goes, attempt = again_.tries, 0
+            while True:
+                attempt += 1
+                if self._agent._stopped:
+                    raise Stopped(f"{self._agent.id} was stopped")
+                if attempt > 1:
+                    # The place's wait, floored by what the failure itself asks for and never
+                    # cut short by it: a service that has said there have been too many
+                    # requests is not answered by the first second of an exponential backoff,
+                    # and a place that asked for a backoff against a gateway that is down
+                    # asked for it.
+                    waiting = max(
+                        fallbacks.waits(again_.policy, attempt),
+                        fallbacks.waits(answer.policy, attempt)
+                        if answer.policy
+                        else 0.0,
+                        answer.least,
+                    )
+                    # Checked before the wait rather than after it, so that a turn is never
+                    # started knowing the time it was given is already spent.
+                    if (
+                        again_.timeout
+                        and time.monotonic() - since + waiting > again_.timeout
+                    ):
+                        break
+                    self._narrates(self._recovering(answer, waiting, attempt - 1, goes))
+                    time.sleep(waiting)
+                started = time.time()
+                try:
+                    yield from self._stream(
+                        self._shaped_ask(prompt, schema), schema=schema
+                    )
+                except Unrecoverable:
+                    # A turn that would fail the same way however often it is taken, and
+                    # under whichever account takes it: a prompt longer than the model's
+                    # context window is that long again on the next try, and a conversation
+                    # its backend can no longer be reached under is not reachable a second
+                    # later. Tried again, those are a loop that runs until somebody stops
+                    # it -- so this one is the turn's own failure, said once.
+                    raise
+                except (FileNotFoundError, NotADirectoryError, PermissionError) as gone:
+                    last = self._nothing_ran(gone)
+                    answer = self._trouble(last, within=time.time() - started)
+                except subprocess.CalledProcessError as failed:
+                    if self._cutting():
+                        # A turn cut off is not a turn to take again, here or under the next
+                        # account: the budget would be spent again on the same words, and a
+                        # watchdog that ended a wedged turn did not ask for another one.
+                        raise
+                    last = failed
+                    answer = self._trouble(failed, within=time.time() - started)
+                else:
+                    return
+                # How many goes this failure is worth here, which the place and the failure
+                # both have a say in: the place asks for as many as it asks for, the failure
+                # floors that where another go is the whole answer, and a failure the same
+                # call cannot come out of differently takes the floor away entirely.
+                goes = 0 if answer.held else max(again_.tries, answer.tries)
+                if answer.reopen:
+                    # The socket rather than the session: what is holding this conversation
+                    # open is let go of, and the next go resumes the conversation by the id
+                    # the backend gave it. A session holding nothing does nothing here.
+                    self._shut()
+                if attempt > goes:
+                    break
+            if self._agent._stopped:
+                # Stopped while this turn was waiting to try again, or between accounts.
+                # A run ended by hand is ended, not carried on somewhere else.
+                raise Stopped(f"{self._agent.id} was stopped")
+            if not answer.accounts:
+                # A model that has been retired, a CLI that is not installed: every account
+                # of this backend is offered the same catalogue and none of them is a second
+                # copy of the CLI, so walking them is walking four accounts to be told the
+                # same thing four times. What answers it is another place.
+                break
+            if self._agent.node().name != account.name:
+                # Another session of this agent moved it while this turn was running, and it
+                # moved it forwards. Taking the next step from where this turn thought it was
+                # would drag the agent back onto an account somebody has already left.
+                continue
+            instead = next(
+                (one for one in providers.chain(account)[1:] if one.name not in tried),
+                None,
+            )
+            if instead is None:
+                break
+            self._agent.fall_back(instead)
+            self._narrates(
+                f"{self._went(answer)}; carrying on as "
+                f"{instead.name or 'this machine is signed in'}"
+            )
+        # Every account of this backend is spent, or none of them was ever the answer. What
+        # is left is another agent -- another CLI, another model, another effort -- which is a
+        # step written down between the two rather than on either, and is the second thing
+        # tried because it is the one that cannot carry the conversation: no backend takes
+        # another backend's session id.
+        stood_in = self._agent.stands_in()
+        if stood_in is not None and self._may_stand_in(stood_in):
+            # What went wrong, where anything here recognised it, and otherwise the line a
+            # turn with nothing left to try has always been narrated with.
+            went = (
+                self._went(answer)
+                if answer.fault
+                else f"{self._agent.backend} has nowhere left to run"
+            )
+            self._narrates(f"{went}; carrying on as {stood_in.spec}")
+            yield from self._instead(stood_in, prompt, schema=schema)
+            return
+        if last is None:  # nothing ran at all, which is nothing this can raise about
+            raise RuntimeError("no account to take the turn under")
+        raise last
+
+    def _narrates(self, text: str) -> None:
+        """Says one step of a recovery where whoever is running the flow can see it.
+
+        To whatever is watching the agent, and -- where nothing is -- on stderr, beside the
+        progress every backend already puts there. A recovery nobody can see is
+        indistinguishable from a hang, and a turn that has just been told to wait half a
+        minute for a rate limit is exactly the turn somebody would otherwise watch do
+        nothing at all.
+
+        Args:
+          text: The line, as :meth:`_recovering` and its like build one.
+        """
+        self._heard(Event(kind="tool", text=text))
+        if not self._agent._watchers:
+            say(text, sys.stderr)
+
+    def _nothing_ran(self, gone: OSError) -> Failed:
+        """A spawn that came back as an error rather than as a process, as a failed turn.
+
+        A CLI that is not installed here does not exit nonzero: there is nothing to exit, so
+        the spawn raises. Left as it is, that is the one failed turn a flow could not carry on
+        past -- a loop written against a failed turn catches `CalledProcessError`, and this is
+        not one. So it becomes one, saying which line installs the CLI.
+
+        Which failure it is depends on what could not be found, and `subprocess` says: the
+        program for one it could not run, the directory for one it could not start in. A
+        workspace that has gone is not a CLI that is missing, and telling somebody to install
+        a CLI they already have would be an answer to a question nobody asked -- so that one
+        is left as a failed turn nothing classified, tried again as any other is.
+
+        Args:
+          gone: What the spawn raised.
+
+        Returns:
+          The failed turn to carry on from.
+        """
+        named = str(gone.filename or "")
+        program = bool(named) and named != self.cwd and not os.path.isdir(named)  # noqa: PTH112
+        return Failed(
+            _NOTHING_TO_RUN if program else 1,
+            [named or self._agent.backend],
+            "",
+            str(gone),
+            fault="missing" if program else "",
+        )
+
+    def _trouble(
+        self, failed: subprocess.CalledProcessError, *, within: float = 0.0
+    ) -> Answer:
+        """Which kind of failure a stopped turn was, and what a turn does about that kind.
+
+        Worked out here rather than where the turn was raised because here is where the
+        three things it takes are all to hand: which backend it was, how the process exited,
+        and -- for the one CLI that answers with a generic error and keeps the status in a
+        log of its own -- what that log has just been written with. The backend is believed
+        first: one that named the kind itself knows something no signature does.
+
+        What is decided is written back onto the failure, so that the turn's own failure says
+        it too. A suppressed turn prints that sentence and nothing else, and `429` there is
+        the difference between an account to attend to and a bug to report.
+
+        Args:
+          failed: What went wrong.
+          within: How long the try that failed took. What bounds the log: these are shared
+            between every session of that CLI on this machine, so a window wider than the try
+            is a window another agent's failure can be read out of -- which, on a machine
+            running nine of them at once, is exactly what would happen.
+
+        Returns:
+          What that kind of failure is owed, with what a person does about it filled in -- the
+          install line for a CLI that is not here, since which line installs it is a fact
+          about that CLI rather than about the kind of failure.
+        """
+        from dataclasses import replace
+
+        from hmz.coganchor import backends, fallbacks
+
+        backend = self._agent.backend
+        said = failed.fault if isinstance(failed, Failed) else ""
+        fault = said or backends.trouble(
+            backend, failed.stderr, failed.output, status=failed.returncode
+        )
+        if not fault:
+            # The streams said nothing this recognises. Antigravity is why that is not the
+            # end of it: it exits with `Agent execution terminated due to error` and puts the
+            # HTTP status in its own log, so six rate-limited turns of the 2026-09-09
+            # evaluation read as six turns that simply failed. Read last and only here, a log
+            # being a file to open and every other backend saying what happened where it
+            # happened.
+            fault = backends.trouble(
+                backend,
+                journal=backends.journalled(
+                    backend, self._environ() or os.environ, within=within
+                ),
+            )
+        answer = fallbacks.answers(fault)
+        if fault == "missing":
+            answer = replace(answer, fix=backends.installing(backend))
+        if isinstance(failed, Failed):
+            failed.fault, failed.fix = answer.fault, answer.fix
+        return answer
+
+    def _went(self, answer: Answer) -> str:
+        """What went wrong, as the clause every line narrating a recovery is built on.
+
+        Args:
+          answer: What kind of failure it was and what a person does about it.
+
+        Returns:
+          The backend and what happened to it, with the fix in brackets where there is one.
+          For a failure nothing classified it is `<backend> failed`, which is what a recovery
+          has always been narrated as.
+        """
+        said = f"{self._agent.backend} {answer.about}"
+        return f"{said} ({answer.fix})" if answer.fix else said
+
+    def _recovering(self, answer: Answer, waiting: float, taken: int, goes: int) -> str:
+        """The line a watcher is shown when a failed turn is about to be taken again here.
+
+        Args:
+          answer: What kind of failure it was and what is being done about it.
+          waiting: How long the turn waits before this go.
+          taken: How many goes have already been taken beyond the first.
+          goes: How many there are.
+
+        Returns:
+          The text of the `tool` event that narrates it. A recovery nobody can see is
+          indistinguishable from a hang, so every part of what is happening is in it: what
+          went wrong, whether the transport is being reopened onto which conversation, how
+          long the wait is and which go this is.
+        """
+        said = self._went(answer)
+        if answer.reopen:
+            said += f"; reopening and resuming {self._id or 'the conversation'}"
+        return f"{said}; trying again in {waiting:.0f}s ({taken} of {goes})"
+
+    def _moving_to(self, stood_in: AgentBase) -> SessionBase:
+        """The conversation of the stand-in that this one's turns are taken in.
+
+        Opened once and held, for as long as this session is: what this conversation was is
+        lost at the move, and a second one lost every turn after it would be a stateful loop
+        started over every round. Opening one starts no process and says nothing to any
+        backend, so it is opened to ask what it can be told as readily as to take a turn.
+
+        Args:
+          stood_in: The agent taking the turn.
+
+        Returns:
+          The session, which works where this one works and goes when this one goes.
+        """
+        if self._moved_to is None:
+            self._moved_to = stood_in.new(self._cwd)
+        return self._moved_to
+
+    def _may_stand_in(self, stood_in: AgentBase) -> bool:
+        """Whether the turn may be moved there, given what is in front of the model here.
+
+        The agent made for a step already answers for the settings it was configured with: one
+        the CLI taking over cannot be told at all is no stand-in. The flow's own callbacks are
+        not among those -- they are offered on the conversation, between two turns, long after
+        the step was read -- and a backend with no way of being given one would take the turn
+        with none of them in front of the model. A callback quietly never offered is a flow
+        that quietly does not do what it says, so there is nowhere to carry on to and the turn
+        fails where it failed.
+
+        What is asked is the agent's list rather than this conversation's own, because that is
+        what the model is actually looking at: a backend is told about its tools where it is
+        started, and some are started once per agent, so a conversation offering none still
+        has a sibling's callbacks in front of it.
+
+        Args:
+          stood_in: The agent that would take the turn.
+
+        Returns:
+          Whether the turn may go there, which is everything except a turn taken with
+          callbacks in front of it moving to a backend that takes none.
+        """
+        offered = self._agent.toolbox.offered()
+        return not offered or type(self._moving_to(stood_in)).takes_tools
+
+    def _instead(
+        self,
+        stood_in: AgentBase,
+        prompt: str,
+        *,
+        schema: type[BaseModel] | None = None,
+    ) -> Iterator[Event]:
+        """This turn, taken in a session of the agent this one falls back to.
+
+        A new session rather than this one carried on: the conversation is the backend's own
+        and is named by an id nothing else answers to, so a turn that leaves its backend
+        leaves the conversation. What the flow sees is one turn either way -- the events come
+        back through the session it asked, bracketed by the moments and the `begins` and
+        `ends` this session was already going to say.
+
+        The stand-in walks its own accounts and then its own next step, so a chain of three
+        agents is this called once and then once again inside it. It cannot come round: the
+        agent that stood in was built holding only the steps after its own.
+
+        Taken in the one session this conversation moves to, which is opened once and held for
+        as long as this one is: :meth:`_moving_to`. What the flow put in front of this turn
+        goes with it -- the skills this conversation carries and the callbacks the agent is
+        offering -- since it is this conversation's turn wherever it is taken.
+
+        Args:
+          stood_in: The agent taking the turn.
+          prompt: What the flow is asking, in its own words: shaped again for the backend that
+            is about to be asked, since one that can be held to a shape is told separately and
+            one that cannot is asked in the prompt.
+          schema: The shape to answer in, or None.
+
+        Yields:
+          What the stand-in said, in the order it said it.
+        """
+        session = self._moving_to(stood_in)
+        session._shaping = schema
+        # The flow's skills go with the turn: the stand-in was made carrying them, and a
+        # session of it puts them where its own backend reads them, which is not where this
+        # one's does. Whichever of them this session carries, since it is this session's turn.
+        session.loads(self._skills)
+        # And so do the flow's own callbacks: a turn taken with none of them in front of the
+        # model would be the flow losing what it offered by being moved. The agent's list
+        # rather than this conversation's own, since that is what the model was looking at --
+        # a backend told about its tools once per agent has a sibling's offer in front of it
+        # too. Nothing at all where nothing is offered, and a turn with any in front of it is
+        # only ever moved somewhere they can go.
+        session.offers(self._agent.toolbox.offered())
+        session._mounts()
+        yield from session._falling_back(prompt, schema=schema)
+
+    def _shaped_ask(self, prompt: str, schema: type[BaseModel] | None) -> str:
+        """The prompt as the backend is to be given it, shape and all.
+
+        Args:
+          prompt: What the flow is asking.
+          schema: The shape it wants back, or None.
+
+        Returns:
+          The prompt itself for a backend that can be held to the shape -- it is told
+          separately, and telling it twice would be asking for the same thing two ways -- and
+          the prompt with the schema under it for one that can only be asked.
+        """
+        if schema is None or type(self).shapes:
+            return prompt
+        return prompt + _IN_SHAPE.format(
+            schema=json.dumps(schema.model_json_schema(), indent=2)
+        )
+
+    def _heard(self, event: Event) -> Event:
+        """Tells whoever is watching the agent what was said, and answers with it.
+
+        Said as this conversation's rather than as the agent's: an agent may be holding ten
+        at once, and whoever is watching has to be able to tell which of them said a thing --
+        to show one conversation rather than ten interleaved, and to say the next thing back
+        to the one it is reading.
+
+        Args:
+          event: What was said.
+
+        Returns:
+          The same event, so that saying it and passing it on is one line.
+        """
+        self._agent._heard(event, self)
+        return event
+
+    def _fire(
+        self,
+        moment: Moment,
+        *,
+        prompt: str = "",
+        tool: str = "",
+        about: str = "",
+        called: Mapping[str, Any] | None = None,
+        said: str = "",
+        again: int = 0,
+        under: str = "",
+    ) -> Verdict:
+        """Tells whatever is hung on one of this agent's moments that it has arrived.
+
+        Args:
+          moment: Which moment it is.
+          prompt: What the agent is about to be told, where that is what the moment is about.
+          tool: What it reached for, where the moment is about a tool.
+          about: What it reached for it with.
+          called: What the tool was called with, where the backend says.
+          said: What the agent said last.
+          again: How many times this turn has already been sent on rather than let stop.
+          under: The backend's own id for the agent this one started, where the moment is
+            about one.
+
+        Returns:
+          What the hooks said, which is nothing at all where none is hung.
+        """
+        return self._agent.hooks.fire(
+            Occasion(
+                moment=moment,
+                agent=self._agent.id,
+                session=self._id or "",
+                prompt=prompt,
+                tool=tool,
+                about=about,
+                under=under,
+                input=called or {},
+                said=said,
+                again=again,
+            )
+        )
+
+    @abstractmethod
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """Sends one turn, saying what the agent says as it says it.
+
+        Args:
+          prompt: The input prompt for this turn.
+          schema: The shape the turn is to answer in, for a backend that can be held to one,
+            and already asked for in the prompt for one that cannot.
+
+        Yields:
+          What the agent said, in the order it said it.
+        """
+
+    def interject(self, text: str) -> None:
+        """Puts a word in while a turn is running, as typing at the agent would.
+
+        The agent reads it when it next looks, so a turn already under way takes it into
+        account rather than being restarted with it. Landing it is not the agent having it:
+        every backend here answers a word put in twice over -- once to say it has been taken
+        from us, and again, later, to say it is in front of the model -- and only the second
+        is the agent having heard. That second one is a `took` event.
+
+        Args:
+          text: What to say to the agent.
+
+        Raises:
+            NotImplementedError: If this backend takes a turn's whole prompt up front and has
+            nowhere to put a later word.
+        """
+        raise NotImplementedError(f"{type(self).__name__} cannot be talked to mid-turn")
+
+    def steering(self, text: str, ticket: str = "") -> str:
+        """Writes down a word being put into a turn, against the name it will come back under.
+
+        Args:
+          text: The word itself.
+          ticket: What the backend will name it by when it says it has it, or "" for a name
+            of our own -- which is what a backend takes when it will carry one back.
+
+        Returns:
+          The ticket, to be sent with the word.
+        """
+        said = ticket or uuid.uuid4().hex
+        with self._steering:
+            self._steered[said] = text
+        return said
+
+    def took(self, ticket: str) -> str | None:
+        """Takes a word off the book, the agent having said it has it.
+
+        Args:
+          ticket: What the backend named it by.
+
+        Returns:
+          The word, or None for one this session never put in -- a turn's own prompt comes
+          back the same way, and is not a word put into anything.
+        """
+        with self._steering:
+            return self._steered.pop(ticket, None)
+
+    def unsteered(self, text: str) -> None:
+        """Takes a word off the book because it never landed at all.
+
+        Args:
+          text: The word, which is what a backend that mints its own name knows it by.
+        """
+        with self._steering:
+            for ticket, said in list(self._steered.items()):
+                if said == text:
+                    del self._steered[ticket]
+                    return
+
+    def close(self) -> None:
+        """Ends the conversation, so that a turn under way stops waiting.
+
+        `SessionEnd` is said once here, and only for a session that ever started: a session
+        opened and dropped without a turn in it never began, and one closed twice did not end
+        twice. What holds the conversation open is let go of in :meth:`_shut`, which a
+        backend that has to end its process between turns reaches for instead -- ending the
+        process is not ending the conversation.
+        """
+        if self._started and not self._ended:
+            self._ended = True
+            self._fire(Moment.SESSION_END)
+        self._shut()
+        # And whatever this conversation was offering the agent: a callback that outlived the
+        # conversation offering it would be one the flow can no longer see the point of.
+        # Calling the finalizer is what takes them back, so that a session closed by hand and
+        # one merely let go of come to the same thing -- once, whichever gets there first.
+        if self._unoffering is not None:
+            self._unoffering()
+            self._unoffering = None
+            self._tools = ()
+            # And once more with the finalizer detached, since `close` is reached from
+            # another thread while this one may be offering: a list landing between the two
+            # lines above would otherwise be an entry with nothing left to take it back.
+            # Offering after this has returned is offering afresh, which registers its own.
+            self._agent.toolbox.offers(id(self), ())
+        if self._moved_to is not None:
+            # And the conversation this one moved to, which is this conversation carried on
+            # somewhere else: it ends when this one does.
+            self._moved_to.close()
+        if not self._working:
+            # What the session mounted goes when the conversation does. Not while a turn is
+            # still running by it, though: this is called to stop an agent, and stopping one
+            # does not wait for the turn it is taking -- so a turn that is still reading those
+            # files would have them taken away underneath it. The turn itself lets go of them
+            # as it ends, which is the first moment nothing is using them.
+            self._unmounted()
+
+    def _unmounted(self) -> None:
+        """Takes away what this session mounted, once and whenever the last holder is done.
+
+        Calling the finalizer is what runs it, once, whichever gets there first: the close,
+        the end of a turn that outlived one, or collection for a session nobody closed.
+        """
+        if self._unmounting is not None:
+            self._unmounting()
+            self._unmounting = None
+        # And nothing is down, so the next turn puts down whatever this session carries then
+        # -- which is what a session closed and spoken to again is owed.
+        self._mounted = None
+
+    def _shut(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
+        """Lets go of whatever is holding this conversation open.
+
+        Does nothing by default: a session that is one command per turn holds nothing
+        between them.
+        """
+
+    def _lets_go(self) -> None:
+        """Puts down whatever transport this turn is riding, from another thread than its own.
+
+        What a watchdog reaches for once asking has not worked: a read blocked on a backend
+        that will never answer ends when the thing it is blocked on ends, and nothing else.
+        The conversation is not ended by it -- the id has been adopted, and the next turn
+        resumes under it, which is what a session whose process was restarted has always done.
+
+        The same as :meth:`_shut` for a session whose transport is its own. A backend whose
+        turns run on something shared -- an app server serving every conversation with the
+        agent -- says so here instead, since shutting the session would put down nothing.
+        """
+        self._shut()
+
+    def elsewhere(self) -> bool:
+        """Whether what this session is holding open was started under another account.
+
+        Asked on the thread taking the turn, which is the only one that may let go of what
+        this session holds: an agent that has fallen back is an agent whose next turn has to
+        be spoken to a process started as whoever it now is.
+
+        Returns:
+          Whether to let go of it before this turn. False for a session holding nothing yet,
+          and for one whose agent has not moved.
+        """
+        return self._as is not None and self._as != self._agent.node().name
+
+    @property
+    def cwd(self) -> str:
+        """The directory this conversation works in, as whoever is watching would name it.
+
+        Which is the path on the machine the work lands on: the one the session was opened
+        with, or the workspace the flow is running in where it was opened with none.
+        """
+        anchor = self._agent.anchor
+        if self._cwd is not None:
+            return os.path.abspath(self._cwd)  # noqa: PTH100
+        if anchor is not None:
+            return os.path.abspath(anchor.workspace or os.getcwd())  # noqa: PTH100, PTH109
+        return os.path.abspath(os.getcwd())  # noqa: PTH100, PTH109
+
+    def _workspace(self) -> str:
+        """The project directory a turn of this session works in, as the backend will find it.
+
+        A backend run as a command works in it directly, and coganchor puts an anchored one in
+        its mirror of the workspace instead -- which is the workspace's own path unless the
+        mirror was put somewhere else. A backend told where to work has to be told that same
+        directory, since it is the one whose files reach the target.
+
+        Returns:
+          The absolute path to open the session at.
+
+        Raises:
+          ValueError: If the session was opened at a directory that is not there, or -- for an
+            agent whose turns land elsewhere -- at one outside the workspace the anchor names.
+            Said before the first turn rather than as a backend failing to start in it.
+        """
+        anchor = self._agent.anchor
+        if anchor is None:
+            where = self.cwd
+            if not os.path.isdir(where):  # noqa: PTH112
+                raise ValueError(f"{where}: no directory to open a session in")
+            return where
+        # The mirror's own path for the same place: what the agent reads and writes is the
+        # mirror, and coganchor is what makes that the target's copy.
+        workspace = os.path.abspath(anchor.workspace or os.getcwd())  # noqa: PTH100, PTH109
+        mirror = os.path.abspath(anchor.shadow or workspace)  # noqa: PTH100
+        where = self.cwd
+        if where != workspace and not where.startswith(workspace + os.sep):
+            raise ValueError(
+                f"{where} is not inside {workspace}, which is the workspace this agent's "
+                "turns land in"
+            )
+        return os.path.join(  # noqa: PTH118 -- text, as every path on this line is
+            mirror, os.path.relpath(where, workspace)
+        )
+
+    def _mounts(self) -> None:
+        """Puts the skills this session carries where the backend reads them, as a turn opens.
+
+        Where that backend reads a project's own skills, for as long as this session carries
+        them: a flow works by the skills it carries, and a session of it that had none would
+        be a turn asked to do something the flow never gave it the means to do. As a turn
+        opens rather than when the session was made, since the directory it works in is
+        settled by then -- and per session, so a skill rewritten between turns is the one the
+        next turn carries.
+
+        Asked each turn rather than once, because which of them this session carries is a
+        thing a flow may change while the conversation is going: a session told to put one
+        down and take another up has the one it was told about from its next turn, which is
+        this one. A session carrying what it was already carrying does nothing at all here,
+        which is every turn but the first and every turn after a change.
+
+        Nothing at all for a flow that brings none, which is most of them, and for a backend
+        that reads no such directory: those carry what their CLI installed and no more.
+
+        Note:
+          Into the directory on this machine, never an anchored agent's mirror of the target.
+          A mirror is the target's copy -- coganchor makes it hold what the target holds, and
+          sweeps away what only it has -- so a skill written into one is a skill deleted, and
+          a mirror created here before coganchor has taken it over is a mirror coganchor
+          refuses to take over at all, which would be every turn of the run failing. A
+          container given this workspace reads this directory and gets them; a machine across
+          a network keeps its own, and a flow that brings skills is a flow to run here.
+        """
+        carrying = self._carrying()
+        if tuple(one.name for one in carrying) == self._mounted:
+            return  # already carrying exactly these, which is every turn but the first
+        # What it was carrying goes before what it is to carry arrives: two sets of skills in
+        # the one directory is the session carrying what it was told to put down.
+        self._unmounted()
+        if not carrying:
+            self._mounted = ()
+            return
+        workspace = self.cwd
+        if not os.path.isdir(workspace):  # noqa: PTH112
+            return  # a session that cannot say where it works is one that will not run
+        mounted = mount(self._agent.backend, workspace, carrying)
+        if mounted.at:
+            # A finalizer rather than a line in `close`, and callable so that whichever of
+            # the two gets there first is the one that runs -- once, whatever happens after.
+            self._unmounting = weakref.finalize(self, unmount, mounted)
+        self._mounted = tuple(one.name for one in carrying)
+
+    def _carrying(self) -> tuple[Loaded, ...]:
+        """The skills this session is to have down, as the flow brought them.
+
+        Returns:
+          The flow's own, in the flow's order, less any this session was told not to carry.
+        """
+        brought = self._agent.loaded
+        if self._skills is None:
+            return tuple(brought)
+        wanted = set(self._skills)
+        return tuple(one for one in brought if one.name in wanted)
+
+    def _environment(self) -> Mapping[str, str]:
+        """What to set in the command's environment on top of this process's own.
+
+        Whatever the agent's provider says, which is how a key, an endpoint or an account on
+        somebody's cloud reaches the CLI, and nothing besides for an agent that has none: a
+        turn then inherits the environment the flow is running in, which is what lets the
+        agent log in the way it already logs in. A backend that takes a setting of its own
+        there adds it to these.
+
+        Returns:
+          The variables to add, which are set for the turn and for nothing else.
+        """
+        return self._agent.environment()
+
+    def _environ(self) -> dict[str, str] | None:
+        """The whole environment this session's processes are started with.
+
+        Returns:
+          This process's own, less what a provider hushes and plus what this session and that
+          provider set, or None where there is nothing to change.
+        """
+        added, hushed = self._environment(), self._agent.hushed()
+        if not added and not hushed:
+            return None
+        return {
+            name: value for name, value in os.environ.items() if name not in hushed
+        } | dict(added)
+
+    def _adopt(self, session_id: str) -> None:
+        """Takes the name the backend gave this session, the first time a turn lands in it.
+
+        The backend logs the session from here on but never says whose it is, so the moment
+        its id becomes known is the moment the agent takes note of it. A turn that failed
+        never gets here, which is what leaves the session unopened for the next one to retry.
+
+        Args:
+          session_id: The backend's id for this session.
+
+        Raises:
+          RuntimeError: If a fork's first turn came back naming the conversation it was cut
+            from. That is a CLI that took the fork flag and did not fork, and taking the id
+            would make this session a second handle on the one conversation -- which is the
+            failure `fork` exists to refuse, arriving where nothing downstream could explain
+            it. Loud here rather than silent for the rest of the run.
+        """
+        if self._id is None:  # an id is fixed for the life of the session it names
+            if session_id and session_id == self._forked_from:
+                raise RuntimeError(
+                    f"{self._agent.backend}: the fork landed back in {session_id}, "
+                    "which is the conversation this one was cut from"
+                )
+            self._id = session_id
+            self._agent._opens(session_id)
+            if self._agent.epic is not None:
+                # The run is the only thing that knows this session was one of its own: the
+                # backend logs it under this id and never says whose it was. Nor which
+                # conversation it was cut from, for one that was cut from another: a fork
+                # reads as a session that began knowing things, and where it got them is a
+                # fact about the run rather than one the backend keeps.
+                self._agent.epic.opened(
+                    self._agent, session_id, self._forked_from or ""
+                )
+
+    @property
+    def forks(self) -> bool:
+        """Whether this backend can carry this conversation into a second one.
+
+        Read off the backend rather than written down on the class, so that the one place
+        that says what a CLI is is the one place this is said too. A flow that means to try
+        two continuations of one conversation asks this where it is choosing its agents,
+        rather than finding out from a session that refused hours in.
+
+        Returns:
+          True where the CLI has a fork of its own, and False for one that can only resume
+          the id it minted, and for a name no backend answers to at all. A CLI somebody added
+          answers True on the strength of the protocol having the call, which is the most that
+          can be known about a backend described only by the protocol it speaks: one that has
+          not implemented it refuses where the fork is asked for, which is still a refusal.
+        """
+        from hmz.coganchor.backends import named
+
+        profile = named(self._agent.backend)
+        return profile is not None and profile.forks
+
+    def fork(self) -> SessionBase:
+        """A second conversation carrying this one's history, and its own from here on.
+
+        Which is what a conversation that has got somewhere is worth: a flow that has spent
+        an hour reading a codebase can try two ways out of that hour without paying for the
+        reading twice::
+
+            careful, quick = session.fork(), session.fork()
+
+        The backend's own fork does the carrying -- there is no replaying of turns here, and
+        no transcript passed between two CLIs -- so what the child knows is exactly what this
+        session knew at the moment it was made, and what either of them is told afterwards is
+        its own. Two conversations from that moment, which is the whole of the point.
+
+        Not :meth:`AgentBase.clone`, which is the other half of the same idea and is
+        deliberately not called this: an agent is structure, so cloning one copies the
+        structure and none of the history; a session is history, so forking one copies the
+        history and none of the structure. Two words for two things.
+
+        Everything a run puts on a conversation rather than carries into it is the child's
+        own: its own id, its own meter, its own place in what the agent has opened, its own
+        line in the run's record. Nothing spent here is spent there.
+
+        The fork itself is the child's first turn -- there is no prompt-free fork on most of
+        these CLIs -- so the child must be used before this conversation moves on. One taken
+        after another turn has been sent here would branch from somewhere else, which is not
+        what was asked for, and is refused rather than done quietly.
+
+        Returns:
+          The new session, unopened with the backend: it is the fork, and the fork happens
+          where its first turn does. Which is what makes two forks of one conversation cost
+          nothing until they are used.
+
+        Raises:
+          NotImplementedError: If this backend has no fork to reach for. A flow handed back a
+            second handle on the one conversation would be two loops writing into one, so it
+            is refused where it is asked -- and :attr:`forks` is how a flow asks first.
+          RuntimeError: If no turn has landed here yet, so there is no conversation to carry:
+            a session that has got nowhere is one to open rather than one to fork.
+        """
+        if not self.forks:
+            raise NotImplementedError(
+                f"{self._agent.backend} has no way of carrying a conversation "
+                "into a second one"
+            )
+        seed = self.id  # raises while nothing has landed, which is nothing to carry
+        made = self._agent._opens_at(self._cwd)
+        made._forked_from = seed
+        # Where this conversation had got to when the fork was asked for, and a weak hold on
+        # the conversation itself: the child checks both as it opens, so that a fork taken
+        # here and used after two more turns is refused rather than cut from where those
+        # turns left it. Weak, because a child is not a reason for its parent to stay alive.
+        made._forked_at = (weakref.ref(self), self._turns)
+        # What this conversation is running by goes with it, since that is what the child is
+        # a continuation of: the effort it has got to, what each of its turns may spend, and
+        # the skills it is carrying now rather than the ones the flow started it on. The
+        # callbacks too, offered again on the new session so that the toolbox holds an entry
+        # for each of the two.
+        made._skills = self._skills
+        made._effort = self._effort
+        made._budget = self._budget
+        if self._tools:
+            made.offers(self._tools)
+        return made
+
+    def _at_the_boundary(self) -> None:
+        """Refuses a fork whose conversation has moved on since it was asked for.
+
+        The fork is the child's first turn, so between the two this conversation may have
+        been given turns the fork was never meant to carry. A child cut from those is a
+        branch from somewhere nobody chose -- and it would read as the branch that was asked
+        for, which is the one failure worth stopping the run over.
+
+        Raises:
+          RuntimeError: If a turn has been sent to the conversation this one was forked from
+            since the fork was asked for.
+        """
+        if self._forked_at is None:
+            return
+        whence, at = self._forked_at
+        parent = whence()
+        # A conversation nobody holds any more is one nothing here can drive on, so there is
+        # nothing left for the fork to be cut from but where the backend has it.
+        if parent is not None and parent._turns != at:
+            raise RuntimeError(
+                f"{self._agent.backend}: the conversation this one was forked from has "
+                "taken a turn since; fork it again to branch from where it is now"
+            )
+
+    def pursue(self, objective: str, *, suppress: bool = False) -> str:
+        """Runs the session under a goal, which the agent then keeps itself going toward.
+
+        This is the backend's own goal feature rather than a prompt that asks for one: the
+        agent decides for itself that the objective has been met, and until it does, a turn
+        that would have ended starts another. A flow that loops over this is running the
+        objective again rather than nudging an agent that stopped early.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+          suppress: Whether a goal that fails answers with nothing instead of raising, as
+            for :meth:`__call__`.
+
+        Returns:
+          The agent's response once it stops, stripped, or "" for a goal that failed while
+          `suppress` was set.
+
+        Raises:
+          NotImplementedError: If this backend has no goal feature to reach for, whether or
+            not `suppress` is set: a flow asking for one it has not got is a flow to correct.
+          RuntimeError: If goals were disabled for this agent, whether or not `suppress` is
+            set: a flow that disabled them retains control of every continuation.
+          subprocess.CalledProcessError: If the turn fails and `suppress` is not set.
+        """
+        if not self._agent.goals_enabled:
+            raise RuntimeError(f"{self._agent.id}: goals are disabled")
+        # A goal is turns of this conversation like any other, however many of them the
+        # backend takes: it opens a session that has none and moves one that has.
+        if self._id is None:
+            self._at_the_boundary()
+        self._turns += 1
+        try:
+            return self._pursue(objective)
+        except Unrecoverable:
+            raise  # not covered by `suppress`, for the reason it is not in a turn
+        except subprocess.CalledProcessError:
+            if not suppress:
+                raise
+            return ""
+
+    def _pursue(self, objective: str) -> str:
+        """Runs the session under a goal, which each backend reaches for its own way.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+
+        Returns:
+          The agent's response once it stops, stripped.
+        """
+        raise NotImplementedError(f"{type(self).__name__} has no goal feature")
+
+
+class CommandSessionBase(SessionBase):
+    """A session whose turns are one run of a coding agent's command line each."""
+
+    #: Whether what the command writes on stdout is a protocol rather than the agent talking.
+    #: A backend that answers in JSON is read into events and watched as those, so its lines
+    #: are not put on the terminal as they arrive and its answer is put there at the end --
+    #: which is what every backend driven over a protocol does.
+    protocol: ClassVar[bool] = False
+
+    def _shut(self) -> None:
+        """Ends the command a turn is running in, which is what holds this turn open.
+
+        A session that is one command per turn holds nothing *between* them, which is no
+        reason to hold nothing during one: during a turn there is a process, that process is
+        the turn, and this ends it and everything it started. Holding nothing at all is what
+        left a stop and a cut-off with nowhere to reach on half the backends here.
+
+        The turn's own reader finds out the way it finds out about any process that has gone:
+        its streams end and its status is nonzero, which is a failed turn -- and the turn
+        that asked to be cut off is the one that answers for it.
+        """
+        self._ends_command()
+
+    def _reads(self, line: str, *, error: bool) -> Iterable[Event]:
+        """Reads one line the command wrote into what it says the agent did.
+
+        The whole line, either way round, for a backend that writes what it is doing where a
+        person would read it: the agent talks on stdout and puts its progress on stderr. One
+        that answers in a protocol reads its own lines instead.
+
+        Args:
+          line: The line, as written.
+          error: Whether it came from stderr rather than stdout.
+
+        Returns:
+          Everything it said, which is nothing at all for a line saying nothing worth showing.
+        """
+        yield Event(kind="tool" if error else "text", text=line.rstrip("\n"))
+
+    def _result(self, transcript: str) -> Event:
+        """The answer the turn ends on, out of everything the command wrote on stdout.
+
+        Args:
+          transcript: The whole of stdout.
+
+        Returns:
+          The `result` event, carrying what the agent answered and what the turn cost.
+
+        Raises:
+          subprocess.CalledProcessError: If what the command wrote says the turn failed. A
+            backend that leaves nonzero for the times it could not start says so here instead,
+            and a turn that failed must not answer as if it had landed.
+        """
+        return Event(kind="result", text=transcript.strip())
+
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """Sends one turn, saying each line the agent writes as it is written.
+
+        Turns of one session are serialized, so a session shared by two threads holds one
+        conversation rather than interleaving two. Both of the agent's streams are teed to ours
+        as they arrive, so a long turn stays watchable. A failed turn leaves the session
+        unopened, so the next call retries the turn the same way rather than resuming a session
+        that may not exist. An anchored agent is run through coganchor, which is what puts the
+        turn's files and commands on another machine while the conversation stays here, and an
+        isolated one is the same thing against a machine the agent started for itself.
+
+        Args:
+          prompt: The input prompt for this turn.
+          schema: The shape to answer in, which the command :meth:`_turn` builds reads off
+            the session -- it is set here, under the lock the turn is taken under, so that
+            what builds the command is looking at this turn's own.
+
+        Yields:
+          A line at a time as the agent writes it, and the whole of what it said last.
+
+        Raises:
+          subprocess.CalledProcessError: If the agent CLI exits nonzero. Both streams are
+            attached to it as diagnostics.
+        """
+        with self._lock:
+            self._shaping = schema
+            argv, stdin = self._turn(prompt)
+            # Where the turn runs, and where it is spawned from: an anchored turn is put in
+            # the mirror by the anchor itself, so only an unanchored one is started here.
+            where = self._workspace()
+            # Spawned rather than called: a supervisor forks the agent and takes the process's
+            # signal handling with it, which a flow pumping turns from threads of its own has
+            # no way to lend it. Whether there is one to spawn -- an anchor, a provider's own
+            # paths, both -- is the agent's to say.
+            argv = self._agent.spawned(argv, self.cwd)
+            out: list[str] = []
+            err: list[str] = []
+            said: queue.Queue[Event | None] = queue.Queue()
+            with subprocess.Popen(
+                argv,
+                # No prompt on stdin means no stdin at all: inheriting ours would let the agent
+                # read the terminal a flow is being watched from.
+                stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                encoding="utf-8",
+                # The agents draw progress bars and check marks: their bytes must never fail a
+                # turn, whatever encoding the machine running the flow happens to be set to.
+                errors="replace",
+                # This process's own, less what the agent's provider hushes and plus what it
+                # and the backend set. None rather than a copy where there is nothing to say,
+                # so that a turn inherits the environment as it always did.
+                env=self._environ(),
+                # The directory the session was opened at, which is this one unless it was
+                # opened at another; an anchored turn is put there by the anchor instead.
+                cwd=None if self._agent.anchor is not None else where,
+            ) as proc:
+                assert proc.stdout is not None  # noqa: S101
+                assert proc.stderr is not None  # noqa: S101
+                # Where a stop or a cut-off reaches it. Written before a line has been read,
+                # because the turns worth ending are the ones that have not said anything.
+                self._underway = proc
+                if self._cutting():
+                    # Cut off while this was still starting, when there was nothing yet to
+                    # end. A turn told to stop before it had said a word must not go on to
+                    # say one, so what arrived a moment early is acted on a moment late.
+                    self._cuts()
+                # Every pipe drains from the moment the agent starts: it puts its progress on
+                # stderr and only the final message on stdout, and a prompt larger than the pipe
+                # buffer would deadlock against an agent that prints before reading all of it.
+                pumps = [
+                    threading.Thread(
+                        target=_tee,
+                        args=(
+                            proc.stdout,
+                            None if type(self).protocol else sys.stdout,
+                            out,
+                            said,
+                            functools.partial(self._reads, error=False),
+                        ),
+                    ),
+                    threading.Thread(
+                        target=_tee,
+                        args=(
+                            proc.stderr,
+                            sys.stderr,
+                            err,
+                            said,
+                            functools.partial(self._reads, error=True),
+                        ),
+                    ),
+                ]
+                for pump in pumps:
+                    pump.start()
+                if stdin is not None:
+                    assert proc.stdin is not None  # noqa: S101
+                    # An agent that exits before reading the prompt is a failed turn, reported
+                    # by its exit status rather than as a broken pipe here.
+                    with contextlib.suppress(BrokenPipeError):
+                        try:
+                            proc.stdin.write(stdin)
+                        finally:
+                            proc.stdin.close()
+                # Said as it arrives, from whichever stream got there first, until both have
+                # ended -- one None apiece, which is the only thing that ends this turn. Under
+                # a clock, since that is the one thing this loop cannot see for itself: a
+                # command that neither writes nor exits owes this queue a None it will never
+                # put there, and the watchdog is what ends the process and so the wait.
+                with Watchdog(self, riding=lambda: proc) as watch:
+                    for _ in pumps:
+                        while (event := said.get()) is not None:
+                            watch.saw()
+                            if type(self).protocol and not self._agent._watchers:
+                                # On stderr, where a backend that writes for a person puts its
+                                # progress: its own stdout is the protocol here, and a turn
+                                # nobody can watch reads as hung for as long as it takes.
+                                say(event.text, sys.stderr)
+                            # The clock stops while whoever is reading this has it: what a
+                            # watcher or a hook does with an event is not the backend's
+                            # silence, and a reader that pauses must not cost the CLI its
+                            # life.
+                            with watch.held():
+                                yield event
+                    for pump in pumps:
+                        pump.join()
+                    status = proc.wait()
+                    self._underway = None  # it has ended; there is nothing left to end
+
+            stdout = "".join(out)
+            if status != 0:
+                if (wedged := watch.wedged()) is not None:
+                    # Killed by the watchdog, so `exit status -15` is what the killing looked
+                    # like rather than what went wrong; what went wrong is what it says. What
+                    # the command had already written is kept all the same -- it is the last
+                    # thing the agent said before it stopped saying anything.
+                    raise Failed(status, argv, stdout, str(wedged.stderr))
+                raise Failed(status, argv, stdout, "".join(err))
+            answered = self._result(stdout)
+            if self._id is None:
+                # Separated, so that a stdout without a trailing newline cannot glue the first
+                # line of stderr onto the last of stdout and hide a line the id is read from.
+                self._adopt(self._read_session_id(stdout + "\n" + "".join(err)))
+            if type(self).protocol and not self._agent._watchers:
+                # Where a backend writing for a person would have put its answer. Something
+                # watching the agent has had it already, as the turn said it.
+                say(answered.text, sys.stdout)
+            yield answered
+
+    @abstractmethod
+    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
+        """Builds the CLI call for one turn.
+
+        Args:
+          prompt: The input prompt for this turn.
+
+        Returns:
+          The command to run and the text to write to its stdin, or None when the prompt is
+          already inside the command. The command opens a new session while the session is
+          unopened, and resumes that session once it has an id.
+        """
+
+    @abstractmethod
+    def _read_session_id(self, transcript: str) -> str:
+        """Reads back the id the backend gave this session, once the opening turn has landed.
+
+        Args:
+          transcript: Everything the turn printed, on stdout and stderr alike.
+
+        Returns:
+          The backend's session id, which every later turn resumes.
+        """
+
+
+class StreamSessionBase(SessionBase):
+    """A session that is one long-lived process, spoken to in JSON a line at a time.
+
+    A turn is a line written in rather than a command run, which is what leaves somewhere for
+    a later word to go: the agent is still there, still reading, so :meth:`interject` reaches
+    the turn already under way instead of waiting for the next one.
+    """
+
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
+        """Initializes a session holding no process yet.
+
+        Args:
+          agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for :class:`SessionBase`.
+        """
+        super().__init__(agent, cwd)
+        self._proc: subprocess.Popen[str] | None = None
+        self._writing = threading.Lock()  # a line is written whole or not at all
+        #: Answers still owed to us: the agent replies to each thing said with a turn of its
+        #: own, so a word put in mid-turn adds one, and the turn is over when none are left.
+        self._owed = 0
+        #: What the agent has complained about, which is what a failed turn is reported with.
+        self._complaints: list[str] = []
+        #: What ends the process if the session is dropped while it is still up.
+        self._reaper: weakref.finalize[..., Any] | None = None
+        #: Who is reading the process's complaints, so a failed turn can wait for the last.
+        self._draining: threading.Thread | None = None
+
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """Sends one turn as a line of JSON, and reads the agent's own back until it ends.
+
+        A word put in while the turn runs is a thing said too, and the agent answers each
+        thing said with a turn of its own. So the turn here is over when the agent has
+        answered everything it was told, not when it first stops -- which is both how what
+        was put in gets read at all, and how the next turn avoids picking up its answer.
+
+        Args:
+          prompt: The input prompt for this turn.
+          schema: The shape to answer in, which is an argument of the process rather than of
+            the turn: a session already holding one that was started for another shape ends
+            it, and the turn starts one that is asked for this one. The conversation is not
+            ended by that -- the new process resumes it, as an anchored session's does every
+            turn.
+
+        Yields:
+          What the agent said, in the order it said it.
+
+        Raises:
+          subprocess.CalledProcessError: If the agent exits rather than answering.
+        """
+        with self._lock:
+            if schema is not self._shaping or self._stale() or self.elsewhere():
+                self._shut()
+            self._shaping = schema
+            argv = self._command()
+            proc = self._start(argv)
+            assert proc.stdout is not None  # noqa: S101
+            if self._cutting():
+                # Cut off while this was starting, which for a CLI that takes a second to
+                # come up is a real moment: the turn is over before it is told anything.
+                self._cuts()
+            try:
+                self._say(prompt)
+            except RuntimeError as gone:
+                # The process was up a moment ago and is not now. A turn that could not even
+                # be said is a failed turn, and it says so the way every other one does --
+                # so that a flow catches turns rather than transports.
+                raise Failed(proc.poll() or 1, argv, "", str(gone)) from gone
+            said = ""
+            spent: Counter[str] = Counter()
+            costing = Usage()
+            settled = False
+            # Under a clock, since a read blocked on a pipe is the one thing this loop
+            # cannot see going wrong: a backend still holding stdout open and never
+            # writing to it again is neither an answer nor an exit, and the `for` waits
+            # on it for as long as anybody leaves the flow running. What the watchdog
+            # ends is the process, which is what gives this the EOF it is owed -- and
+            # the failure it then says instead of `exit status -15`.
+            with Watchdog(self, riding=lambda: self._proc) as watch:
+                for line in proc.stdout:
+                    # Every line, whether or not it turns into anything: a backend writing
+                    # protocol nobody shows is a backend that has not wedged.
+                    watch.saw()
+                    for event in self._read(line):
+                        if event.kind == "failed":
+                            # The backend answered, and what it answered is that it could
+                            # not. A turn that returned this as its text would be a Ralph
+                            # loop feeding an error message forward as the turn's own work.
+                            status = proc.poll() or 1
+                            if self._draining is not None:
+                                # Waited on: what the agent said on its way out is the diagnostic,
+                                # and it may not have been read yet.
+                                self._draining.join(timeout=5)
+                            complained = "".join(self._complaints)
+                            self._shut()
+                            raise Failed(status, argv, event.text, complained)
+                        if event.kind == "result":
+                            said = event.text
+                            # Every answer in the turn cost something, the ones to a word put in
+                            # mid-turn included, and the turn is what all of it is charged to --
+                            # counted by model and by kind, which are the same spending twice.
+                            spent.update(event.tokens)
+                            costing = costing + event.spent
+                            with self._writing:
+                                self._owed -= 1
+                                settled = self._owed <= 0
+                            if settled:
+                                break
+                            # An answer to something put in mid-turn. It is counted and not
+                            # passed on: the agent said these same words as it said them, and
+                            # the turn is watched as it goes -- so passing the answer on here
+                            # would show it a second time. Two things said mid-turn would then
+                            # read as three answers. The turn goes on to whatever it was told
+                            # last, and the answer to that is the one it ends on.
+                            continue
+                        if not self._agent._watchers:
+                            # On stderr, where every other backend puts its progress: stdout is
+                            # the protocol here, and a turn nobody can watch is the point of all
+                            # this. Something watching the agent shows the turn itself, and would
+                            # then be showing it twice.
+                            say(event.text, sys.stderr)
+                        with (
+                            watch.held()
+                        ):  # a reader that pauses is not the backend's silence
+                            yield event
+                    if settled:
+                        break
+                else:
+                    # stdout ended instead: the agent is gone, and a turn it never answered is a
+                    # failed turn rather than an empty one.
+                    status = proc.wait()
+                    if self._draining is not None:
+                        # Waited on, because a process that wrote its one explanation and left
+                        # may not have had it read yet -- and that explanation is the diagnostic.
+                        self._draining.join(timeout=5)
+                    complained = "".join(self._complaints)
+                    self._shut()
+                    raise Failed(status or 1, argv, said, complained)
+            if self._agent.anchor is not None:
+                # An anchored turn has to be over when it says it is: coganchor pushes what the
+                # agent wrote when the session ends, so a process held open past the turn would
+                # leave that turn's work still on this machine. The cost is that an anchored
+                # session cannot be talked to between turns -- there is nothing there to hear.
+                # The process, not the conversation: the next turn resumes it.
+                self._shut()
+            if not self._agent._watchers:
+                # Where the backend's own command line would have put the answer, as the other
+                # backends put it: the turn that settled the answer broke out of the reading
+                # above before saying it, and a flow watched by nobody would end with nothing
+                # on the terminal it was run from. Something watching the agent has had it
+                # already, as the turn said it, and would then be shown it twice.
+                say(said, sys.stdout)
+            yield Event(kind="result", text=said, tokens=spent, spent=costing)
+
+    def interject(self, text: str) -> None:
+        """Says something to the agent now, whether or not a turn is running.
+
+        Named as it goes, so that the agent saying it has it says which one: several words
+        put into one turn come back one at a time, and a name apiece is what tells them
+        apart. A word that could not be written is taken off the book again -- there is
+        nothing coming back for it.
+
+        Args:
+          text: What to say to the agent.
+
+        Raises:
+          RuntimeError: If no process is up to hear it, which is a session no turn has opened.
+        """
+        ticket = self.steering(text)
+        try:
+            self._say(text, ticket)
+        except BaseException:
+            self.took(ticket)
+            raise
+
+    def _cuts(self) -> None:
+        """Ends the process this session is spoken to, outright.
+
+        Rather than by closing its stdin, which is what :meth:`_shut` does and what both of
+        the CLIs held open this way answer by finishing the turn they are in the middle of
+        and then leaving -- which is exactly the minutes a cut-off is there to save.
+
+        Its streams are left to the turn's own reader: that reader is sitting in stdout, and
+        a stream closed under a thread blocked on it is a thread that finds out by raising.
+        The process going is what ends the read, and the read ending is what closes them.
+        """
+        super()._cuts()  # the command a shaped turn ran in, for the two backends with one
+        proc = self._proc
+        if proc is not None:
+            _ended(proc)
+
+    def _shut(self) -> None:
+        """Ends the process, which is what was holding the conversation open."""
+        # And the command a shaped turn ran in, for the turns this backend cannot keep warm:
+        # `_shut` is what a stop reaches, and a stop that left that command running would be
+        # the gap this class's own `_shut` was written to close, reopened for two backends.
+        self._ends_command()
+        with self._writing:
+            # Taken together, so that nothing is written to a process on its way out and no
+            # answer is left owed by one that is gone.
+            proc, self._proc, self._owed = self._proc, None, 0
+        if proc is None:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            if proc.stdin is not None:
+                proc.stdin.close()  # its stdin ending is how the agent knows to stop
+        try:
+            # Short: a process whose stdin has ended is already going, so this waits only for
+            # one that is not -- and that one is being stopped, which should read as stopped.
+            proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            # A turn cut off in the middle of a tool is one of these, and what it is in the
+            # middle of is a process of its own: ending the tree rather than the CLI is what
+            # keeps a `npm test` it started from outliving the turn that started it.
+            _ended(proc)
+        # stdout is ours to close: the turn has finished reading it. stderr is not -- the
+        # reader is sitting in it, and closing a stream another thread is blocked on waits on
+        # that thread, which waits on whatever the agent left holding the write end. It is
+        # closed by the reader itself, when there is nothing left to come.
+        with contextlib.suppress(OSError, ValueError):
+            if proc.stdout is not None:
+                proc.stdout.close()
+
+    def _say(self, text: str, ticket: str = "") -> None:
+        """Writes one line of JSON to the agent, whole, whoever else is writing.
+
+        Counted once it has landed: the agent owes an answer for each thing said, and a turn
+        is not over until it has given them all -- so counting one that never arrived would
+        leave the next turn waiting for an answer nobody is going to give.
+
+        Args:
+          text: What to say.
+          ticket: What the agent is to name it by when it says it has it, or "" for a turn's
+            own prompt, which needs no name: the turn beginning is the whole of that answer.
+
+        Raises:
+          RuntimeError: If there is no process listening, or it stopped while being told.
+        """
+        with self._writing:
+            proc = self._proc
+            if proc is None or proc.stdin is None:
+                raise RuntimeError("no turn is running to be talked to")
+            try:
+                proc.stdin.write(self._write(text, ticket))
+                proc.stdin.flush()
+            except (OSError, ValueError) as gone:
+                # A stdin closed under us raises ValueError rather than BrokenPipeError.
+                raise RuntimeError("the agent is no longer listening") from gone
+            self._owed += 1
+
+    def _send(self, line: str) -> None:
+        """Writes one line of the protocol itself, which is not a thing said to the agent.
+
+        An answer to something the agent asked us is not a turn, so nothing is owed for it:
+        counting one would leave the turn waiting for a reply that is never coming. A
+        process on its way out takes nothing more, since a turn cannot be rescued by it.
+
+        Args:
+          line: The line, newline included.
+        """
+        with self._writing:
+            proc = self._proc
+            if proc is None or proc.stdin is None:
+                return
+            with contextlib.suppress(OSError, ValueError):
+                proc.stdin.write(line)
+                proc.stdin.flush()
+
+    def _start(self, argv: list[str]) -> subprocess.Popen[str]:
+        """Starts the process if it is not up, and returns the one to speak to.
+
+        Args:
+          argv: The command to run, which this turn already asked for.
+
+        Returns:
+          The process to speak to, which is the one already up whenever there is one.
+        """
+        if self._proc is not None and self._proc.poll() is None:
+            return self._proc
+        where = self._workspace()
+        # Which account this is being started as, read before the environment is built out of
+        # it rather than after the process is up: a fallback landing in between would name the
+        # account this process is *not* running as, and a session that believes it is already
+        # somewhere else is one that never starts again -- the wrong credentials for good.
+        # Read early, the same fallback makes it start again once for nothing, which is a
+        # turn's cost rather than a run's.
+        account = self._agent.node().name
+        argv = self._agent.spawned(argv, self.cwd)
+        started = subprocess.Popen(
+            argv,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,  # a line at a time, which is what the protocol is made of
+            # This process's own, less what the agent's provider hushes and plus what it and
+            # the backend set, as for a session that is one command per turn.
+            env=self._environ(),
+            # And in the directory the session was opened at, as for one of those: a backend
+            # held open across its turns is held open where its conversation is rooted.
+            cwd=None if self._agent.anchor is not None else where,
+        )
+        assert started.stderr is not None  # noqa: S101
+        # Which account it was started as, so that an agent that falls back is an agent whose
+        # next turn starts another process rather than speaking to this one.
+        self._as = account
+        with self._writing:
+            # A new process owes nothing for what was said to the one before it. Left standing,
+            # that count is an answer this session would wait for and never be given.
+            self._proc, self._owed, self._complaints = started, 0, []
+        self._restarted()
+        # Drained for as long as the process lives: stderr is not the protocol, but a pipe
+        # nobody reads fills and stops the agent writing to it, which would hang the turn.
+        self._draining = threading.Thread(
+            target=_tee,
+            args=(started.stderr, sys.stderr, self._complaints),
+            daemon=True,
+        )
+        self._draining.start()
+        # Held by the finalizer alone, so a flow that drops a session leaves no process behind.
+        # The one before it is let go, or a long flow keeps every process it ever started.
+        if self._reaper is not None:
+            self._reaper.detach()
+        self._reaper = weakref.finalize(self, _reaped, started)
+        return started
+
+    def _restarted(self) -> None:
+        """Told that a new process is up, for whatever was measured against the old one.
+
+        Does nothing by default. A backend counting anything per process says so here.
+        """
+
+    def _stale(self) -> bool:
+        """Whether the process now up was started for something this turn is no longer.
+
+        A setting that is an argument of the process rather than of the turn moves by
+        restarting it -- the conversation is not ended by that, since the new process resumes
+        it, which is what an anchored session does between every pair of turns anyway.
+
+        Returns:
+          Whether to end the process before this turn, which is never by default: a backend
+          with nothing on its command line that a flow can move has nothing to go stale.
+        """
+        return False
+
+    @abstractmethod
+    def _command(self) -> list[str]:
+        """The command the session's one process is run as.
+
+        Returns:
+          The command to run, which must speak the protocol on stdin and stdout.
+        """
+
+    @abstractmethod
+    def _write(self, text: str, ticket: str = "") -> str:
+        """Renders something to say to the agent as the line to write.
+
+        Args:
+          text: What to say.
+          ticket: What the agent is to name it by when it says it has it, or "" to ask for
+            no such name.
+
+        Returns:
+          The line, newline included.
+        """
+
+    @abstractmethod
+    def _read(self, line: str) -> Iterable[Event]:
+        """Reads one line the agent wrote.
+
+        Args:
+          line: The line, as written.
+
+        Returns:
+          Everything it said, which is nothing at all for a line saying nothing worth
+          showing, and more than one thing for a line carrying more than one.
+        """
+
+
+def _built(place: str, like: AgentBase) -> AgentBase | Literal[False]:
+    """One agent to stand in at a place, configured as the agent that could not run was.
+
+    A step is written between two places rather than between two agents: what failed is the
+    CLI, the account and the model, and everything else about the agent -- how hard it thinks,
+    what it may reach for, whether it may search the web, where its turns land -- is what that
+    agent *is*, settled where it was made. So it comes across the step rather than being
+    written down again beside it.
+
+    Made here rather than by whatever wrote the step down, because it is made at the moment a
+    turn has nowhere left to go: a chain of four places that were all started when the run was
+    would be three CLIs held open for a failure that never came.
+
+    Args:
+      place: Where the turn goes, as `CLI[@ACCOUNT]/MODEL`.
+      like: The agent that could not run, which is what the one taking over is configured as.
+
+    Returns:
+      The agent, or False for a place that no longer names one -- a CLI nobody has installed
+      here, a step written down against a backend that has gone, one that cannot be told
+      something this agent was told. A turn then fails the way it failed before anybody wrote
+      a step down, which is the answer that says what went wrong rather than the one about
+      the step.
+    """
+    from dataclasses import fields, replace
+
+    from hmz.coganchor import backends, fallbacks
+
+    from . import driver
+    from .config import AgentConfig as Common
+
+    said = fallbacks.reads(place)
+    backend, _, model = said.partition("/")
+    backend, _, provider = backend.partition("@")
+    profile = backends.named(backend)
+    if not said or profile is None:
+        return False
+    try:
+        kind, config = driver(profile.name)
+    except KeyError:
+        return False
+    # The common settings alone: an agent is what it was made as, and what one backend was
+    # told in its own vocabulary -- a codex override, a rule Claude reads as an allowed tool
+    # -- says nothing to the CLI taking the turn over.
+    common = replace(
+        Common(**{one.name: getattr(like.config, one.name) for one in fields(Common)}),
+        model=model,
+        effort=_rung(backends.named(like.backend), profile, like.effort),
+        provider=provider,
+    )
+    try:
+        return kind(
+            config(**{one.name: getattr(common, one.name) for one in fields(common)})
+        )
+    except (ValueError, TypeError):
+        return False
+
+
+def _rung(was: Profile | None, now: Profile, effort: str) -> str:
+    """How hard the agent taking a turn over thinks, in the words its own backend has.
+
+    A word the backend already has is left alone, which is what happens between the CLIs that
+    name their rungs the same way. Where it has not got that word, every ladder here is
+    written hardest first, so the rung is how far down from the top it was: an agent thinking
+    as hard as its CLI could goes on doing so, and one three rungs down goes three rungs down
+    whatever the CLI taking over calls them. A ladder that is shorter stops at its own bottom.
+
+    Args:
+      was: The backend the agent that could not run was, or None for one nothing here knows.
+      now: The backend the turn is moving to.
+      effort: The word that agent was thinking at.
+
+    Returns:
+      A word `now` has, or the one it was given for a backend that lists none -- one whose
+      model carries its own effort is refused a word beside the name anyway.
+    """
+    if not now.efforts or effort in now.efforts or effort in now.beyond:
+        return effort
+    ladder = was.efforts if was is not None else ()
+    at = ladder.index(effort) if effort in ladder else 0
+    return now.efforts[min(at, len(now.efforts) - 1)]
+
+
+class AgentBase(ABC):
+    """A coding agent behind a uniform interface: structure only, and no history.
+
+    An agent says which model to run at which effort, and is one agent apart from that: a flow
+    that reviews its own work runs two of them at one configuration, and they are not the same
+    agent. The conversation lives in the :class:`SessionBase` it opens, so a flow decides for
+    itself whether turns share context -- a fresh session per turn is a Ralph loop, one session
+    across turns is a stateful one.
+    """
+
+    #: The moments of a turn a hook may be hung on here. Every backend reaches the ones that
+    #: are read off the turn itself; one that also lets a turn be answered mid-flight names
+    #: more, and a flow that needs one of those says so where it declares the agents it drives.
+    moments: ClassVar[frozenset[Moment]] = EVERYWHERE
+
+    #: Whether this backend has a goal feature of its own -- one where the agent decides for
+    #: itself that an objective has been met, and a turn that would have ended starts another
+    #: instead, which is what `pursue` reaches for. Four of them have; a flow that runs its
+    #: agent under a goal says so where it declares them, and is then refused an agent that
+    #: has not rather than raising on the first turn.
+    pursues: ClassVar[bool] = False
+
+    #: Provider service tiers this backend can express exactly. A backend opts into ``fast``
+    #: only when it has a native request setting for it, so unsupported requests fail before
+    #: the first provider turn.
+    service_tiers: ClassVar[tuple[str, ...]] = ("default",)
+
+    def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
+        """Initializes an agent that has opened nothing yet.
+
+        Args:
+          config: The model and effort every session of this agent runs at.
+          name: What to call this agent, defaulting to one nothing else answers to -- a
+            Chrysos Heir's, out of :mod:`hmz.coganchor.agents.codenames`. Two agents sharing a name
+            are one agent to a trace, which is how the roles of a flow survive being restarted; two
+            left unnamed are two, which is how one configuration driven twice -- an actor and the
+            reviewer reading its work -- stays two.
+        """
+        self._serves(config)
+        self._config = config
+        #: What this agent's turns are to think at, where a flow has said something other
+        #: than what it was configured with, and None where it has not.
+        self._effort: str | None = None
+        #: What every session of this agent has cost and how fast, kept here as well as on
+        #: each of them: a Ralph loop drops a session a turn, and what the agent has spent
+        #: must outlive the conversations it spent it in.
+        self._meter = Meter()
+        self._id = name or codename()
+        #: Whether that name is the agent's own, rather than one to be told by whatever ends
+        #: up driving it: a flow that names the agents it takes names the ones that are not.
+        self._named = name is not None
+        #: What this agent has opened, is watched by, and still holds. Every one of them is
+        #: written from whichever thread a turn is running on and read from whichever thread
+        #: is asking, and a flow may have ten thousand of both, so each is touched under this
+        #: one lock. Re-entrant because dropping the last reference to a session runs the
+        #: bookkeeping that forgets it, and that can happen under any line that lets go of one
+        #: -- including a line already holding this.
+        self._holding = threading.RLock()
+        #: Every session this agent has opened and somebody still holds, oldest first, each
+        #: under a number of its own. A mapping rather than a list: an agent that has opened
+        #: ten thousand drops them one at a time and in no particular order, and a list would
+        #: search itself for each of them.
+        self._sessions: dict[int, weakref.ref[SessionBase]] = {}
+        self._holds = 0  # what the next session is filed under
+        self._opened: list[str] = []
+        self._watchers: list[
+            Callable[[AgentBase, SessionBase | None, Event], None]
+        ] = []
+        #: What is hung on this agent's moments, which a flow adds to and takes from while
+        #: the agent is running: the hooks are the flow's own callables rather than a table
+        #: the backend read out of a settings file before anything started.
+        self._hooks = Hooks(type(self).moments, self._id)
+        self._stopped = False
+        #: Asked as each turn starts for anything said to this agent while no turn was open,
+        #: which goes into that turn. Left unset by a flow driven from the command line,
+        #: where there is nobody to say anything mid-run.
+        self.waiting: Callable[[], list[str]] | None = None
+        #: Asked when a turn of this agent stops to ask its user something, and answers with
+        #: what was said or None when nobody is there to say it. Left unset by a flow driven
+        #: from the command line, where there is nobody at all.
+        self.ask: Callable[[Question], str | None] | None = None
+        #: Asked by a flow between turns for the next thing to say to this agent, and answers
+        #: with it or None once there will be nothing more. Left unset by a flow driven from
+        #: the command line, where nobody is at a prompt. It MUST answer within a while of the
+        #: agent being stopped: nothing releases a flow waiting inside it but itself.
+        self.prompting: Callable[[], str | None] | None = None
+        #: The run this agent is part of, set by whatever is driving the flow and told of
+        #: every session this agent opens. Left unset by an agent driven by hand, which is
+        #: not a run of anything.
+        self.epic: Journal | None = None
+        #: The skills the flow driving this agent brings, mounted onto every session it
+        #: opens. Set by whatever started the flow, since a skill is the flow's rather than
+        #: the agent's: the same agent under another flow carries that flow's instead.
+        self._loads: tuple[Loaded, ...] = ()
+        # The machine this agent's turns land on, once the first of them has brought it up.
+        self._anchor: AnchorConfig | None = None
+        #: Which account its turns run as now: the one it was configured with, or the one it
+        #: moved to when that failed. Looked up once, when the first turn needs it, and held
+        #: from then on -- an account taken away while a flow is running is not a reason for
+        #: the next turn of that flow to sign in as somebody else. None until it is asked for.
+        self._at: Provider | None = None
+        self._starting = threading.Lock()
+        #: The agent this one's turns go to once it has nowhere left to run, once it has been
+        #: asked for -- False for an agent that falls back nowhere, so that reading the chain
+        #: is a thing that happens once rather than once a turn.
+        self._stands_in: AgentBase | Literal[False] | None = None
+        #: The rest of that chain, for an agent that is itself a stand-in, or None for one
+        #: that has not been told and reads it off what is written down.
+        self._beyond: tuple[str, ...] | None = None
+        #: The flow's own callbacks this agent's conversations are offering, and the socket
+        #: they are served on. The agent's rather than a session's because a CLI is told
+        #: about its tools where it is started, and some of these are started once per agent.
+        #: Nothing is served until something is offered.
+        self._toolbox = Toolbox()
+        # What is serving them goes when the agent does, and at exit for one held to the end:
+        # a socket nothing is behind is a socket nothing can answer on.
+        weakref.finalize(self, self._toolbox.close)
+
+    @property
+    def id(self) -> str:
+        """What this agent is called, and what a trace groups its sessions under."""
+        return self._id
+
+    @property
+    def toolbox(self) -> Toolbox:
+        """The flow's own callbacks this agent's conversations are offering, as one list.
+
+        Nothing is started until one of them offers something: an agent whose flow hands it
+        no callbacks has no socket, no thread and no bridge, and its turns are the turns they
+        always were.
+        """
+        return self._toolbox
+
+    def runs_on(self, machine: MachineConfig | None) -> None:
+        """Puts this agent's turns on the machine the flow said they land on.
+
+        For a place a flow declared as one of its own to isolate: the flow says the image and
+        nobody is asked, so the machine is settled here rather than chosen anywhere. Said
+        before the agent has opened anything, because a session resumes under the settings it
+        opened with -- which is the reason the config is frozen in the first place.
+
+        Args:
+          machine: Where its turns are to land, or None to leave them here.
+
+        Raises:
+          RuntimeError: If this agent has already opened a session, which is a conversation
+            that would resume somewhere other than it started.
+        """
+        from dataclasses import replace
+
+        if self._opened:
+            raise RuntimeError(f"{self._id} has already opened a session")
+        self._config = replace(self._config, machine=machine)
+
+    def reconfigure(self, config: AgentConfig) -> None:
+        """Sets this agent up as something else, from its next turn on.
+
+        The config is frozen because a session resumes under the settings it opened with, and
+        an agent that quietly changed model halfway through a conversation would be one
+        conversation split across two. This is the one thing that is not that: it is asked for
+        by hand, by whoever is watching the run, about an agent that is thinking too little or
+        is allowed too much -- and what it says is that everything from here on is to be the
+        other thing. The turn under way keeps what it started with, a model not thinking
+        harder halfway through an answer.
+
+        What an agent is cannot be changed this way: a backend is the class this is, and one
+        of those becoming another is another object, which is a thing only building the flow
+        again does.
+
+        Args:
+          config: What every turn of it is to run at from now on.
+
+        Raises:
+          ValueError: If the backend cannot express the service tier asked for. The same
+            refusal as at construction, and for the same reason: a tier that cannot be sent
+            must be said no to rather than silently served at another one.
+        """
+        self._serves(config)
+        self._config = config
+
+    def _serves(self, config: AgentConfig) -> None:
+        """Refuses a config this backend has no way of expressing.
+
+        Two of them: a service tier it cannot send, and web search it cannot switch off.
+        Both are refused wherever the config arrives -- where the agent is made, and where one
+        already running is set up as something else -- since a setting a backend quietly
+        ignored would be a setting that lies about what the agent is doing.
+
+        Args:
+          config: What the agent is to run at.
+
+        Raises:
+          ValueError: If the tier is not one of :attr:`service_tiers`, or web search was
+            switched off for a backend with no way of being told.
+        """
+        if config.service_tier not in self.service_tiers:
+            raise ValueError(
+                f"{type(self).__name__} does not support service tier "
+                f"{config.service_tier!r}; expected {', '.join(self.service_tiers)}"
+            )
+        if not config.web_search and not self._tellable():
+            raise ValueError(
+                f"{type(self).__name__} has no way of being told not to search the web; "
+                "web_search must be on for it"
+            )
+
+    def _tellable(self) -> bool:
+        """Whether this backend can be told whether its agents may search the web.
+
+        Read off the backend rather than written down on the class, so that the one place
+        that says what a CLI is is the one place this is said too.
+
+        Returns:
+          True where it can be told, and False for a backend nothing here knows -- a
+          stand-in written for a test, a CLI somebody added by hand -- which is the answer
+          that refuses rather than the one that pretends.
+        """
+        from hmz.coganchor.backends import named
+
+        profile = named(self.backend)
+        return profile is not None and profile.searches
+
+    def clone(
+        self,
+        *,
+        config: AgentConfig | None = None,
+        name: str | None = None,
+        skills: Iterable[Loaded] | None = None,
+    ) -> Self:
+        """Another agent of this one's backend, differing in what this call names and nothing.
+
+        Which is what an agent set up differently is: not this agent changed, but a second one
+        beside it. An agent is what it was made as -- a flow is handed one and drives it, and
+        a flow that could set it up as something else would be a flow rewriting what the
+        person who started the run chose -- so the way to have one that is not quite this one
+        is to make one, and this is that written down::
+
+            careful = agent.clone(config=replace(agent.config, effort="max"))
+
+        Everything that is not named is this agent's. Everything that a run puts on an agent
+        rather than sets it up with is not: the clone has opened no conversation, has spent
+        nothing, is watched by nobody, has no hook hung on it, and is being written down
+        nowhere. Two agents, which is what they are.
+
+        And nothing about it can be said afterwards. That is the whole of the point: what an
+        agent is, is settled where it is made, and this is where a second one is made.
+
+        Not :meth:`SessionBase.fork`, which is the opposite half of it and is deliberately
+        not called this. An agent is structure, so cloning one copies the structure and none
+        of the history: the clone has held no conversation. A session is history, so forking
+        one copies the history and none of the structure: the child is another conversation
+        of this same agent, which knows everything the first one knows.
+
+        Args:
+          config: What every session of it runs at, or None for this agent's own.
+          name: What to call it, or None for one nothing else answers to -- since two agents
+            are two agents, and a trace that read them as one would read a comparison of two
+            efforts as one agent that changed its mind. Given a name, it is that agent.
+          skills: The flow's skills it carries, or None for the ones this agent carries.
+
+        Returns:
+          The new agent.
+        """
+        made = self._remade(self._config if config is None else config, name)
+        made.loads(self._loads if skills is None else skills)
+        return made
+
+    def _remade(self, config: AgentConfig, name: str | None) -> Self:
+        """Builds one of this class, for a backend whose making is the ordinary one.
+
+        Overridden by an agent that is not made from a config -- the person at the prompt is
+        made from nothing at all -- so that :meth:`clone` is one thing wherever it is called.
+
+        Args:
+          config: What it runs at.
+          name: What to call it, or None for one nothing else answers to.
+
+        Returns:
+          The new agent.
+        """
+        return type(self)(config, name=name)
+
+    def rename(self, name: str) -> None:
+        """Calls this agent what the flow driving it calls it, if it has no name of its own.
+
+        A flow that declares its agents as a named tuple has said what each of them is for --
+        builder, reviewer -- and that is a better name than a codename out of somebody else's
+        story, which is what an agent nobody named has. One handed an agent that was named
+        where it was made says nothing: the name it was given is the name.
+
+        Args:
+          name: What the flow calls this one.
+        """
+        if not self._named:
+            self._id = name
+            self._hooks.agent = name
+
+    def loads(self, skills: Iterable[Loaded]) -> None:
+        """Says which skills every session this agent opens is to be given.
+
+        Told to the agent rather than configured on it, because they are the flow's: the
+        agent is what the flow was handed, and the same agent under another flow carries what
+        that flow works by instead.
+
+        Args:
+          skills: The skills, already fetched to somewhere they can be copied from.
+        """
+        self._loads = tuple(skills)
+
+    @property
+    def loaded(self) -> tuple[Loaded, ...]:
+        """The skills mounted onto every session this agent opens, which are the flow's."""
+        return self._loads
+
+    @property
+    def hooks(self) -> Hooks:
+        """What is hung on this agent's moments, to be hung on and taken from as it runs.
+
+        On the agent rather than on a session, so that a hook covers every conversation the
+        agent holds -- and so that a flow which has already started can hang one, which is
+        the whole reason these are callables rather than a table in a settings file::
+
+            with agents.builder.hooks.on(Moment.STOP, keep_going):
+                agents.builder(task)
+        """
+        return self._hooks
+
+    @property
+    def stopped(self) -> bool:
+        """Whether this agent has been told to take no further turn.
+
+        Which is not the same as the turn it was taking having failed, though that is how it
+        looks from inside one: a process killed under a turn is a turn that could not finish.
+        """
+        return self._stopped
+
+    @property
+    def goals_enabled(self) -> bool:
+        """Whether this agent may be run under a backend goal.
+
+        This is a per-agent runtime policy, distinct from :attr:`pursues`, which says whether
+        the backend has a goal feature at all.
+        """
+        return self._config.goals
+
+    def disable_goals(self) -> None:
+        """Prevents this agent and its sessions from starting backend goals.
+
+        Ordinary turns are unaffected. Backends that expose goals outside ``pursue`` may
+        override this to disable the corresponding runtime feature as well.
+        """
+        from dataclasses import replace
+
+        self._config = replace(self._config, goals=False)
+
+    @property
+    def backend(self) -> str:
+        """The coding agent this drives, named as a command line names it.
+
+        Read off the class rather than written down twice: `ClaudeCodeAgent` drives `claude`,
+        and an agent whose class says otherwise would be the one thing nobody could check.
+        Read back through the backend that answers to it, so that the name is one the rest of
+        humanize can look up -- `GrokBuildAgent` drives `grok`, which is what its accounts,
+        its skills and its cost are all kept under.
+        """
+        from hmz.coganchor.backends import named
+
+        said = (
+            type(self)
+            .__name__.removesuffix("Agent")
+            .removesuffix("CLI")
+            .removesuffix("Code")
+            .lower()
+        )
+        profile = named(said)
+        return profile.name if profile is not None else said
+
+    @property
+    def opened(self) -> list[str]:
+        """The backend's id for every session this agent has opened, oldest first.
+
+        What :attr:`sessions` cannot say: a flow that drops a session per turn keeps none of
+        them, but the backend logged them all, and a trace of the run has to know whose they
+        were. Ids rather than sessions, so remembering a day of turns costs a list of strings.
+        """
+        with self._holding:
+            return list(self._opened)
+
+    @property
+    def config(self) -> AgentConfig:
+        """The model and effort every session of this agent was configured with.
+
+        What it was configured with rather than what it is running at: the config is frozen,
+        because a session resumes under the settings it opened with, and :attr:`effort` is
+        the one of them a flow may move while the agent runs.
+        """
+        return self._config
+
+    def spent(self) -> Usage:
+        """What this agent has cost so far, by the kind of token it went on.
+
+        Every session it has opened, the ones nobody holds any more included: a flow that
+        drops a session a turn has still spent what those turns spent.
+
+        Returns:
+          Every kind its backend counts, `input` and `output` among them.
+        """
+        return self._meter.spent()
+
+    def rate(self, over: float = WINDOW) -> Usage:
+        """How fast this agent is spending, by kind, over the last stretch of it.
+
+        Args:
+          over: How far back to measure, in seconds.
+
+        Returns:
+          Tokens a second, by kind.
+        """
+        return self._meter.rate(over)
+
+    def juice(self, over: float = WINDOW) -> float:
+        """What an average turn of this agent's model came out with, over the last stretch.
+
+        Every session it has opened, the ones nobody holds any more included, as for
+        :meth:`spent`.
+
+        Args:
+          over: How far back to measure, in seconds.
+
+        Returns:
+          Output tokens per turn, and 0.0 where no turn has landed in the window.
+        """
+        return self._meter.juice(over)
+
+    @property
+    def effort(self) -> str:
+        """How hard this agent's turns are to think, from the next one on.
+
+        What it was configured with until a flow says otherwise. Setting it moves every
+        session of this agent that has not been told something of its own -- a flow watching
+        what a loop is costing turns the whole agent down, and one nursing a single
+        conversation through a hard patch turns that session up.
+        """
+        return self._effort or self._config.effort
+
+    @effort.setter
+    def effort(self, effort: str) -> None:
+        """Has this agent's turns think at something other than what it was configured with.
+
+        Args:
+          effort: The backend's own word for it, or "" to go back to the configured one.
+        """
+        self._effort = effort or None
+
+    @property
+    def anchor(self) -> AnchorConfig | None:
+        """Where this agent's turns land, or None while they land here.
+
+        An agent given a machine brings it up the first time this is asked for, which is the
+        first turn it is given: constructing an agent pulls no image and starts no container,
+        and a flow that configures more agents than it drives pays for the ones it drives. The
+        machine then stands for as long as the agent does -- its sessions are turns of one
+        conversation each, and they must find the workspace as the last turn left it -- and is
+        taken down when the agent is collected, or at exit for one held to the end. One that
+        was already running is only reached, and is left running.
+        """
+        if self._config.machine is None:
+            return None
+        # Two sessions of one agent share the machine rather than bringing up one each.
+        with self._starting:
+            if self._anchor is None:
+                machine = self._config.machine.create()
+                self._anchor = machine.start()
+                # Held by the finalizer alone, which is what takes the machine down: when the
+                # agent is collected, and at exit for one held to the end.
+                weakref.finalize(self, machine.stop)
+            return self._anchor
+
+    @property
+    def provider(self) -> Provider | None:
+        """Which account this agent's turns run as, or None while they run as the CLI does.
+
+        None is the account this machine is already signed into: an agent nobody gave one
+        runs the CLI exactly as whoever is at this machine runs it, with nothing added to its
+        environment, nothing taken out of it and no path answered by another. Which is why
+        this answers None for that rather than the account :meth:`node` holds -- everything
+        that asks whether a turn is run under an account is asking whether any of that is to
+        happen, and for the machine's own the answer is no.
+
+        Raises:
+          ValueError: If this agent was configured with a provider there is no such thing as.
+            Said the first time a turn needs one rather than swallowed: an agent that cannot
+            find the account it was told to run as must not quietly run as the one whoever
+            started it happens to be signed in as.
+        """
+        held = self.node()
+        return held if held.name else None
+
+    def node(self) -> Provider:
+        """The account this agent is on now, whether or not it is one anybody made.
+
+        Which is where its chain is walked from: the one it was configured with, or the one
+        this machine is signed into for an agent given none, or -- once a turn has moved --
+        wherever it moved to. Read once and kept, for the reason :attr:`provider` is.
+
+        Returns:
+          The account. Never None: an agent that was given none is on the account this
+          machine is already signed into, which is an account of every backend there is.
+
+        Raises:
+          ValueError: If this agent was configured with a provider there is no such thing as.
+        """
+        from hmz.coganchor import providers
+
+        with self._starting:
+            if self._at is None:
+                found = providers.find(self.backend, self._config.provider)
+                if found is None and not self._config.provider:
+                    # A backend `hmz.coganchor.backends` has never heard of -- a CLI somebody is
+                    # writing, a stand-in a test drives -- still takes its turns as whoever
+                    # is at this machine. That is an account with nothing written down about
+                    # it, since there is nowhere to write it, rather than no account at all.
+                    found = providers.Provider(self.backend, providers.LOCAL, way="")
+                if found is None:
+                    raise ValueError(
+                        f"{self._id}: no {self.backend} provider called "
+                        f"{self._config.provider!r}"
+                    )
+                self._at = found
+            return self._at
+
+    def walks(self) -> tuple[Provider, ...]:
+        """Every account a turn of this agent may be taken under, in the order it tries them.
+
+        The one it is on, and then whatever that account falls back to, and whatever that one
+        does: each account names the next, so a subscription that runs out falls to a key and
+        a key that is refused falls to a gateway. Said on the accounts rather than on the
+        agent because it is the account that goes down, and whichever agent was running under
+        one when it did is the agent that needs somewhere else to go.
+
+        A chain may begin at the account this machine is signed into, which is where an agent
+        nobody gave an account starts: `/providers`, enter on that account, and `falls back
+        to` is what says so, and until somebody does it is a chain of one, tried once.
+
+        Returns:
+          One per account, the one it is on first. From wherever it is now rather than from
+          where it started: an agent that has already moved does not walk the part of the
+          chain that failed again. Never empty.
+        """
+        from hmz.coganchor import providers
+
+        return tuple(providers.chain(self.node()))
+
+    @property
+    def spec(self) -> str:
+        """Where this agent runs, as a step names it: `CLI[@ACCOUNT]/MODEL`.
+
+        Three things and no more, because those are what a turn can fail for having named. How
+        hard it thinks and what it may reach for are what this agent *is* rather than where it
+        runs, and a step is not written about them.
+
+        The account it was configured with rather than the one it has moved to, since that is
+        what somebody wrote down when they said where this place falls back to: an agent that
+        walked its own accounts and ran out is still at the place they meant.
+        """
+        from hmz.coganchor import fallbacks
+
+        return fallbacks.spec(self.backend, self._config.model, self._config.provider)
+
+    def stands_in(self) -> AgentBase | None:
+        """The agent that takes this one's turns, once this one has nowhere left to run.
+
+        Which is the other half of a chain: an account that goes down is answered by the next
+        account of the same backend, inside the conversation that was running, and this is
+        what is left when there is no next account -- a model retired, a CLI that will not
+        start, a whole account rate-limited rather than one request. Another agent then, and a
+        turn taken in a session of its own, because no backend can be handed another
+        backend's session id.
+
+        Made at most once and kept, for the reason an account that has moved stays moved: the
+        agent that went down is not one to try again each turn, and a stand-in made afresh
+        every time would be a new conversation and a new set of skills mounted every turn.
+        Held only for as long as this agent is: it is this agent's answer.
+
+        Returns:
+          The agent to take the turn, already carrying this agent's skills and holding the
+          rest of the chain so that it cannot come round to this one, or None where nothing
+          was written down about this agent -- which is the turn failing as it always has.
+        """
+        from hmz.coganchor import fallbacks
+
+        with self._starting:
+            if self._stands_in is not None:
+                return self._stands_in or None
+            walked = (
+                self._beyond
+                if self._beyond is not None
+                else tuple(fallbacks.chain(self.spec)[1:])
+            )
+            # Written down as "nothing", so that an agent with nowhere to go is asked once
+            # rather than once a turn: reading the chain is reading a file.
+            self._stands_in = made = _built(walked[0], self) if walked else False
+            if made:
+                made.loads(self._loads)
+                made.epic = self.epic
+                # Only the steps after its own: a chain read again from the top by each hop
+                # would be a chain that walks the agents before it a second time.
+                made._beyond = walked[1:]
+            return made or None
+
+    def fall_back(self, provider: Provider) -> None:
+        """Runs every turn from here on under another account.
+
+        Args:
+          provider: The account to run as.
+        """
+        with self._starting:
+            self._at = provider
+        self.moved()
+
+    def moved(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
+        """Told that this agent is on another account from here on.
+
+        A session is a process, a server or a runtime started with an account's own
+        environment and its own credential paths, and none of that changes under a process
+        that is already up -- so everything held open under the account just left has to be
+        opened again. Nothing is torn down here, though: what holds one is the thread taking
+        turns in it, and reaching across to kill a process another thread is reading would end
+        a turn that was doing nothing wrong and might block on a pipe that thread is sitting
+        in.
+
+        So this says the account has changed and each holder answers for itself, on its own
+        thread, the next time it needs what it holds: a session compares the account its
+        process was started under with the one the agent is on now, and starts another when
+        they differ. A backend holding something of its own per agent does the same where it
+        hands that thing out.
+        """
+
+    def environment(self) -> Mapping[str, str]:
+        """What this agent's turns are run with, on top of the environment they inherit.
+
+        Which is what a provider that is a key, an endpoint or an account on somebody's cloud
+        comes to: every one of these CLIs reads such a thing out of a variable of its own.
+
+        Returns:
+          The variables to add, which is nothing at all for an agent running as its CLI does.
+        """
+        from hmz.coganchor import providers
+
+        return providers.environ(self.provider)
+
+    def hushed(self) -> frozenset[str]:
+        """The variables a turn of this agent is run without, whoever left them lying about.
+
+        A provider is which account the agent is, and these CLIs will take an account from an
+        environment variable in preference to the credentials they were signed in with: an
+        `ANTHROPIC_API_KEY` exported in somebody's shell profile outranks the file a provider
+        holds, and the turn would run -- and bill -- as that key with nothing about it looking
+        wrong. So a turn under a provider is run without every variable its backend would read
+        an account from, except the ones that provider set itself.
+
+        Returns:
+          The variables to take away, which is nothing at all for an agent running as its CLI
+          already runs: an agent with no provider is left exactly as it was found.
+        """
+        from hmz.coganchor.backends import named
+
+        provider = self.provider
+        profile = named(self.backend)
+        if provider is None or profile is None:
+            return frozenset()
+        return profile.hushes() - set(provider.env)
+
+    def _environ(self) -> dict[str, str] | None:
+        """The whole environment one of this agent's processes is started with.
+
+        Args:
+          None.
+
+        Returns:
+          This process's own, less what a provider hushes and plus what it sets, or None
+          where there is nothing to change -- which is inheritance, as it always was.
+        """
+        added, hushed = self.environment(), self.hushed()
+        if not added and not hushed:
+            return None
+        return {
+            name: value for name, value in os.environ.items() if name not in hushed
+        } | dict(added)
+
+    def spawned(self, argv: list[str], cwd: str = "") -> list[str]:
+        """One turn of this agent, as the command to actually spawn.
+
+        Every backend renders its own call and then comes here, so that what a turn is wrapped
+        in is decided once: the provider's own arguments are added to the CLI's command line,
+        and the whole of it is put under whatever has to supervise it.
+
+        A turn that is both anchored and run under a provider is supervised once, not twice: a
+        process has one tracer, so the anchor is told which paths to answer rather than being
+        wrapped in something that would answer them for it.
+
+        An anchor that drives the CLI already on the target is the other arrangement, and
+        almost everything above is turned around by it. The CLI is the target's rather than
+        this machine's, so it is not looked for here. The account is the turn's business
+        wherever the turn runs, so what a provider sets crosses instead of being kept back,
+        and what it hushes is taken off *there* -- where the environment is composed -- rather
+        than merely left out of what is sent. And its credential files, which a supervisor
+        would answer a path with, are put on the target instead, there being no tracer there
+        to answer anything.
+
+        Args:
+          argv: The backend's own command for this turn.
+          cwd: Where the session it is a turn of works, as the machine it lands on names it,
+            or "" for the workspace itself. An anchored turn is told there rather than put
+            there: the agent is started in this machine's mirror of that directory, which is
+            the anchor's to work out.
+
+        Returns:
+          The command to spawn, which is `argv` itself for an agent that is neither anchored
+          nor run under a provider -- which is most of them.
+        """
+        from hmz.coganchor.backends import elsewhere
+
+        provider = self.provider
+        anchor = self.anchor
+        native = anchor is not None and anchor.native
+        # A command this machine's PATH does not name is run by the path it is installed at
+        # instead: a flow started by something with a PATH of its own -- a notebook kernel, a
+        # service, the launcher of a runtime platform -- would otherwise fail to start an
+        # agent that is installed here. Everything else is spawned exactly as it was written,
+        # so a name PATH answers to is still the name that runs, and one nothing answers to
+        # still fails saying what could not be found.
+        # Not for a turn taken by the target's own CLI: where that is installed is a fact
+        # about that machine, and this machine's answer would be a path it has never had.
+        if not native and (found := elsewhere(argv[0])) is not None:
+            argv = [found, *argv[1:]]
+        if provider is not None and provider.args:
+            argv = [*argv, *provider.args]
+        if anchor is None:
+            return provider.command(argv) if provider is not None else argv
+        if native:
+            return self._reaching(anchor, provider).command(argv, chdir=cwd)
+        swaps = provider.swaps() if provider is not None else ()
+        # What the provider hands the agent as variables is the agent's own, and the target
+        # is not to be given it: everything the agent exports is inherited by every command
+        # it runs there, and a key crossing to another machine is a key on that machine.
+        private = tuple(provider.env) if provider is not None else ()
+        return self._reaching(anchor, provider).command(
+            argv, swaps=swaps, private=private, chdir=cwd
+        )
+
+    def _reaching(
+        self, anchor: AnchorConfig, provider: Provider | None = None
+    ) -> AnchorConfig:
+        """The anchor, plus whatever a turn under it has to be able to reach where it runs.
+
+        Under a supervisor that is the bridge to the flow's own callbacks, for an agent that
+        is offering any: the socket it carries lines to is in *this* process, so the program
+        that carries them has to run here. Everything a CLI spawns under an anchor goes to the
+        target unless it is named, and a bridge started there would find no socket and no
+        humanize.
+
+        Under an anchor driving the target's own CLI it is three other things, each of which a
+        mirror and a tracer would otherwise have done: the variables a provider's account must
+        not be run beside, the credential files that account keeps, and the skills the flow
+        carries. The bridge is not among them, and cannot be: it is a program on this machine
+        speaking to a socket in this process, and the CLI that would spawn it is elsewhere.
+
+        Args:
+          anchor: Where this agent's turns land.
+          provider: Which account they run as, or None for the one this machine is signed in
+            with -- whose credentials are the CLI's own and are wherever the CLI runs already.
+
+        Returns:
+          It, or a copy saying what this turn has to be given.
+        """
+        from dataclasses import replace
+
+        if anchor.native:
+            from hmz.coganchor.agents.skills import carried
+            from hmz.coganchor.backends import installing
+            from hmz.coganchor.transport import Target
+
+            if (
+                not self._toolbox.empty()
+                and Target.parse(anchor.target).scheme != "local"
+            ):
+                # Refused rather than dropped. The bridge is a program on this machine that
+                # speaks to a socket in this process, and the CLI that would start it is on
+                # another one: a turn taken anyway would be one whose model was never told
+                # about the flow's callbacks, which reads as a model that would not use them.
+                # A `local` target is the exception and not a special case -- the CLI runs
+                # here, so the bridge, the socket and humanize are all where they always were.
+                raise ValueError(
+                    f"{self.backend}: a turn driven on {anchor.target} cannot be offered "
+                    "the flow's own callbacks -- the bridge that carries them is a program "
+                    "on this machine, and the CLI that would start it is on that one"
+                )
+            return replace(
+                anchor,
+                hushes=tuple(sorted(self.hushed())),
+                projects=self._projecting(provider),
+                carries=carried(self.backend, self._loads),
+                installs=installing(self.backend),
+            )
+        if self._toolbox.empty():
+            return anchor
+        held = self._toolbox.command()[0]
+        if held in anchor.local_execs:
+            return anchor
+        return replace(anchor, local_execs=(*anchor.local_execs, held))
+
+    def _projecting(self, provider: Provider | None) -> tuple[tuple[str, str], ...]:
+        """The credential files this turn's account keeps, and what to call each on the target.
+
+        A turn under a provider reads its account out of that provider's own copies of the
+        CLI's credential files. Under a supervisor the paths are answered one syscall at a
+        time and nothing moves; there is no tracer on the target, so the only way a CLI there
+        reads them is to be pointed at them by a variable -- and the only variables that will
+        do are the ones that move *the backend's own* directories, which is what
+        :meth:`hmz.coganchor.backends.Profile.credentials` already writes each root down under.
+
+        Which is why the third root does not cross. A credential the CLI reads at `~/...` can
+        only be pointed at by replacing `HOME`, and a replaced home is not a projected account:
+        it is a different machine. The target's git identity, its ssh keys, its caches and the
+        CLI's own sessions all live under that name, and a turn given a near-empty directory
+        instead is a turn whose commands behave nothing like the target's -- and whose next
+        turn cannot resume the conversation this one opened, the transcript having gone with
+        the directory. So those are left where they are and the account is carried by what can
+        carry it.
+
+        Args:
+          provider: Which account the turn runs as, or None for the one this machine is signed
+            in with -- whose credentials are the CLI's own, wherever that CLI runs.
+
+        Returns:
+          One `(variable, the directory on this machine)` pair per root that has anything in it
+          and a variable that moves it. Nothing at all for an account that is only variables --
+          which is every key and every gateway, and which is why most turns project nothing.
+
+        Raises:
+          ValueError: If this account keeps a credential that cannot cross and has no other
+            way of reaching the turn. Refused rather than skipped: the CLI would then read the
+            one file left on the target, which is a turn taken as whoever that machine is
+            signed in as -- the one failure this must not have.
+        """
+        from hmz.coganchor.backends import named
+        from hmz.runtime import telemetry
+
+        if provider is None or not provider.name:
+            return ()
+        profile = named(self.backend)
+        if profile is None:
+            return ()
+        held: list[tuple[str, str]] = []
+        stranded: list[str] = []
+        for under, variable in (
+            # Where the backend keeps its own state, which its own variable moves -- but only
+            # where that variable names the directory outright: one that names a parent with
+            # the backend's directory inside it would land these a level out of place.
+            ("home", "" if profile.home_in else profile.home_var),
+            # Where every program that follows it keeps its configuration, which is a
+            # directory of the backend's inside a directory one variable moves.
+            ("config", "XDG_CONFIG_HOME"),
+            # And the user's own home, which nothing but `HOME` moves -- see above.
+            ("user", ""),
+        ):
+            root = provider.at / under
+            if not any(path.is_file() for path in root.rglob("*")):
+                continue
+            if variable:
+                held.append((variable, str(root)))
+            else:
+                stranded.append(str(root))
+        if stranded and not held and not provider.env:
+            raise ValueError(
+                f"{self.backend}: the {provider.name} account is kept only in "
+                f"{', '.join(stranded)}, which nothing can point a CLI "
+                "on another machine at without replacing its home -- so a turn driven there "
+                "would be taken as whatever account that machine is signed into"
+            )
+        if stranded:
+            # It happened and the turn still runs as this account, which is what the variables
+            # and the projected roots are carrying. Said and not raised for that reason, and
+            # said without the path: which accounts somebody keeps do not leave the machine.
+            telemetry.snag("native-credential-stays-here")
+        return tuple(held)
+
+    @property
+    def sessions(self) -> list[SessionBase]:
+        """The sessions opened on this agent and still held by someone, oldest first.
+
+        Held weakly, so a flow that opens a session per turn -- a Ralph loop runs for days --
+        does not grow an agent by one session a turn for as long as it runs.
+        """
+        with self._holding:
+            held = list(self._sessions.values())
+        return [session for ref in held if (session := ref()) is not None]
+
+    def stop(self) -> None:
+        """Has this agent take no further turn, and ends the one it is taking.
+
+        A turn is where a flow spends its time -- a model can think for minutes -- so a stop
+        that waited for one would not read as a stop. What the turn was doing is left where
+        it got to; what ends is the agent's part in it.
+
+        And whatever is standing in for it, since a turn of this agent's may be being taken
+        there: an agent stopped whose stand-in went on thinking would be a run ended by hand
+        that did not end.
+        """
+        self._stopped = True
+        for session in self.sessions:
+            session.close()
+        with self._starting:
+            stood_in = self._stands_in
+        if stood_in:
+            stood_in.stop()
+
+    def watch(
+        self, listener: Callable[[AgentBase, SessionBase | None, Event], None]
+    ) -> None:
+        """Has everything this agent's turns say reach `listener` as they say it.
+
+        Args:
+          listener: What to tell, as this agent, the conversation that said it, and the thing
+            said. The conversation is None for something the agent said rather than one of
+            them -- a question put by a server that serves every session of it at once.
+        """
+        with self._holding:
+            self._watchers.append(listener)
+
+    def _hold(self, session: SessionBase) -> None:
+        """Files a session as this agent's, weakly, as the session opens.
+
+        Weakly, so that a flow which drops a session per turn does not grow the agent by one
+        a turn; filed under a number of its own, so that dropping one of ten thousand costs
+        the same as dropping one of two.
+
+        Args:
+          session: The session, which has just been made for this agent.
+        """
+        with self._holding:
+            self._holds += 1
+            at = self._holds
+            self._sessions[at] = weakref.ref(session, lambda _gone: self._forget(at))
+
+    def _forget(self, at: int) -> None:
+        """Drops a session that has been collected, whoever else has dropped it already.
+
+        Called from wherever the collector happens to be -- a turn's own thread as a flow
+        lets a session go, or the interpreter on its way out, or a line of this class that
+        was itself holding the lock, which is why the lock is re-entrant. A place that no
+        longer holds it is a place with nothing to do here, and raising out of a finalizer
+        only puts an `Exception ignored in:` on the terminal a flow is being watched from.
+
+        Args:
+          at: What the session was filed under.
+        """
+        with self._holding:
+            self._sessions.pop(at, None)
+
+    def _opens(self, session: str) -> None:
+        """Writes down a session this agent has just opened, from the turn that opened it.
+
+        Args:
+          session: The backend's id for it.
+        """
+        with self._holding:
+            self._opened.append(session)
+
+    def _heard(self, event: Event, session: SessionBase | None = None) -> None:
+        """Tells everyone watching what a turn of this agent just said.
+
+        A watcher that raises is a watcher's own problem: a flow must not fail because
+        something looking at it did. Told from a copy of the list rather than from the list,
+        since a turn saying something is a turn on some other thread than the one hanging a
+        watcher on the agent.
+
+        Args:
+          event: What was said.
+          session: Which conversation said it, or None for something the agent said rather
+            than one of them.
+        """
+        if not self._watchers:
+            return
+        with self._holding:
+            watching = tuple(self._watchers)
+        for listener in watching:
+            with contextlib.suppress(Exception):
+                listener(self, session, event)
+
+    def asked(self, question: Question) -> str | None:
+        """Puts something a turn stopped to ask to whoever is driving this agent.
+
+        Called from the turn's own thread, which waits here: an agent that has asked has
+        stopped working until it is answered.
+
+        Args:
+          question: What the agent wants to know.
+
+        Returns:
+          The answer, or None when there is nobody to ask -- a flow run from the command
+          line, or an interface told its user is away. The backend is then told that nobody
+          answered rather than left waiting, since a turn waiting on an answer that is not
+          coming is a flow that has stopped.
+        """
+        self._heard(Event(kind="asks", text=question.text))
+        # An agent that has stopped to ask is an agent that wants a person, which is the one
+        # thing a flow running unattended has to be able to hear about.
+        self._hooks.fire(
+            Occasion(moment=Moment.NOTIFICATION, agent=self._id, said=question.text)
+        )
+        if self.ask is None:
+            return None
+        # And every clock of this agent stops while the person thinks. A turn that has asked
+        # is a turn its backend owes nothing: the CLI is sitting there with nothing being
+        # asked of it, and counting that as silence would have a watchdog kill a healthy
+        # agent for the time somebody took over a permission prompt.
+        try:
+            with held(self):
+                return self.ask(question)
+        except Exception:  # noqa: BLE001 -- whatever was asked failed, and the turn goes on
+            return None
+
+    def prompted(self) -> str | None:
+        """Waits for the next thing to say to this agent, for a flow that is a conversation.
+
+        Called between turns, from the thread the flow runs on -- which waits here, there
+        being nothing for a flow to do until it has been told something.
+
+        Returns:
+          What was said, or None once there will be nothing more: a flow driven from the
+          command line, where nobody is at a prompt, or an interface that has gone. A flow
+          that is a conversation then has had its conversation, and returns.
+
+        Raises:
+          Stopped: If the agent was told to take no further turn while this was waiting. A
+            run ended by hand is written down as ended by hand, and answering with None here
+            would write it down as one that finished.
+        """
+        said = None
+        if self.prompting is not None:
+            try:
+                said = self.prompting()
+            except Exception:  # noqa: BLE001 -- whoever was asked failed, and the flow ends
+                said = None
+        if self._stopped:
+            raise Stopped(f"{self._id} was stopped")
+        return said
+
+    @overload
+    def __call__(
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str: ...
+
+    @overload
+    def __call__[T: BaseModel](
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> T | None: ...
+
+    def __call__[T: BaseModel](
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str | T | None:
+        """Runs one turn in a session of its own, and keeps nothing.
+
+        Which is the shape a Ralph loop is made of: the agent starts from the task and the
+        repository, every turn, with none of the last one in context. A flow whose turns are
+        to remember each other holds the session :meth:`new` gives it instead.
+
+        Args:
+          prompt: The input prompt for the turn.
+          suppress: Whether a turn that fails answers with nothing, as for
+            :meth:`SessionBase.__call__`.
+          schema: The shape to answer in, as for :meth:`SessionBase.__call__` -- which is
+            what a flow asking one agent a question rather than setting it to work wants:
+            `agents.reviewer(asked, schema=Review).done` is the review read as a decision.
+          cwd: Where the turn works, or None for wherever the flow is. One agent given a
+            directory apiece is one agent working in several places at once, which is what a
+            flow with a worktree per task is doing.
+
+        Returns:
+          What the agent answered, stripped, or the model it was asked for.
+        """
+        opened = self._opens_at(cwd)
+        if schema is None:
+            return opened(prompt, suppress=suppress)
+        return opened(prompt, suppress=suppress, schema=schema)
+
+    def pursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str:
+        """Runs a goal in a session of its own, and keeps nothing.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+          suppress: Whether a goal that fails answers with nothing, as for
+            :meth:`SessionBase.pursue`.
+          cwd: Where it works, as for :meth:`__call__`.
+
+        Returns:
+          What the agent answered once it stopped, stripped.
+        """
+        return self._opens_at(cwd).pursue(objective, suppress=suppress)
+
+    @overload
+    async def aturn(
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str: ...
+
+    @overload
+    async def aturn[T: BaseModel](
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> T | None: ...
+
+    async def aturn[T: BaseModel](
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str | T | None:
+        """The same turn as :meth:`__call__`, awaited: `await agent.aturn(prompt)`.
+
+        A session of its own and nothing kept, as calling the agent is -- run on a thread of
+        its own, so that a flow written as `async def run` can have as many of these going as
+        it likes without any one of them holding up the rest.
+
+        Args:
+          prompt: The input prompt for the turn.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
+          schema: The shape to answer in, as for :meth:`__call__`.
+          cwd: Where the turn works, as for :meth:`__call__` -- which is what makes many at
+            once many places at once.
+
+        Returns:
+          What :meth:`__call__` would have answered with.
+        """
+        opened = self._opens_at(cwd)
+        if schema is None:
+            return await opened.aturn(prompt, suppress=suppress)
+        return await opened.aturn(prompt, suppress=suppress, schema=schema)
+
+    async def apursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str:
+        """The same goal as :meth:`pursue`, awaited: `await agent.apursue(objective)`.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+          suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+          cwd: Where it works, as for :meth:`__call__`.
+
+        Returns:
+          What :meth:`pursue` would have answered with.
+        """
+        return await self._opens_at(cwd).apursue(objective, suppress=suppress)
+
+    def batch_new(
+        self, count: int, cwd: str | os.PathLike[str] | None = None
+    ) -> list[SessionBase]:
+        """Opens as many sessions as it is asked for, at once.
+
+        Sessions cost nothing until a turn lands in one -- a session is a conversation that
+        has not started, and the backend has not been told it exists -- so this is a list to
+        hand to whatever runs the turns, however long a list it is. Which is the shape a
+        fan-out has: ten thousand conversations, each of which will remember its own.
+
+        Args:
+          count: How many to open. None at all for a count of nothing or less.
+          cwd: The directory they all work in, or None for the one the flow is running in. A
+            session per directory is `[agent.new(one) for one in directories]` instead.
+
+        Returns:
+          The sessions, in the order they were opened, which is the order the agent has them.
+        """
+        return [self._opens_at(cwd) for _ in range(max(count, 0))]
+
+    @overload
+    def batch(
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[str]: ...
+
+    @overload
+    def batch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[T | None]: ...
+
+    def batch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[Any]:
+        """Runs many turns at once, each in a session of its own, and keeps none of them.
+
+        :meth:`__call__` as many times over as there are prompts, all of them going at the
+        same time: a fan-out where each turn starts from the task and the repository with none
+        of the others in context. What comes back is in the order it was asked for, whichever
+        turn landed first.
+
+        A turn is a coding agent and everything it starts, so how many to have going at once
+        is a question about the machine rather than about this library: `at_once` is where a
+        flow says, and a flow that says nothing gets the fan-out it asked for.
+
+        Args:
+          prompts: What to ask, one turn apiece.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
+            A batch that does not suppress raises the first failure once every turn of it has
+            landed: a turn already running cannot be taken back.
+          schema: The shape to answer in, as for :meth:`__call__`.
+          at_once: How many turns to have running at a time, or 0 for all of them.
+          cwd: Where every turn of it works, or None for wherever the flow is. A batch across
+            directories is a session apiece -- `agent.new(one)` -- gathered.
+
+        Returns:
+          One answer per prompt, in the order the prompts were given.
+
+        Raises:
+          subprocess.CalledProcessError: If a turn failed and `suppress` is not set.
+          Stopped: If the agent has been told to take no further turn.
+        """
+        asked = list(prompts)
+        if not asked:
+            return []
+
+        def one(prompt: str) -> Any:
+            if schema is None:
+                return self(prompt, suppress=suppress, cwd=cwd)
+            return self(prompt, suppress=suppress, schema=schema, cwd=cwd)
+
+        # Sized to the batch rather than kept between them: a fan-out is over when its
+        # answers are in, and the threads it took go with it.
+        with ThreadPoolExecutor(
+            max_workers=_at_once(at_once, len(asked)),
+            thread_name_prefix=f"{self.id}-at",
+        ) as crowd:
+            return list(crowd.map(one, asked))
+
+    @overload
+    async def abatch(
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[str]: ...
+
+    @overload
+    async def abatch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[T | None]: ...
+
+    async def abatch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> list[Any]:
+        """The same batch as :meth:`batch`, awaited: `await agent.abatch(prompts)`.
+
+        Args:
+          prompts: What to ask, one turn apiece.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`batch`.
+          schema: The shape to answer in, as for :meth:`__call__`.
+          at_once: How many turns to have running at a time, or 0 for all of them.
+          cwd: Where every turn of it works, as for :meth:`batch`.
+
+        Returns:
+          One answer per prompt, in the order the prompts were given.
+
+        Raises:
+          subprocess.CalledProcessError: If a turn failed and `suppress` is not set, once
+            every turn of the batch has landed, as for :meth:`batch`.
+        """
+        import asyncio
+
+        asked = list(prompts)
+        if not asked:
+            return []
+        gate = asyncio.Semaphore(_at_once(at_once, len(asked)))
+
+        async def one(prompt: str) -> Any:
+            async with gate:
+                if schema is None:
+                    return await self.aturn(prompt, suppress=suppress, cwd=cwd)
+                return await self.aturn(
+                    prompt, suppress=suppress, schema=schema, cwd=cwd
+                )
+
+        # Gathered whatever any of them did, and only then raised: a batch that let the first
+        # failure out from under the others would leave those others running with nobody
+        # waiting for them, which is a turn nothing will ever read and a thread nothing joins.
+        answered = await asyncio.gather(
+            *(one(prompt) for prompt in asked), return_exceptions=True
+        )
+        for said in answered:
+            if isinstance(said, BaseException):
+                raise said
+        return list(answered)
+
+    def _opens_at(self, cwd: str | os.PathLike[str] | None) -> SessionBase:
+        """Opens a session at a directory, or wherever the flow is where none was named.
+
+        Asked for without the argument where there is none to give, so that an agent written
+        before there was anywhere else to work -- a stand-in in somebody's suite, whose `new`
+        takes only itself -- goes on being an agent.
+
+        Args:
+          cwd: The directory the conversation works in, or None.
+
+        Returns:
+          The session.
+        """
+        return self.new() if cwd is None else self.new(cwd)
+
+    @abstractmethod
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> SessionBase:
+        """Opens a new session, which stays unopened with the backend until its first turn.
+
+        Args:
+          cwd: The directory the conversation works in, or None for the one the flow is
+            running in. It is a session's setting rather than a turn's because that is what
+            it is to these backends: a conversation is rooted at a directory. Which is what
+            makes a session per directory the way to work in several at once::
+
+                held = [agent.new(worktree) for worktree in worktrees]
+                await asyncio.gather(*(one.aturn(task) for one in held))
+
+        Returns:
+          A session with no history yet.
+        """

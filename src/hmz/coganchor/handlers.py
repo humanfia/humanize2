@@ -77,7 +77,7 @@ _RESOLVE_CONFINED = 0x08 | 0x10
 #: Where each syscall keeps the paths it names, as ``(descriptor argument, path
 #: argument)`` pairs -- the descriptor being ``None`` for a call that has none and
 #: resolves against the process's own directory.  Read off the manual pages, one
-#: line per call, and the same table :mod:`hmz.providers._trace` redirects
+#: line per call, and the same table :mod:`hmz.coganchor.providers._trace` redirects
 #: against when a turn is run under a provider without being anchored.
 #:
 #: ``execve`` is deliberately absent: what a process becomes is the exec bridge's

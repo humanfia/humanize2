@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends
-from hmz.agents import AcpAgent, AcpAgentConfig, driver
+from hmz.coganchor import backends
+from hmz.coganchor.agents import AcpAgent, AcpAgentConfig, driver
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from hmz.agents.acp import AcpSession
+    from hmz.coganchor.agents.acp import AcpSession
 
 #: An agent that speaks ACP: it answers the handshake, opens a session, and takes a turn --
 #: saying a thought, a tool call it asks permission for, and the answer it ends on. A prompt

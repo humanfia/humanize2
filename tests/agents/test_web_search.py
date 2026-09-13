@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends
-from hmz.agents import (
+from hmz.coganchor import backends
+from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     DshAgent,
@@ -33,14 +33,14 @@ from hmz.agents import (
     QwenCodeAgentConfig,
 )
 from hmz.flows import NotAFlow
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-#: The backends that can be told, and the ones that cannot. Read off `hmz.backends` here as
-#: everything else reads it, so a backend that gains a way of being told is a backend this
-#: notices rather than a list to remember.
+# : The backends that can be told, and the ones that cannot. Read off `hmz.coganchor.backends` here
+# as : everything else reads it, so a backend that gains a way of being told is a backend this :
+# notices rather than a list to remember.
 TELLABLE = ("claude", "codex", "grok", "qwen", "opencode", "mimo", "zcode")
 
 #: A flow whose one agent reads this repository and nothing else, which is a thing about the
@@ -49,7 +49,7 @@ SEARCHLESS = '''"""A flow whose answers have to be the same tomorrow."""
 
 from typing import Annotated
 
-from hmz.agents import AgentBase, AgentDefaults
+from hmz.coganchor.agents import AgentBase, AgentDefaults
 from hmz.flows import flow
 
 

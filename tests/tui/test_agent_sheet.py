@@ -18,9 +18,9 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.backends import Model
-from hmz.kept import Runs
-from hmz.settings import Settings
+from hmz.coganchor.backends import Model
+from hmz.runtime.kept import Runs
+from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Anchors, Catalogue, Clis, Confirms, Flows
 from tests.stubs import written
@@ -41,7 +41,7 @@ HERE = '''
 
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -62,7 +62,7 @@ REMOTE = '''
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Remote
+from hmz.coganchor.agents import AgentBase, Remote
 from hmz.flows import flow
 
 
@@ -83,7 +83,7 @@ BOXED = '''
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated
+from hmz.coganchor.agents import AgentBase, Isolated
 from hmz.flows import flow
 
 
@@ -104,7 +104,7 @@ PAIR = '''
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Remote
+from hmz.coganchor.agents import AgentBase, Remote
 from hmz.flows import flow
 
 
@@ -510,7 +510,7 @@ async def test_the_flow_may_rule_a_backend_out_of_the_clis_offered(
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Goal
+from hmz.coganchor.agents import AgentBase, Goal
 from hmz.flows import flow
 
 

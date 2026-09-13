@@ -7,10 +7,12 @@ import shlex
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 import pytest
 
+from hmz.coganchor import transport
 from hmz.coganchor.transport import (
     MINIMUM_PYTHON,
     PYTHON_CANDIDATES,
@@ -70,6 +72,31 @@ def test_bundle_is_self_contained(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "--export" in result.stdout
+
+
+def test_the_bundle_carries_nothing_that_drives_an_agent(tmp_path: Path) -> None:
+    """A target runs `anchor serve` and never a coding agent, so it is sent none of them.
+
+    The package holds both halves now -- the anchor, and everything humanize knows about
+    driving a CLI -- and only the first is any use on a target. Left in, the second is
+    megabytes crossing a link and being cached at the far end for a line that cannot reach
+    it. Asserted on what the archive holds rather than on what a run of it loads, which is
+    already asked next door: a module nothing imports still ships.
+    """
+    bundle = build_bundle(tmp_path / "coganchor.pyz")
+
+    carried = zipfile.ZipFile(bundle).namelist()
+
+    assert not [
+        name
+        for name in carried
+        if any(f"coganchor/{one}" in name for one in transport.DRIVING)
+    ]
+    # And the half that is any use is all there: an exclusion that took the wire with it
+    # would leave a bundle that cannot start, which the run next door would report as a
+    # failure to load rather than as a bundle missing a file.
+    assert any(name.endswith("coganchor/proto.py") for name in carried)
+    assert any("coganchor/serve/" in name for name in carried)
 
 
 def test_the_bundle_is_the_same_wherever_it_is_built(

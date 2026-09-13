@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hmz.prices import money
+from hmz.coganchor.prices import money
 
 __all__ = [
     "AgentProgress",

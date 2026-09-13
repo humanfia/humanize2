@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz import backends
-from hmz.agents import (
+from hmz.coganchor import backends
+from hmz.coganchor.agents import (
     AgentConfig,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
@@ -30,9 +30,9 @@ from hmz.agents import (
     QwenCodeAgent,
     Verdict,
 )
-from hmz.agents import hooks as hooked
-from hmz.agents.hooks import EVERYWHERE, WAITING, Gate, Hooks, answers
-from hmz.agents.qwen import _SETTINGS
+from hmz.coganchor.agents import hooks as hooked
+from hmz.coganchor.agents.hooks import EVERYWHERE, WAITING, Gate, Hooks, answers
+from hmz.coganchor.agents.qwen import _SETTINGS
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -148,7 +148,7 @@ def test_a_moment_this_serves_no_answer_to_is_answered_with_nothing() -> None:
 
 def test_an_agent_stopped_inside_a_hook_still_stops_the_tool() -> None:
     """There is nowhere here to raise it to, and the tool must not run in the meantime."""
-    from hmz.agents import Stopped
+    from hmz.coganchor.agents import Stopped
 
     hooks = _hooks()
 
@@ -395,7 +395,7 @@ def test_the_variable_qwen_is_pointed_through_is_written_down_once() -> None:
 
 def test_an_anchored_turn_is_not_told_about_a_socket_it_cannot_reach() -> None:
     """Its CLI runs on another machine; a relay named there would never answer."""
-    from hmz.agents.config import anchored
+    from hmz.coganchor.agents.config import anchored
     from hmz.coganchor.anchor import AnchorConfig
 
     agent = ClaudeCodeAgent(

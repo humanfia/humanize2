@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     AgentBase,
     AgentConfig,
     ClaudeCodeAgent,
@@ -30,7 +30,7 @@ from hmz.agents import (
     Question,
     Stopped,
 )
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.machines import AnchoredConfig
 from tests.stubs import HereAnchor, ShellAgent
 
 if TYPE_CHECKING:
@@ -190,8 +190,8 @@ def test_every_driven_agent_names_the_backend_it_is_registered_under() -> None:
     -- `GrokBuildAgent` for `grok` -- would name a backend nothing answers to, and every one
     of those lookups would quietly answer with nothing.
     """
-    from hmz.agents import DRIVEN
-    from hmz.backends import named
+    from hmz.coganchor.agents import DRIVEN
+    from hmz.coganchor.backends import named
 
     for backend, (driver, config) in DRIVEN.items():
         agent = driver(config(model="m", effort="high"))

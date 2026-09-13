@@ -19,11 +19,11 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from hmz.backends import named, profiles, program, speaking
+from hmz.coganchor.backends import named, profiles, program, speaking
 from hmz.sdk import Hmz
 
 if TYPE_CHECKING:
-    from hmz.backends import Model
+    from hmz.coganchor.backends import Model
 
 __all__ = ["installable", "installed", "machines", "ready_to_open"]
 
@@ -98,7 +98,7 @@ def ready_to_open(backend: str, where: Path) -> bool:
 
     # Local so discovering ordinary CLIs does not import any agent implementation. The SDK
     # runtime itself remains lazy inside the dsh driver and is not started by this check.
-    from hmz.agents.dsh import native_ready
+    from hmz.coganchor.agents.dsh import native_ready
 
     return native_ready(where)
 

@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, cast
 
-from hmz.agents import _inputs
+from hmz.coganchor.agents import _inputs
 
 if TYPE_CHECKING:
     import pytest

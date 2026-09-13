@@ -123,9 +123,9 @@ before.
 no other change to the flow:
 
 ```python
-from hmz.agents import ClaudeCodeAgentConfig
+from hmz.coganchor.agents import ClaudeCodeAgentConfig
 from hmz.coganchor import AnchorConfig
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.machines import AnchoredConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",

@@ -16,8 +16,8 @@ from __future__ import annotations
 import gc
 from typing import TYPE_CHECKING
 
-from hmz.agents import AgentConfig
-from hmz.runner import Runner
+from hmz.coganchor.agents import AgentConfig
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ HEAD = '''"""A flow that says what its sessions are carrying."""
 
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

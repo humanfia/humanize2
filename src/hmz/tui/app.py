@@ -61,8 +61,8 @@ from textual.theme import Theme
 from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
-from hmz import telemetry
-from hmz.prices import money, refresh
+from hmz.coganchor.prices import money, refresh
+from hmz.runtime import telemetry
 from hmz.sdk import Hmz
 
 from .btw import AgentProgress, FlowSnapshot, Observation, compact, format_snapshot
@@ -104,7 +104,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentBase, Board, Event, Question, SessionBase
+    from hmz.coganchor.agents import AgentBase, Board, Event, Question, SessionBase
     from hmz.flows import Place
     from hmz.sdk import Session
 
@@ -1323,7 +1323,7 @@ class Humanize(App[None]):
           The agent and the conversation, agents in the order the flow takes them and each of
           their conversations oldest first.
         """
-        from hmz.agents import HumanAgent
+        from hmz.coganchor.agents import HumanAgent
 
         return [
             (agent, session)
@@ -1344,7 +1344,7 @@ class Humanize(App[None]):
           One apiece, in the order the flow takes them, less the person -- who is talked to
           at this prompt rather than read.
         """
-        from hmz.agents import HumanAgent
+        from hmz.coganchor.agents import HumanAgent
 
         held = self._agents or self._ran
         return [one for one in held if not isinstance(one, HumanAgent)]
@@ -1878,7 +1878,7 @@ class Humanize(App[None]):
         Returns:
           The board, or None where the flow being run declares no person.
         """
-        from hmz.agents import HumanAgent
+        from hmz.coganchor.agents import HumanAgent
 
         held = self._agents or self._ran
         return next(
@@ -2063,7 +2063,7 @@ class Humanize(App[None]):
 
     def _btw_snapshot(self) -> FlowSnapshot:
         """Copies the current run into a prompt-sized, immutable observation."""
-        from hmz.agents import HumanAgent
+        from hmz.coganchor.agents import HumanAgent
 
         shape = self._monitor.shape()
         driven = tuple(self._agents)
@@ -2131,7 +2131,7 @@ class Humanize(App[None]):
 
     def _btw_candidates(self) -> list[AgentBase]:
         """Orders usable coding agents for a side question, without including the person."""
-        from hmz.agents import HumanAgent
+        from hmz.coganchor.agents import HumanAgent
 
         reading = self._reading()
         ordered = ([reading] if reading is not None else []) + list(self._agents)
@@ -2375,7 +2375,7 @@ class Humanize(App[None]):
         """
         import asyncio
 
-        from hmz.exporting import sized
+        from hmz.runtime.exporting import sized
 
         epic = self._epic()
         if epic is None:
@@ -2409,7 +2409,7 @@ class Humanize(App[None]):
           It, or the last run of this directory where no flow has been started here yet, or
           None where nothing has ever been run here.
         """
-        from hmz.epic import Epic
+        from hmz.runtime.epic import Epic
 
         for agent in self._ran:
             if isinstance(agent.epic, Epic):
@@ -2638,7 +2638,7 @@ class Humanize(App[None]):
         """
         from dataclasses import replace
 
-        from hmz.agents import anchored
+        from hmz.coganchor.agents import anchored
 
         for at, agent in enumerate(self._agents):
             if at >= len(self._models):
@@ -3095,7 +3095,7 @@ class Humanize(App[None]):
         """
         from dataclasses import replace
 
-        from hmz.agents import anchored
+        from hmz.coganchor.agents import anchored
 
         moved: list[AgentBase] = []
         for at, agent in enumerate(chosen):
@@ -3496,7 +3496,7 @@ class Humanize(App[None]):
         """
 
         def go() -> None:
-            from hmz.agents import Stopped
+            from hmz.coganchor.agents import Stopped
 
             try:
                 status = work()
@@ -3775,7 +3775,7 @@ def _machine() -> dict[str, object]:
     """
     import platform
 
-    from hmz.agents.skills import skills
+    from hmz.coganchor.agents.skills import skills
 
     held = Hmz()
     return {

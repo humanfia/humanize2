@@ -16,7 +16,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.coganchor import AnchorConfig
-from hmz.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
+from hmz.coganchor.machines import (
+    AnchoredConfig,
+    DockerConfig,
+    MachineBase,
+    MachineConfig,
+)
 from tests.machines.conftest import IMAGE
 
 if TYPE_CHECKING:

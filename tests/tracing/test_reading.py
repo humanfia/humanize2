@@ -12,7 +12,14 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, cast
 
-from hmz.tracing.session import label, mapping, records, summarize, text_of, truncate
+from hmz.runtime.tracing.session import (
+    label,
+    mapping,
+    records,
+    summarize,
+    text_of,
+    truncate,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path

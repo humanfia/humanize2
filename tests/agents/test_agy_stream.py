@@ -11,15 +11,15 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-import hmz.agents.agy as agy_driver
-from hmz.agents import (
+import hmz.coganchor.agents.agy as agy_driver
+from hmz.coganchor.agents import (
     AgentConfig,
     AntigravityCLIAgent,
     AntigravityCLIAgentConfig,
     Failed,
 )
-from hmz.agents.event import Usage
-from hmz.providers import Provider
+from hmz.coganchor.agents.event import Usage
+from hmz.coganchor.providers import Provider
 from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:

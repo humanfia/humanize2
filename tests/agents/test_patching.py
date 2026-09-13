@@ -9,7 +9,7 @@ The bundles themselves are 200 MB binaries that are not in the tree, so the pars
 patcher are exercised against a hand-built stand-in with the same shape -- a `---- Bun! ----`
 trailer, a module table, and a module carrying source and a bytecode pointer -- small enough to
 assert every byte of. One test reaches for the real Claude binary where this machine has it, to
-keep the fingerprint written in `hmz.backends` honest, and is skipped where it does not.
+keep the fingerprint written in `hmz.coganchor.backends` honest, and is skipped where it does not.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents.patching import Patch, Patched, located, patched
-from hmz.backends import Bundled, Profile, named, program
+from hmz.coganchor.agents.patching import Patch, Patched, located, patched
+from hmz.coganchor.backends import Bundled, Profile, named, program
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -373,7 +373,7 @@ def test_a_copy_left_by_a_process_that_is_gone_is_swept_before_a_new_one(
 
 @pytest.mark.agent
 def test_the_written_down_fingerprint_still_names_the_installed_claude_bundle() -> None:
-    """The version `hmz.backends` fingerprints Claude by is the one this machine has installed.
+    """The fingerprint written in `hmz.coganchor.backends` names the installed Claude.
 
     Skipped only where Claude is not installed at all -- the fingerprint is release-specific by
     design and will go stale, and a red here on a Claude that has updated past the version

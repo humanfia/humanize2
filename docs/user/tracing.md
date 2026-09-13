@@ -162,7 +162,7 @@ whatever the turn under way made of it. A run you stopped by hand is written dow
 too.
 
 ```python
-from hmz.epic import epics, opened
+from hmz.runtime.epic import epics, opened
 
 for epic in epics():                   # this workspace, oldest first
     print(epic, opened(epic))          # {"actor": ["0a1b…"], "reviewer": [...]}
@@ -283,7 +283,7 @@ nothing about what runs, only about whether what runs is watched. From Python it
 property and one call:
 
 ```python
-from hmz.settings import Settings
+from hmz.runtime.settings import Settings
 
 Settings().profiling            # whether a run in this directory is profiled
 Settings().profiles(on=True)    # written down for it, from now on

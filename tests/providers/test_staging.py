@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.providers import _staging
-from hmz.providers._staging import Staging
+from hmz.coganchor.providers import _staging
+from hmz.coganchor.providers._staging import Staging
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

@@ -6,33 +6,52 @@
 .
 ├── __init__.py
 ├── __main__.py
-├── agents
-├── backends.py
 ├── cli
 ├── coganchor
+│   ├── agents
+│   ├── backends.py
+│   ├── fallbacks.py
+│   ├── machines
+│   ├── models.py
+│   ├── prices.py
+│   └── providers
 ├── daemon
-├── epic.py
-├── exporting.py
-├── fallbacks.py
 ├── flows
-├── kept.py
-├── machines
-├── models.py
-├── prices.py
-├── providers
-├── runner.py
+├── runtime
+│   ├── epic.py
+│   ├── exporting.py
+│   ├── kept.py
+│   ├── runner.py
+│   ├── settings.py
+│   ├── telemetry.py
+│   └── tracing
 ├── sdk
-├── settings.py
-├── telemetry.py
-├── tracing
 └── tui
 ```
 
-Each subdirectory is a library and has a SPEC of its own; the modules beside them are
-specified here. None of them MUST have a command line: `cli` is the whole of it, one module
-per command that takes a parser of its own, and it MUST reach a layer only from inside the
-command carried out in it, so that a command pays for no layer but its own -- and so that the
-same package serves as the target half of a session, where it is the only one installed.
+Nothing but `__init__.py` and `__main__.py` MUST sit at the top. Everything else is one of
+the directories above, and a module MUST be inside the one whose question it answers rather
+than beside it: a tree whose top is a list of files is one where nothing says which of them
+belong together.
+
+`coganchor` MUST be the whole of what humanize knows about driving a coding agent CLI --
+what each one is, driving it, which account it runs as, where its turns land, where a turn
+goes when the place taking it cannot, what its tokens cost, and the anchor that puts its
+work on another machine. It MUST offer that as one capability, so that what is above it
+schedules flows and drives nothing: a layer that reached past this to a driver would be a
+second answer to a question this one already answers.
+
+`runtime` MUST be what a run is: finding the flow, handing it the agents it declared,
+driving it, writing it down as it happens, remembering what a workspace was set up with, and
+reading the whole of it back afterwards. It MUST drive no coding agent itself.
+
+Each subdirectory is a library; one with a contract of its own has a SPEC named for it, and
+one no file is named for is bound by this one. The modules inside `coganchor` and `runtime`
+are specified here, under the path each is written at. None of them MUST have a command
+line: `cli` is the whole of it, one module per command that takes a parser of its own, and
+it MUST reach a layer only from inside the command carried out in it, so that a command pays
+for no layer but its own -- and so that the same package serves as the target half of a
+session, where it is the only one installed.
 
 There are four ways in and one thing under them. `sdk` is humanize as one object, and `cli`,
 `daemon` and `tui` MUST each be a way of reaching it rather than a second copy of what it
@@ -44,14 +63,17 @@ can be done every way and is refused the same way whichever way it was asked.
 No two layers MUST name each other. A pair that does is two things put in one place, not one
 thing above another, and is what `tests/test_layering.py` refuses.
 
-Every module MUST be named for what it holds. `coganchor` alone is a name of its own, being a
-program that ships to a target and could be lifted out whole.
+Every module MUST be named for what it holds. `coganchor` alone is a name of its own, being
+what the anchor inside it is: a program that ships to a target and could be lifted out whole.
+What ships MUST be that half alone -- a target runs the serving half and never a coding
+agent, so the drivers, the facts about them, the accounts and the prices MUST NOT be in the
+bundle carried there.
 
 ## `__init__.py`
 
 Expose `home`, and nothing else. A caller names the layer it wants.
 
-## `settings.py`
+## `runtime/settings.py`
 
 ```python
 class Settings:
@@ -106,7 +128,7 @@ not a workspace's.
 - A file that is missing, unreadable or not what this writes MUST read as nothing remembered
   rather than as a reason to stop.
 
-## `telemetry.py`
+## `runtime/telemetry.py`
 
 ```python
 SENT: tuple[str, ...]
@@ -146,7 +168,7 @@ What humanize reports about itself when something goes wrong, and what it never 
 - Nothing here MUST be able to stop humanize running. A reporter that will not start, a
   callable that raises and a report that cannot be sent MUST each leave the run as it was.
 
-## `backends.py`
+## `coganchor/backends.py`
 
 Every fact about a coding agent CLI that is not code: what it is called, what a command line
 may call it, how hard it can be asked to think, where it keeps its home, which files under it
@@ -203,7 +225,7 @@ load.
   because there was nothing to run: that line is the whole of what such a turn has to say, and
   a backend nobody has written one for MUST say so in general terms rather than say nothing.
 
-## `models.py`
+## `coganchor/models.py`
 
 ```python
 def where(cli: str, provider: str = "") -> Path: ...
@@ -259,7 +281,7 @@ What each backend runs, asked of that backend and kept until it is asked again.
   of that model -- a model it says nothing about is one it will take any of them for.
 - A catalogue that has never been asked for MUST be empty rather than guessed at.
 
-## `prices.py`
+## `coganchor/prices.py`
 
 ```python
 SOURCE: str
@@ -344,7 +366,7 @@ to.
   `total_cost_usd` on one real turn -- 10 in, 448 out, 35,188 cache-written -- this came to
   $0.0462 against its $0.0472, which is 2% low and low in the right direction.
 
-## `kept.py`
+## `runtime/kept.py`
 
 ```python
 class Runs(NamedTuple):
@@ -380,7 +402,7 @@ What an agent is, written down: a shape and the two directions it goes in, and n
 - An entry written before there was a setting MUST read as what every agent did then, rather
   than as an entry that is not one: a file humanize wrote is a file humanize reads back.
 
-## `fallbacks.py`
+## `coganchor/fallbacks.py`
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -454,7 +476,7 @@ def answers(fault: str) -> Answer: ...
 
 The layer between an agent and its accounts: where a turn goes when the place taking it cannot
 take it at all, and how many times over it is taken again first. A layer of its own because it
-is about neither of the two places on its own, and not `hmz.providers` because what it answers
+is about neither of the two places on its own, and not `hmz.coganchor.providers` because what it answers
 is not an account going down.
 
 - A place MUST be three things and no more: the CLI, the account it runs as, and the model it
@@ -511,7 +533,7 @@ is not an account going down.
   keeps a flow's agents from all coming back on the same second. The time a place was given
   MUST be checked before a wait rather than after it, so that a turn is never started knowing
   it is already spent.
-- A place's CLI MUST be read through `hmz.backends` rather than matched here: a name no
+- A place's CLI MUST be read through `hmz.coganchor.backends` rather than matched here: a name no
   backend answers to MUST be refused where it is written rather than found by the turn that
   needed it. A model MAY hold slashes of its own, so the first slash MUST be the one that
   separates them. An effort written after a colon MUST be read past rather than refused: a
@@ -548,7 +570,7 @@ is not an account going down.
   the steps after its own, or a chain read from the top by each hop would walk the failed ones
   twice.
 
-## `epic.py`
+## `runtime/epic.py`
 
 What one run of one flow was, written down as it happens: which flow, on what, by which
 agents, and which sessions each of them opened. Not what the sessions said -- the backend's
@@ -621,7 +643,7 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   a flow is picked up from is the last run of it, and two started inside one second would
   otherwise be ordered at random.
 
-## `exporting.py`
+## `runtime/exporting.py`
 
 ```python
 BUNDLE = "{epic}.epic.tar.gz"
@@ -714,7 +736,7 @@ report of a bug is developed against.
   say what is in it out of the manifest rather than by reading the run again afterwards -- for
   a run that is still going, the second reading is a different answer.
 
-## `runner.py`
+## `runtime/runner.py`
 
 ```python
 class Runner:
@@ -975,7 +997,7 @@ Args:
   said, what it ran, what it started under it, what a turn cost when it lands, and -- while a
   terminal is reading -- something that goes on moving: a turn thinks for minutes and says
   nothing for most of them, and a run that looks hung is one somebody kills.
-- What a turn cost MUST be said in money as well as in tokens, off `hmz.prices`, for the
+- What a turn cost MUST be said in money as well as in tokens, off `hmz.coganchor.prices`, for the
   reason the interface says it there: nobody is watching a token count for its own sake. A
   model nobody lists MUST show the tokens alone -- `$0.00` beside a turn that spent something
   is a claim about a bill, and a wrong one.

@@ -36,7 +36,7 @@ runs — all come from that one name:
 from hmz.flows import Agent, Moment, Person, Session, Unrecoverable, flow, load
 ```
 
-A flow that named `hmz.agents` for the type of what it drives would be a flow written against
+A flow that named `hmz.coganchor.agents` for the type of what it drives would be a flow written against
 which CLI is behind it, and it would break the day humanize moved anything. It never has to.
 `Unrecoverable` is exposed here too, so bounded flows can distinguish a transient failed turn
 from one whose next attempt would necessarily fail the same way.
@@ -47,7 +47,7 @@ from one whose next attempt would necessarily fail the same way.
 | `Session` | One conversation with one agent, kept alive across turns. What `agent.new()` gives you. |
 | `Person` | The person at the prompt, driven as an agent. A place nobody is asked to fill — see [the person at the prompt](#the-person-at-the-prompt). |
 
-They are **interfaces**, not base classes. `hmz.agents.AgentBase` and `SessionBase` answer to
+They are **interfaces**, not base classes. `hmz.coganchor.agents.AgentBase` and `SessionBase` answer to
 them, and never name them back: a flow says what it drives, and a driver is written without
 ever hearing of a flow. Whatever a flow may ask of an agent is in the interface; how a turn is
 spelled to a CLI, where its logs go and how it falls back to another account are not, being how
@@ -344,7 +344,7 @@ Whether a flow can be picked up at all is asked of the flow rather than of the r
 may have been rewritten since it last ran:
 
 ```python
-from hmz.epic import resumed, state
+from hmz.runtime.epic import resumed, state
 from hmz.flows import resumes
 
 resumes("weekly")            # what the flow says now, read by running it
@@ -840,7 +840,7 @@ own state and calls flows of its own, so the epic gives every call a record of i
 the run's — `epic.<flow>_<hex>.jsonl` — and the record of whatever called it says `called` and
 `returned` with that filename. Records nest: a call made from inside a called flow is written
 under *that* flow's record, so a five-deep recursion with siblings at every level reads back as
-the tree it ran as. `hmz.epic.tree()` reads it that way. What the called flow opened is in its
+the tree it ran as. `hmz.runtime.epic.tree()` reads it that way. What the called flow opened is in its
 record rather than in the record of whatever started the run. See [Records of called
 flows](/reference/tracing#records-of-called-flows).
 
@@ -1247,8 +1247,8 @@ so a flow that needs one is handed agents built in Python — and a machine only
 own place for that agent [said `Remote`](#where-each-agent-works):
 
 ```python
-from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-from hmz.runner import Runner
+from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.runtime.runner import Runner
 
 config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 agents = [
@@ -1496,7 +1496,7 @@ A flow is a function, so drive it with something that is not a coding agent:
 ```python
 from collections.abc import Iterator
 
-from hmz.agents import AgentBase, AgentConfig, Event, SessionBase
+from hmz.coganchor.agents import AgentBase, AgentConfig, Event, SessionBase
 
 class FakeSession(SessionBase):
     def _stream(

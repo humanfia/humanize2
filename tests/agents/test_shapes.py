@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     AgentBase,
     AgentConfig,
     ClaudeCodeAgent,

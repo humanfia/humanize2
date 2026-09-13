@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import providers
-from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig
-from hmz.backends import named
-from hmz.machines import MachineBase, MachineConfig
+from hmz.coganchor import providers
+from hmz.coganchor.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.coganchor.backends import named
+from hmz.coganchor.machines import MachineBase, MachineConfig
 from tests.stubs import HereAnchor, ShellAgent, ShellSession
 from tests.supervising import traced
 

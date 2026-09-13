@@ -198,7 +198,7 @@ def run(agents: tuple[Agent], task: str) -> None:
     pytest.param(
         DOC
         + """
-from hmz.agents import Moment
+from hmz.coganchor.agents import Moment
 
 from hmz.flows import Agent, flow
 
@@ -212,7 +212,7 @@ def run(agents: tuple[Agent], task: str) -> None:
     pytest.param(
         DOC
         + """
-import hmz.backends
+import hmz.coganchor.backends
 
 from hmz.flows import Agent, flow
 
@@ -908,7 +908,7 @@ def test_what_is_under_skills_is_not_read(tmp_path: Path) -> None:
         skills={"helping": "# How to help\n"},
     )
     beside = at / "skills" / "helping" / "helper.py"
-    beside.write_text("import hmz.backends\nwhile True:\n    pass\n")
+    beside.write_text("import hmz.coganchor.backends\nwhile True:\n    pass\n")
     assert checked(at) == ()
 
 

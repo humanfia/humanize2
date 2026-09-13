@@ -25,17 +25,17 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from hmz import backends
-from hmz.agents import Failed, driver
+from hmz.coganchor import backends
+from hmz.coganchor.agents import Failed, driver
 
 if TYPE_CHECKING:
-    from hmz.agents import AgentBase
+    from hmz.coganchor.agents import AgentBase
 
 pytestmark = pytest.mark.agent
 
-#: Where this machine keeps what each backend last said it runs. Read from the real home
-#: rather than through `hmz.models`, which the suite points at a directory of its own: what
-#: is wanted here is what this machine's own accounts may actually name.
+# : Where this machine keeps what each backend last said it runs. Read from the real home : rather
+# than through `hmz.coganchor.models`, which the suite points at a directory of its own: what : is
+# wanted here is what this machine's own accounts may actually name.
 _KEPT = Path.home() / ".humanize" / "models"
 
 #: What to ask for. One word, no tools, nothing to think about: what is being tested is that

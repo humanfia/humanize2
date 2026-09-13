@@ -6,7 +6,7 @@ with nothing in it. So a bundle is the run with every link followed -- and with 
 credential taken out, since the one thing a person sending their own run must not also send is
 the key it ran on.
 
-`hmz.exporting` itself, and no command line: there is none any more. `/export` in the
+`hmz.runtime.exporting` itself, and no command line: there is none any more. `/export` in the
 interface is what asks for a bundle now, and this is the layer under it, held to what a bundle
 holds and what it must never carry rather than to how a line said so.
 """
@@ -19,11 +19,19 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz import providers
-from hmz.agents import AgentConfig
-from hmz.epic import epics, sessions
-from hmz.exporting import MANIFEST, REDACTED, TRANSCRIPT, bundle, logged, plain, sized
-from hmz.runner import Runner
+from hmz.coganchor import providers
+from hmz.coganchor.agents import AgentConfig
+from hmz.runtime.epic import epics, sessions
+from hmz.runtime.exporting import (
+    MANIFEST,
+    REDACTED,
+    TRANSCRIPT,
+    bundle,
+    logged,
+    plain,
+    sized,
+)
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 from tests.supervising import traced
 
@@ -34,7 +42,7 @@ CONFIG = AgentConfig(model="m", effort="high")
 
 #: A flow that opens one session per agent, each naming itself as it lands.
 FLOW = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -46,7 +54,7 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
 
 #: One that drives one agent, and says its session is called what the log is named after.
 ONE = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -57,7 +65,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 #: A flow that calls another, so that a bundle has a record beside the run's own to carry.
 CALLS = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow, load
 
 
@@ -68,7 +76,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 #: The one it calls, which opens a session of its own -- one run, two records.
 UNDER = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -80,7 +88,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: One that calls the same flow twice, so that two calls of one flow are two records and the
 #: manifest has to say which of them a session belongs to.
 TWICE = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow, load
 
 
@@ -92,7 +100,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 #: The one it calls twice, whose session is named after the call so the two are two.
 EACH = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -105,7 +113,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 KEEPS = """
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

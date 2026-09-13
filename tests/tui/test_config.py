@@ -14,9 +14,9 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.backends import Model
-from hmz.kept import Runs
-from hmz.settings import Settings
+from hmz.coganchor.backends import Model
+from hmz.runtime.kept import Runs
+from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Configures, Flows, setting
 from hmz.tui.selecting import Transcript
@@ -37,7 +37,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 FIRST = {"section": "first  ·  how loudly"}
@@ -76,7 +76,7 @@ def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> No
 UNGROUPED = '''
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -94,7 +94,7 @@ def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> No
 
 #: A flow that takes no setting up at all, which is what most of them are.
 PLAIN = """
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

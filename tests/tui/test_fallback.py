@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz import fallbacks
-from hmz.backends import Model
+from hmz.coganchor import fallbacks
+from hmz.coganchor.backends import Model
 from hmz.tui import Humanize
 from hmz.tui.pick import Accounts, Catalogue, Clis, Failing, Fallbacks, Retries
 

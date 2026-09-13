@@ -4,7 +4,7 @@ A provider goes down -- a key revoked, a gateway refusing, a subscription out of
 what a flow sees is a turn that failed. Each account names which account to carry on under, so
 what a turn walks is a chain; how many times over the turn is taken again before it moves is a
 thing about the place it is running at rather than about the credentials, so that is written
-in `hmz.fallbacks`. What is checked here is that the chain is walked in order, inside the
+in `hmz.coganchor.fallbacks`. What is checked here is that the chain is walked in order, inside the
 conversation that was running, that a loop in it ends, and that an agent with nowhere to go
 still fails the way it always did.
 """
@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, fallbacks, providers
-from hmz.agents import AgentConfig
+from hmz.coganchor import backends, fallbacks, providers
+from hmz.coganchor.agents import AgentConfig
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -382,7 +382,7 @@ def test_a_turn_stopped_between_tries_is_stopped(accounts: None) -> None:
     """
     import threading
 
-    from hmz.agents import Stopped
+    from hmz.coganchor.agents import Stopped
 
     fallbacks.retrying("shell@main/m", 3, "constant", 0.0)
     providers.points("shell", "main", "spare")
