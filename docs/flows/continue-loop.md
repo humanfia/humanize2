@@ -29,16 +29,19 @@ if answered:
 A turn that failed — a backend that fell over before it said anything — answers with nothing,
 and the next round sends the task rather than nudging a session that never got it.
 
-## What it takes
+## What ends it
 
-`budget`, in millions of output tokens the loop may spend across every run of it in this
-workspace. **10 by default**, `0` for no limit.
+The flow takes no settings of its own. What ends a run of it is the run's
+[allowance](/features/allowances) — hours, millions of output tokens, dollars — held to at the
+edges of every turn of the session rather than implemented here. It declares **ten million
+output tokens** as what a run of it is worth by default; `-c budget.yaml` with a `budget:`
+mapping in it, or the **budget** row in `/flow`, says otherwise.
 
 ## What it keeps
 
-`rounds` and `output`. That the task has been sent is **not** kept: a picked-up run opens a
-session that has heard nothing, and starts it on the task exactly as the first run did. What
-the agent went on to say is the backend's own log to keep, not this flow's.
+`rounds`. That the task has been sent is **not** kept: a picked-up run opens a session that has
+heard nothing, and starts it on the task exactly as the first run did. What the agent went on to
+say is the backend's own log to keep, not this flow's.
 
 ## See also
 

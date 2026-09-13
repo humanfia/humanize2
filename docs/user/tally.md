@@ -284,6 +284,8 @@ each says it as the turn lands.
 ## See also
 
 - [Efforts](/user/efforts) — what `juice` responds to
-- [A turn can be cut off](/features/budgets) — the same reading, used as a cap
+- [A turn can be cut off](/features/budgets) — the same reading, used as a cap on one turn
+- [Every run has an allowance](/features/allowances) — the same reading, used as a cap on the
+  whole run, money included
 - [Watching a run](/user/monitor)
 - [Agents › What it has cost, and how fast](/reference/agents#what-it-has-cost-and-how-fast)

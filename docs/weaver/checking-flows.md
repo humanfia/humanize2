@@ -17,9 +17,17 @@ for one in Hmz().flows.check("rlar"):
 
 ```text
 …/rlar/__init__.py:125: warning: unbounded-loop: every way out of this loop waits for an
-agent to say so, and an agent may never say it -- give the loop a bound of its own: a budget
-read off spent(), a cap on the rounds, a range
+agent to say so, and an agent may never say it -- it then runs to the end of the run's
+allowance; give the loop a bound of its own if it should stop sooner: a cap on the rounds, a
+range, a clock
 ```
+
+A loop that takes a turn is never an error for having no way out. Every run has an
+[allowance](/features/allowances), and a turn taken once it is spent raises rather than
+answering — so such a loop ends wherever it is. It is still worth saying, because a loop that
+only ever stops rather than finishes stops on a number somebody else set. What the finding
+will not tell you to add is a budget of your own: holding a flow to one is the thing a flow is
+no longer for.
 
 A flow is named the way `-f` names one — `chat`, `rlar`, a path of your own — and
 everything wrong comes back at once, one finding per thing found rather than the first of them
@@ -76,9 +84,13 @@ assert all(one.finished for one in proof.outcomes), proof.outcomes
 
 `NEVER_DONE` is the reviewer that never says the work is done. The stubs answer every turn at
 once — every boolean verdict `False`, every turn adding 100k output tokens to `spent()` — so a
-loop held to a budget walks to the end of it in milliseconds, and one whose only exit is the
-verdict is caught by the turn cap. That is the executable proof that a run of your flow can
-end. `SILENT` answers every turn with nothing, which is what a failed turn answers: a flow that
+flow that declared an allowance of its own with `@flow(budget=...)` walks to the end of it in
+milliseconds, and one whose only exit is the verdict is caught by the turn cap. That is the
+executable proof that a run of your flow can end.
+
+The stubs are held to the allowance your flow *declared* and to no other. The one a real run
+has is whoever started it's, and a proof standing on that would pass a loop that never ends
+because somebody's money ran out — which proves nothing about the flow. `SILENT` answers every turn with nothing, which is what a failed turn answers: a flow that
 reads a field off an unguarded answer falls over here rather than at hour three.
 
 ## An atlas is read more strictly

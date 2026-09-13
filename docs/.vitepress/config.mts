@@ -166,6 +166,7 @@ export default defineConfig({
             { text: 'Two accounts of one CLI', link: '/features/accounts' },
             { text: 'A line typed mid-turn', link: '/features/steering' },
             { text: 'A turn can be cut off', link: '/features/budgets' },
+            { text: 'Every run has an allowance', link: '/features/allowances' },
             { text: 'Answers in a shape', link: '/features/shapes' },
             { text: 'It decides when it is done', link: '/features/goals' },
             { text: 'The moments of a turn', link: '/features/hooks' },

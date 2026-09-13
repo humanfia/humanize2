@@ -59,20 +59,37 @@ Every flag is in the [CLI reference](/reference/cli).
 ## What ends a loop
 
 A loop with nothing to stop it runs until somebody stops it, which is a bill nobody agreed to
-and a week of rounds nobody read. So every loop here without a stopping condition of its own
-takes a **budget**, in millions of output tokens:
+and a week of rounds nobody read. So every run of every flow here is held to an
+**[allowance](/features/allowances)** — hours on the clock, millions of output tokens, dollars —
+and whichever of the three it reaches first is the one that stops it:
 
 ```yaml
-budget: 25    # millions of output tokens; 0 goes on until it is stopped
+budget:
+  hours: 6      # wall clock, 0 for as long as it takes
+  tokens: 10    # millions of output tokens, 0 for as many as it takes
+  dollars: 50   # what it may cost, 0 for whatever it costs
 ```
 
-**Ten million by default**, kept in the flow's state, so a loop restarted forty times has one
-budget between the forty. Output rather than every kind, because output is the only kind a loop
-of its own accord grows.
+The allowance is humanize's rather than any flow's. It is held to at the edges of every turn of
+every session of every agent, whatever backend, so a loop needs no stopping condition of its own
+and none of them can opt out of one somebody set. It is also **per run**: a loop restarted forty
+times gets forty allowances rather than one between the forty, which is what makes a run stopped
+by its allowance a run to pick up rather than one that is over.
 
-The rest stop themselves: [`chat`](/flows/chat) when you stop typing, [`rlar`](/flows/rlar)
-when its reviewer agrees the work is done, [`humanize1`](/flows/humanize1)'s loop on `--max`
-rounds, and the two [lane flows](/flows/parallel-flame-chase) when the lanes run out of work.
+Six of them say what a run of them is worth by default: [`ralph_loop`](/flows/ralph-loop),
+[`stateful_ralph`](/flows/stateful-ralph), [`continue_loop`](/flows/continue-loop),
+[`goal`](/flows/goal), [`fixed_juice_ralph`](/flows/fixed-juice-ralph) and
+[`flame_chase`](/flows/flame-chase) each declare ten million output tokens. `-c budget.yaml`
+with a `budget:` mapping in it, or the **budget** row in `/flow`, says otherwise.
+
+The rest reach an end of their own first: [`chat`](/flows/chat) when you stop typing,
+[`rlar`](/flows/rlar) when its reviewer agrees the work is done, and
+[`humanize1`](/flows/humanize1)'s loop on `--max` rounds. The two
+[lane flows](/flows/parallel-flame-chase) are under the allowance like everything else, and for
+`parallel_flame_chase` it is the only end there is: its lanes are scheduled again for as long as
+it runs, so until there was an allowance a run of it went on until somebody stopped it. It
+declares no default either, so a run of one that caps nothing is a run `hmz exec` says on stderr
+that nothing will stop, and one the interface asks about before it saves it.
 
 ## Where they come from
 
