@@ -1,6 +1,6 @@
 # Remote execution
 
-`hmz anchor` runs a coding agent on this machine whose work lands on another one. The agent
+`hmz internal anchor` runs a coding agent on this machine whose work lands on another one. The agent
 needs no plugin, no configuration and no cooperation: it is told none of this and takes part in
 none of it.
 
@@ -20,8 +20,8 @@ own path by default, so the paths the agent sees are the target's own.
      this machine                              the target
 ┌────────────────────┐                   ┌────────────────────┐
 │  claude / codex …  │                   │                    │
-│        ↓ syscalls  │                   │                    │
-│  ┌──────────────┐  │   one channel     │  hmz anchor serve  │
+│        ↓ syscalls  │                   │  hmz internal      │
+│  ┌──────────────┐  │   one channel     │    anchor serve    │
 │  │  supervisor  │──┼──────────────────▶│         ↓          │
 │  └──────────────┘  │  ssh / docker /   │  files, processes, │
 │   local mirror     │  tcp / a pipe     │  the network       │
@@ -40,8 +40,8 @@ sends it the signals aimed here, and exits with its own status.
 ```
      this machine                              the target
 ┌────────────────────┐                   ┌────────────────────┐
-│  hmz anchor        │   one channel     │  claude / codex …  │
-│    --native        │──────────────────▶│         ↕          │
+│  hmz internal      │   one channel     │  claude / codex …  │
+│    anchor --native │──────────────────▶│         ↕          │
 │    ↕ three streams │  ssh / docker /   │  files, processes, │
 │                    │  tcp / a pipe     │  the network       │
 └────────────────────┘                   └────────────────────┘
@@ -54,7 +54,7 @@ framed protocol to a process humanize spawns — the frames cross a machine boun
 end is told.
 
 ```sh
-hmz anchor --native --target docker://build-container --remote-path /srv/project claude
+hmz internal anchor --native --target docker://build-container --remote-path /srv/project claude
 ```
 
 Three things do not follow the CLI across on their own, so the anchor carries each:
@@ -88,15 +88,15 @@ the credentials and the skills are written again each time.
 ## Quick start
 
 ```sh
-hmz anchor --target ssh://build-box claude
-hmz anchor --target ssh://gpu-01 codex exec "run the test suite"
+hmz internal anchor --target ssh://build-box claude
+hmz internal anchor --target ssh://gpu-01 codex exec "run the test suite"
 ```
 
 Everything after the agent's name is the agent's own. Before running anything, ask the target
 what it is:
 
 ```console
-$ hmz anchor --check --target ssh://build-box
+$ hmz internal anchor --check --target ssh://build-box
 target      ssh://build-box
 hostname    build-box
 python      3.12.3 (pid 41207)
@@ -104,7 +104,7 @@ export      /home/me/code/myproject -> /home/me/code/myproject
 workspace   /home/me/code/myproject (184 entries)
 ```
 
-Every flag is in the [CLI reference](/reference/cli#hmz-anchor).
+Every flag is in the [CLI reference](/reference/cli#hmz-internal-anchor).
 
 ## Targets
 
@@ -189,7 +189,7 @@ config = ClaudeCodeAgentConfig(
 )
 ```
 
-Every option of `hmz anchor` is a field of `AnchorConfig` and every field is an option, so the
+Every option of `hmz internal anchor` is a field of `AnchorConfig` and every field is an option, so the
 two spellings mean exactly the same thing — a flow spawns what an operator would have typed.
 Settings no session could run under are refused where they are *written* rather than where they
 are used, so a flow that misspells a target hears about it as it configures its agents, not
@@ -213,10 +213,10 @@ Instead of bootstrapping over ssh each time, a target can be left listening:
 
 ```sh
 # on the target
-hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+hmz internal anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 
 # on this machine
-HUMANIZE_TOKEN=$SECRET hmz anchor --target tcp://build-box:7777 --workspace /srv/project claude
+HUMANIZE_TOKEN=$SECRET hmz internal anchor --target tcp://build-box:7777 --workspace /srv/project claude
 ```
 
 `--export VIRTUAL[:REAL]` says which directory to expose, and under what path the agent believes
@@ -225,7 +225,7 @@ it is using. Repeat it for more than one.
 Listening on anything but loopback **without** `--token` is refused. Read
 [Security](#security) before opening one.
 
-The same program serves both ends — the bundle shipped to a target runs `hmz anchor serve
+The same program serves both ends — the bundle shipped to a target runs `hmz internal anchor serve
 --stdio`, which is one session over a pipe.
 
 ## From Python
@@ -242,7 +242,7 @@ status = connect(["claude", "--print"], config)   # the agent's own exit status
 `connect` returns once the agent has exited and everything it wrote has been pushed.
 
 `AnchorConfig` fields map one-to-one onto the flags in the
-[CLI reference](/reference/cli#hmz-anchor): `target`, `workspace`, `chdir`, `remote_path`,
+[CLI reference](/reference/cli#hmz-internal-anchor): `target`, `workspace`, `chdir`, `remote_path`,
 `shadow`, `local_paths`, `local_execs`, `redirects`, `private`, `net`, `net_allow`, `token`,
 `force`.
 
@@ -290,7 +290,7 @@ Each of these is deliberate, and each looks like a defect if you meet it cold.
 
 ## Security
 
-**An `hmz anchor` port is equivalent to a shell on that machine.** Give `--token` a real secret,
+**An `hmz internal anchor` port is equivalent to a shell on that machine.** Give `--token` a real secret,
 and prefer `ssh://` or `docker://`, which need no open port at all.
 
 The full statement, including what running any agent under humanize means, is in

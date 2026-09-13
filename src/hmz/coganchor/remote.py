@@ -1,4 +1,4 @@
-"""Client for a connection to ``hmz anchor`` on the target.
+"""Client for a connection to ``hmz internal anchor`` on the target.
 
 One reader thread demultiplexes replies by message id.  Filesystem calls are
 synchronous -- the traced process is stopped anyway, so blocking the caller

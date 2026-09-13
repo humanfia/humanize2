@@ -1,4 +1,4 @@
-"""``hmz anchor`` -- both halves of a session, routed apart before either is reached.
+"""``hmz internal anchor`` -- both halves of a session, routed apart before either is reached.
 
 `serve` is what the zipapp bootstrapped onto a target runs, and it is answered first: only
 the agent half needs ptrace and an x86-64 register map, which is what lets the same program
@@ -48,7 +48,7 @@ def anchor(argv: list[str]) -> int:
         stream=sys.stderr,
     )
     if not args.command and not args.check:
-        parser.error("no agent given; try `hmz anchor claude`")
+        parser.error("no agent given; try `hmz internal anchor claude`")
     try:
         config = line.settings(args)
     except ValueError as exc:
@@ -85,7 +85,7 @@ def anchor(argv: list[str]) -> int:
 
 
 def _serve(argv: list[str]) -> int:
-    """Replays on this machine what an `hmz anchor` elsewhere asks of it.
+    """Replays on this machine what an `hmz internal anchor` elsewhere asks of it.
 
     Args:
       argv: What followed the command name.
@@ -100,8 +100,8 @@ def _serve(argv: list[str]) -> int:
     import os
 
     parser = argparse.ArgumentParser(
-        prog="hmz anchor serve",
-        description="Replay an `hmz anchor` session's operations on this machine.",
+        prog="hmz internal anchor serve",
+        description="Replay an `hmz internal anchor` session's operations on this machine.",
     )
     parser.add_argument(
         "--export",

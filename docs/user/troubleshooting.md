@@ -232,7 +232,7 @@ exactly `on` or `off`.
 
 ### `no such command: /foo`
 
-Type `/` to see the list. `hmz anchor` is deliberately not a command here: it is not a thing to
+Type `/` to see the list. `hmz internal anchor` is deliberately not a command here: it is not a thing to
 do to a flow that is running. `/epics` is where the runs of this directory are, and where one
 of them is collected into a trace.
 
@@ -400,7 +400,7 @@ An open port is equivalent to a shell on that machine. Give `--token` a real sec
 Ask it what it is. This runs nothing there:
 
 ```sh
-hmz anchor --check --target ssh://build-box
+hmz internal anchor --check --target ssh://build-box
 ```
 
 It bootstraps the target half, opens the channel and reads the workspace back — the whole path,
@@ -460,7 +460,7 @@ That cannot reach past you on a machine several people share.
 
 ## Still stuck
 
-- `--log-level debug` on `hmz anchor`, both ends.
+- `--log-level debug` on `hmz internal anchor`, both ends.
 - The SPECs under `specs/` say what it is *supposed* to do, normatively.
   `specs/coganchor.md` is the one worth reading when a remote session behaves strangely.
 - [Architecture](/contributing/architecture) says which layer to look in.

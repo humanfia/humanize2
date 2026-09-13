@@ -14,7 +14,7 @@ of these CLIs already takes a tool it was not shipped with. It is spoken here ra
 through a client library for the reason `hmz.coganchor` speaks its own protocol here: what is
 needed is four methods of a JSON-RPC subset over a pipe, in a process that is threaded rather
 than asynchronous, and every library for it is written the other way round. What a backend is
-handed is a command to run -- `hmz tools --at <socket>` -- which relays that pipe to this
+handed is a command to run -- `hmz internal tools --at <socket>` -- which relays that pipe to this
 process. The callback therefore runs where the flow is, which is the whole point: a tool that
 ran anywhere else would be a subprocess and not a callback.
 
@@ -220,7 +220,15 @@ class Toolbox:
         """
         import sys
 
-        return [sys.executable, "-m", "hmz", "tools", "--at", self.address()]
+        return [
+            sys.executable,
+            "-m",
+            "hmz",
+            "internal",
+            "tools",
+            "--at",
+            self.address(),
+        ]
 
     def config(self, named: str = _WHOSE) -> dict[str, Any]:
         """These callbacks as the entry a CLI's own MCP configuration holds.

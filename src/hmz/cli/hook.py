@@ -1,4 +1,4 @@
-"""`hmz hook`: the one call a coding agent's own hook table makes, relayed to a flow.
+"""`hmz internal hook`: the one call a coding agent's own hook table makes, relayed to a flow.
 
 A moment of a flow's is a Python callable in the flow's own process, and a CLI takes a hook by
 starting a program, writing what is happening on its stdin and reading what to do about it off
@@ -10,9 +10,9 @@ was reached for and then the tool runs, so a verdict read off that stream arrive
 be one; the CLI's own table is the one place it is waiting to be told, and this is what stands
 in that place.
 
-Spawned rather than typed, like `hmz cred` and `hmz tools`: it is a command line because
-starting a process is what a backend does with a hook, and not because it is a thing anybody
-runs by hand.
+Spawned rather than typed, like `hmz internal cred` and `hmz internal tools`: it is a command
+line because starting a process is what a backend does with a hook, and not because it is a
+thing anybody runs by hand.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ def hook(argv: list[str]) -> int:
     """Carries one call of a CLI's hook table to the flow whose moment it is.
 
     Args:
-      argv: The arguments after `hmz hook`.
+      argv: The arguments after `hmz internal hook`.
 
     Returns:
       Zero, whatever the flow said and whether or not it was there to say it, and one for a
@@ -40,7 +40,7 @@ def hook(argv: list[str]) -> int:
       gone says is nothing, which is the tool going ahead exactly as it would have.
     """
     parser = argparse.ArgumentParser(
-        prog="hmz hook",
+        prog="hmz internal hook",
         description="relay one hook call to the flow whose moment it is",
     )
     parser.add_argument(
@@ -70,7 +70,7 @@ def hook(argv: list[str]) -> int:
         # A flow that has ended. Said where a person would see it and nowhere the agent will:
         # every one of these CLIs shows a hook's stderr and goes on with the turn, which is
         # what a gate with nobody behind it has to come to.
-        print(f"hmz hook: {args.at}: {why}", file=sys.stderr)
+        print(f"hmz internal hook: {args.at}: {why}", file=sys.stderr)
         held.close()
         return 0
     answer = b""

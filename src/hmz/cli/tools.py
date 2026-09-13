@@ -1,12 +1,13 @@
-"""`hmz tools`: the pipe a coding agent speaks the tool protocol over, relayed to a flow.
+"""`hmz internal tools`: the pipe a coding agent speaks the tool protocol over, relayed to a flow.
 
 A callback of a flow's is a Python function in the flow's own process, and a CLI takes a tool
 by starting a program and talking to it over that program's stdin and stdout. This is the
 program: it does nothing but carry each line between the two, so that the function runs where
 the flow is rather than in a process of its own.
 
-Spawned rather than typed, like `hmz cred`: it is a command line because starting a process is
-what a backend does with a tool server, and not because it is a thing anybody runs by hand.
+Spawned rather than typed, like `hmz internal cred`: it is a command line because starting a
+process is what a backend does with a tool server, and not because it is a thing anybody runs
+by hand.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ def tools(argv: list[str]) -> int:
     """Relays this process's stdin and stdout to a flow's toolbox.
 
     Args:
-      argv: The arguments after `hmz tools`.
+      argv: The arguments after `hmz internal tools`.
 
     Returns:
       Zero once either end has gone, and one for a socket that is not there -- which is a
@@ -33,7 +34,7 @@ def tools(argv: list[str]) -> int:
       turn that failed.
     """
     parser = argparse.ArgumentParser(
-        prog="hmz tools",
+        prog="hmz internal tools",
         description="relay the tool protocol to the flow whose callbacks these are",
     )
     parser.add_argument(
@@ -47,7 +48,7 @@ def tools(argv: list[str]) -> int:
     try:
         held.connect(args.at)
     except OSError as why:
-        print(f"hmz tools: {args.at}: {why}", file=sys.stderr)
+        print(f"hmz internal tools: {args.at}: {why}", file=sys.stderr)
         held.close()
         return 1
 
