@@ -35,7 +35,7 @@ from ._inputs import snapshot
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Usage
-from .hooks import WAITING, Gate
+from .hooks import WAITING, Gate, Moment
 from .preload import preloaded
 
 if TYPE_CHECKING:
@@ -278,6 +278,12 @@ class QwenCodeSession(StreamSessionBase):
         self._announced: str | None = None
         self._launched: tuple[object, ...] | None = None
         self._requested: tuple[object, ...] = ()
+        #: Whether the settings file this turn is run against holds a hook table. Written
+        #: where that file is built and read where a moment is about to be said off the
+        #: stream: a gate outlives the hook that asked for it, so a turn that was not given a
+        #: table has to go on saying the moment itself rather than leaving it to a CLI that
+        #: was never told to ask.
+        self._tabled = False
 
     def _stream(
         self, prompt: str, *, schema: type[BaseModel] | None = None
@@ -392,6 +398,22 @@ class QwenCodeSession(StreamSessionBase):
                     )
         return snapshot(paths)
 
+    def _asking(self, moment: Moment) -> bool:
+        """Whether the Qwen Code running this conversation was pointed at a table of its own.
+
+        What the file the process was started against holds rather than what is hung now: a
+        hook hung after it started is one this process will never stop to ask about, and the
+        moment has to go on being read off this turn's own stream until the turn after has
+        started one that was told.
+
+        Args:
+          moment: The moment.
+
+        Returns:
+          True where this process asks about it and waits to be told.
+        """
+        return self._tabled and super()._asking(moment)
+
     def _stale(self) -> bool:
         """Restarts before settings or mounted flow resources change."""
         return self._launched is not None and self._launched != self._requested
@@ -492,7 +514,11 @@ class QwenCodeSession(StreamSessionBase):
         `PreToolUse` read off the stream this session reads arrives after Qwen Code has
         announced the tool and is about to run it, and Qwen Code's own table is the one place
         it stops and waits to be told. Not for an anchored turn, whose `qwen` runs on another
-        machine and could not reach the socket the relay carries the moment to.
+        machine and could not reach the socket the relay carries the moment to -- and not for
+        an agent with nothing hung on that moment: a table is a program the CLI starts and
+        waits for before every tool it runs, so writing one for hooks that are not there is a
+        relay spawned per file read, one after another, for nobody. Hanging one or taking it
+        down moves the file, and a moved settings file is a process started again under it.
 
         And where the CLI's compiled bundle is kept between processes, unless whoever started
         the flow has said where themselves: a session a turn is a Node process a turn, and
@@ -502,7 +528,13 @@ class QwenCodeSession(StreamSessionBase):
         what a turn of it actually runs, reads, writes and opens can be read from inside the process
         it runs in. :mod:`hmz.coganchor.agents.preload` is what decides whether one is wanted.
         """
-        gate = self._agent.hooks.gate() if self._agent.anchor is None else None
+        gate = (
+            self._agent.hooks.gate()
+            if self._agent.anchor is None
+            and self._agent.hooks.hooked(Moment.PRE_TOOL_USE)
+            else None
+        )
+        self._tabled = gate is not None and gate.serving
         held = {
             **super()._environment(),
             _SETTINGS: str(_thinking(self.effort, gate)),

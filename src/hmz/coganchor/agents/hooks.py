@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import threading
 import weakref
 from dataclasses import dataclass, field
@@ -52,6 +53,7 @@ __all__ = [
     "Verdict",
     "about",
     "answers",
+    "arriving",
 ]
 
 
@@ -382,17 +384,21 @@ class Hooks:
           moment: The moment.
 
         Returns:
-          True where a gate is serving it, which is what tells a session not to say the moment
-          a second time off the stream it is reading: the CLI has already asked, and a turn
-          that fired the moment twice would be one whose hooks ran twice for one tool. False
-          for a gate that could not be served at all, whose turns go on reading the moment off
-          the stream rather than reading it nowhere.
+          True where a gate is serving it and something is hung on it, which is what tells a
+          session not to say the moment a second time off the stream it is reading: the CLI
+          has already asked, and a turn that fired the moment twice would be one whose hooks
+          ran twice for one tool. False for a gate that could not be served at all, whose
+          turns go on reading the moment off the stream rather than reading it nowhere -- and
+          false with nothing hung, because a CLI is only given a table for a moment something
+          is waiting on, so a gate that was up for an earlier hook is not a gate this turn's
+          process was told about.
         """
         with self._lock:
             return (
                 self._gate is not None
                 and moment in self._gate.moments
                 and self._gate.serving
+                and bool(self._hung.get(moment))
             )
 
 
@@ -431,6 +437,72 @@ def about(called: Mapping[str, Any]) -> str:
         ),
         "",
     )
+
+
+#: One thing at a time out of half-written JSON: a string that has been *closed*, or one of
+#: the characters that says where in the object the next thing is. A string still arriving
+#: matches nothing, which is the whole point -- half a value is half a path, and a row saying
+#: `write /tmp/se` would be worse than no row.
+_TOKENS = re.compile(r'"(?:[^"\\]|\\.)*"|[][{}:,]')
+
+#: How far into the arguments this looks before it gives up and waits for the end. A row has
+#: room for a line, and a value that has not finished in four thousand characters is the file
+#: being written rather than the path it is being written to -- so reading further is reading
+#: the whole of a growing buffer again on every fragment of it, for something not worth
+#: showing.
+_ROOM = 4096
+
+
+def arriving(partial: str) -> str:
+    """The same, read off arguments that have not all arrived yet.
+
+    A CLI streams what a tool was called with, and the message that carries the call whole
+    lands only once the last fragment has -- which for a `write` is the entire file, and so is
+    minutes on a slow model in which the agent has reached for something and the turn has said
+    nothing at all. The path and the command are in the first fragments, so this is what a row
+    can say as soon as there is anything to say.
+
+    The same answer :func:`about` gives, said earlier: the first value of the object itself
+    that is words, which means the same string in the same place whether a row was drawn from
+    the fragments or from the whole. Nothing nested is reached into, because `about` reaches
+    into nothing, and a hook told two different things about one tool call depending on how
+    its CLI happened to send it would be worse than one told nothing.
+
+    Args:
+      partial: The call's input as JSON, which is as much of it as has come in.
+
+    Returns:
+      The first thing in it that is words -- the path, the command, the query -- and "" while
+      nothing in it has finished arriving, which is a row that waits for the next fragment
+      rather than one that says half a path.
+    """
+    depth = 0
+    # Whether what comes next is a value of the object itself, rather than its key or
+    # something inside one of its values.
+    valued = False
+    for found in _TOKENS.finditer(partial[:_ROOM]):
+        said = found.group()
+        if said in ("[", "{"):
+            depth += 1
+        elif said in ("]", "}"):
+            depth -= 1
+        elif said == ":":
+            valued = depth == 1
+        elif said == ",":
+            valued = False
+        elif valued and depth == 1:
+            valued = False
+            # Through the reader rather than as it stands: what arrives is JSON, so a newline
+            # in a command is two characters and a quote in it is escaped. An escape JSON does
+            # not have is not a value this can name, and is the end of the reading: whatever
+            # wrote it is not writing what this is here to read.
+            try:
+                words = str(json.loads(said))
+            except json.JSONDecodeError:
+                return ""
+            if words.strip():
+                return words
+    return ""
 
 
 def answers(line: str, hooks: Hooks) -> str:
@@ -584,11 +656,15 @@ class Gate:
     nothing of the user's own settings is read, written or replaced, so a person's own hooks go
     on being theirs and a flow that ends leaves nothing behind.
 
-    Started once and held for as long as the agent is, rather than per turn and rather than
-    only while something is hung: a hook is hung on a live agent and taken down again while it
-    runs, so a table installed only for the hooks that happened to be up when the CLI started
-    would be a flow whose later hooks quietly did nothing. What is hung is asked at the moment
-    it fires, which is the only moment the answer is true.
+    Started when a turn is first run under a hook, and then held for as long as the agent is
+    rather than made again per turn: a CLI restarted mid-session reaches the same socket it
+    always did. Asked for only where something is actually hung on the moment, because a table
+    is a program the CLI starts and waits for before every tool it runs -- a relay per file
+    read, one after another, for hooks that are not there. A hook hung or taken down between
+    two turns is answered the way a changed effort is, by starting the next turn in a process
+    told the new answer; one hung while a turn is running is read off that turn's own stream
+    instead, watching the tool rather than gating it. What is hung is still asked at the moment
+    it fires, which is the only moment that answer is true.
     """
 
     #: The moments a CLI's own table is pointed here for. One, because one is what this is

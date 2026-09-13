@@ -27,6 +27,7 @@ from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CommandSessionBase,
+    Event,
     Question,
     Stopped,
 )
@@ -772,6 +773,60 @@ def test_an_agent_takes_the_name_a_flow_calls_it_unless_it_has_one() -> None:
 
     assert named.id == "actor"  # a name given where the agent was made is the name
     assert unnamed.id == "reviewer"
+
+
+def test_a_watcher_that_raises_is_reported_rather_than_only_swallowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A draw that failed is a thing the agent said that nobody will ever see.
+
+    Swallowed in silence, a run whose rows all went that way reads as a turn sitting there
+    doing nothing -- a hang to whoever is watching it and no trace at all afterwards. Once
+    per kind, since a watcher that fails on one event fails on every one of them.
+    """
+    from hmz.runtime import telemetry
+
+    agent = ClaudeCodeAgent(CONFIG)
+    heard: list[str] = []
+    reported: list[tuple[str, object]] = []
+
+    def noted(name: str, **said: object) -> None:
+        reported.append((name, said.get("kind")))
+
+    monkeypatch.setattr(telemetry, "snag", noted)
+
+    def broken(_agent: object, _session: object, event: Event) -> None:
+        raise RuntimeError(event.kind)
+
+    agent.watch(broken)
+    agent.watch(lambda _agent, _session, event: heard.append(event.kind))
+
+    for _ in range(3):
+        agent._heard(Event(kind="tool", text="Read x.py"))
+    agent._heard(Event(kind="text", text="hello"))
+
+    # The turn is untouched, and so is every other watcher.
+    assert heard == ["tool", "tool", "tool", "text"]
+    assert reported == [("watcher-raised", "tool"), ("watcher-raised", "text")]
+
+
+def test_a_report_that_will_not_be_made_is_not_a_turn_that_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The branch exists so a watcher cannot fail a flow; the reporting must not either."""
+    from hmz.runtime import telemetry
+
+    def unreportable(name: str, **said: object) -> None:
+        del name, said
+        raise OSError("no reporting from here")
+
+    monkeypatch.setattr(telemetry, "snag", unreportable)
+    agent = ClaudeCodeAgent(CONFIG)
+    agent.watch(lambda _agent, _session, _event: (_ for _ in ()).throw(RuntimeError()))
+
+    agent._heard(
+        Event(kind="tool", text="Read x.py")
+    )  # says nothing, and raises nothing
 
 
 def test_a_question_reaches_whoever_is_driving_the_agent_and_nobody_otherwise() -> None:

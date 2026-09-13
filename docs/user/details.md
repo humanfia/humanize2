@@ -42,6 +42,22 @@ discarded. Turning it back on does not recover what scrolled past, but the
 details · ◉ chat · ~/work/api                     / commands · esc monitor · ctrl+c exit
 ```
 
+## What it never hides
+
+A `notice` is humanize saying what it is doing about the turn — waiting out a rate limit,
+carrying on as another account, cutting the turn off, taking it away from a backend that had
+stopped saying anything. That is not the working, and it is drawn whichever way the switch is
+set:
+
+```
+● waiting 30s for a rate limit; carrying on as work
+```
+
+A turn told to wait half a minute and a turn that has hung look the same from the outside, and
+that line is the only thing that tells them apart. It used to be drawn as a tool call, which
+meant that asking not to see every file read was also asking not to be told why the run had
+gone quiet.
+
 ## It is a screen setting, not an agent setting
 
 `/details` changes nothing about the run. The agent is not told about the setting, and it does

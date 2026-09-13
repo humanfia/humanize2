@@ -232,6 +232,13 @@ line, with what the flow is doing beside the transcript.
   a flow is watched to see where it has got to: what the agents said is that, and a tool row
   per file read is a screen nobody is reading with the answer somewhere in it. On, all of it
   MUST be shown rather than a sample of it.
+- What humanize is doing about a turn MUST be shown either way. A rate limit being waited out,
+  another account being carried on as, a turn being cut off, a backend that stopped saying
+  anything being taken away: none of that is the working, and a turn told to wait half a minute
+  and a turn that has hung look identical from here. Hidden with the tool rows, the one line
+  that tells them apart is hidden from exactly the person sitting in front of the silence -- so
+  a `notice` MUST be drawn whatever `/details` says, and MUST read as its own thing rather than
+  as another tool row.
 - An agent that stops to ask MUST be able to reach whoever is at the prompt: the question and
   what it offers MUST be shown, and the next line typed MUST be the answer rather than a word
   put into the turn. It MUST be shown against whichever of that agent's sessions is working,

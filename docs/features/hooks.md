@@ -77,6 +77,12 @@ CLI on its own command line, or through a settings file this run alone is pointe
 length of the run — your own hooks stay yours, and a flow that ends leaves the machine as it
 found it.
 
+The table is there only while a hook is. It is a program the CLI starts and waits for before
+every tool it runs, so an agent with nothing hung on `PreToolUse` is given none at all rather
+than paying for one per file read. Hanging or unhanging one between two turns starts the next
+turn in a CLI told the new answer; hanging one while a turn is already running has it read off
+that turn's own stream until the turn after, which watches the tool rather than stopping it.
+
 On a backend with no such seam, and on a turn whose work lands on [another
 machine](/features/anchor) — where the relay is not — the moment is still told to every hook
 hung on it, and a refusal there is a flow watching a tool rather than stopping one.
