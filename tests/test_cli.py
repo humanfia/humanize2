@@ -22,8 +22,8 @@ from hmz import cli
 #: names rather than as the directory each is in, because a directory is now several answers:
 #: `runtime` holds both what drives a run and the tracer that reads one back afterwards, and
 #: a budget saying `runtime` would stop noticing `hmz exec` paying for the second. A name
-#: here covers the modules inside it; a package on the way to one is loaded to reach it and
-#: covers nothing, which is how `runtime` can be walked through without being let in.
+#: here covers the modules inside it; a package walked through on the way to one is in
+#: `WALKED` below and covers nothing, which is how `runtime` is reached without being let in.
 #: `anchor` is in the list for being the one humanize spawns that a whole layer is behind:
 #: the target half of a session is this package with the anchor and nothing else on it.
 COMMANDS = [
@@ -50,6 +50,14 @@ COMMANDS = [
     ("anchor", {"hmz.coganchor"}),
 ]
 
+#: The packages every budget is walked through on the way to a module inside one, and which
+#: cost their own `__init__` and nothing else. Named here rather than worked out from the
+#: budgets, because being a package is not what makes one free: each of these three is a
+#: front door that fetches what it offers when it is named, and `hmz/tui/__init__.py` hands
+#: through the whole interface -- so a rule that let any package in for the sake of a module
+#: under it would let that one in too, the day something here is budgeted a module of it.
+WALKED = {"hmz", "hmz.coganchor", "hmz.runtime"}
+
 
 @pytest.mark.parametrize(("command", "layers"), COMMANDS, ids=lambda value: value)
 def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
@@ -73,18 +81,10 @@ def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     reached = set(result.stdout.split())
     assert reached, "the command imported nothing, so this checks nothing"
     allowed = layers | {"hmz.cli"}
-    # A package a budgeted module is inside was loaded on the way to it and is let through
-    # for that alone: importing `hmz.runtime.runner` runs `hmz/runtime/__init__.py`, and a
-    # budget that had to say so would be saying the whole directory beneath it as well.
-    through = {
-        ".".join(one.split(".")[:cut])
-        for one in allowed
-        for cut in range(1, len(one.split(".")))
-    }
     assert not {
         name
         for name in reached
-        if name not in through
+        if name not in WALKED
         and not any(name == one or name.startswith(f"{one}.") for one in allowed)
     }
 

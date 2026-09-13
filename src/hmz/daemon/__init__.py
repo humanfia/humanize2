@@ -129,10 +129,15 @@ class Daemon:
 
         Returns:
           What it said, and what is written down beside its socket for a run that would not
-          answer -- which is a daemon that is starting up, or one that is wedged.
+          answer -- which is a daemon that is starting up, or one that is wedged. The same
+          keys either way: a run that could not be asked answers as one reading nothing and
+          running nothing, so that whoever asked reads an answer rather than guessing which
+          of the two they got.
         """
         said = self.asked({"do": "status"})
-        return said if said.get("ok") else {**self._written(), "attached": 0}
+        if said.get("ok"):
+            return said
+        return {**self._written(), "attached": 0, "flows": []}
 
     def detach(self) -> int:
         """Lets go of every terminal reading this run, leaving the run running.
