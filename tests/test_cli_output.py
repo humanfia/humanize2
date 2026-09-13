@@ -162,6 +162,9 @@ def test_a_run_nobody_is_watching_is_written_without_an_escape_in_it(
         shown.heard(agent, None, Event(kind="begins", text=""))
         shown.heard(agent, None, Event(kind="text", text="fixing the checker"))
         shown.heard(agent, None, Event(kind="tool", text="Bash ls -la"))
+        shown.heard(
+            agent, None, Event(kind="notice", text="waiting 30s for a rate limit")
+        )
         shown.heard(agent, None, Event(kind="ends", text=""))
     said = capsys.readouterr()
 
@@ -169,6 +172,9 @@ def test_a_run_nobody_is_watching_is_written_without_an_escape_in_it(
     assert "builder is working" in said.err
     assert "fixing the checker" in said.err
     assert "Bash(ls -la)" in said.err
+    # What humanize is doing about the turn, which is not the agent working and is shown as
+    # its own thing: a recovery nobody can see is indistinguishable from a hang.
+    assert "waiting 30s for a rate limit" in said.err
     assert "Worked for" in said.err
 
 

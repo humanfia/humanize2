@@ -299,6 +299,7 @@ def test_claude_is_told_where_this_agent_s_moments_are_on_its_own_command_line()
 ):
     """`--settings` is the whole of a settings file for one run: no file of anybody's."""
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    agent.hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
     session = agent.new()
 
     argv = session._command()
@@ -316,6 +317,7 @@ def test_claude_is_told_where_this_agent_s_moments_are_on_its_own_command_line()
 def test_qwen_is_told_through_the_settings_file_it_is_already_pointed_at() -> None:
     """One file for one run, at the layer that outranks what a person has configured."""
     agent = QwenCodeAgent(AgentConfig(model="m", effort="high"))
+    agent.hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
     session = agent.new()
 
     where = session._environment()[_SETTINGS]
@@ -335,6 +337,8 @@ def test_two_agents_are_two_gates_and_two_settings_files() -> None:
     """A file keyed by effort alone would point one agent's turns at another's socket."""
     one = QwenCodeAgent(AgentConfig(model="m", effort="high"))
     two = QwenCodeAgent(AgentConfig(model="m", effort="high"))
+    for agent in (one, two):
+        agent.hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
 
     theirs = [agent.new()._environment()[_SETTINGS] for agent in (one, two)]
 
@@ -349,6 +353,7 @@ def test_a_moment_the_backend_itself_asks_about_is_not_said_twice() -> None:
     assert not hooks.gated(Moment.PRE_TOOL_USE)
     assert hooks.gated(Moment.STOP) is False
 
+    hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
     gate = hooks.gate()
     try:
         assert hooks.gated(Moment.PRE_TOOL_USE)
@@ -357,6 +362,119 @@ def test_a_moment_the_backend_itself_asks_about_is_not_said_twice() -> None:
         assert not hooks.gated(Moment.USER_PROMPT_SUBMIT)
     finally:
         gate.close()
+
+
+def test_a_moment_nothing_is_hung_on_is_not_gated_by_a_gate_from_an_earlier_hook() -> (
+    None
+):
+    """A CLI is only given a table for a moment something waits on, so nor is this one.
+
+    A gate outlives the hook that first asked for it, and a session reading `gated` to decide
+    whether to say the moment off its own stream would otherwise stop saying it for good --
+    the CLI having no table any more and this saying it had one.
+    """
+    hooks = _hooks()
+    hung = hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
+    gate = hooks.gate()
+    try:
+        assert hooks.gated(Moment.PRE_TOOL_USE)
+
+        hung.off()
+
+        assert not hooks.gated(Moment.PRE_TOOL_USE)
+    finally:
+        gate.close()
+
+
+def test_a_claude_with_nothing_hung_on_the_moment_is_given_no_table_at_all() -> None:
+    """A table is a program started and waited for before every tool the turn runs.
+
+    Written for hooks that are not there it is a relay spawned per file read, one after
+    another, adding its own quarter-second to each for nobody.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    session = agent.new()
+
+    argv = session._command()
+    settings = json.loads(argv[argv.index("--settings") + 1])
+
+    assert "hooks" not in settings
+    # So the moment is read off the stream instead, which is what every backend does.
+    assert not agent.hooks.gated(Moment.PRE_TOOL_USE)
+    # And nothing was ever bound: a socket per agent that never had a hook is a socket, a
+    # thread and a directory for each of them.
+    assert agent.hooks._gate is None
+
+
+def test_a_hook_hung_between_two_turns_restarts_the_claude_that_was_not_told() -> None:
+    """`--settings` is read when the process starts, so a later hook is one it never hears.
+
+    The same answer a moved effort gets: this turn ends the process and resumes the
+    conversation in one started under what is true now.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    session = agent.new()
+    session._command()
+    session._restarted()
+
+    assert not session._stale()
+
+    hung = agent.hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
+
+    assert session._stale()
+
+    # And back again: a hook taken down leaves a process spawning a relay for nobody.
+    session._command()
+    session._restarted()
+    assert not session._stale()
+    hung.off()
+    assert session._stale()
+
+
+def test_a_turn_whose_cli_was_told_nothing_goes_on_saying_the_moment_itself() -> None:
+    """A gate outlives the hook that asked for it; a process is told once, when it starts.
+
+    So a hook hung while a turn is already running must be read off that turn's own stream --
+    watching the tool rather than gating it -- rather than left to a CLI that was never told
+    to ask. Read off the process and not off the agent, or the moment fires in neither place.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    hung = agent.hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
+    told = agent.new()
+    told._command()
+    told._restarted()
+
+    assert told._asking(Moment.PRE_TOOL_USE)
+
+    # The hook comes down, and the next turn starts a Claude with no table in it.
+    hung.off()
+    untold = agent.new()
+    untold._command()
+    untold._restarted()
+
+    assert not untold._asking(Moment.PRE_TOOL_USE)
+
+    # And now one goes up again, mid-turn, on the agent whose gate is still serving.
+    agent.hooks.on(Moment.PRE_TOOL_USE, lambda _one: None)
+
+    assert not untold._asking(Moment.PRE_TOOL_USE)
+    # The one whose process was told still leaves it to the CLI, which is still asking.
+    assert told._asking(Moment.PRE_TOOL_USE)
+
+
+def test_a_qwen_with_nothing_hung_on_the_moment_is_given_no_table_at_all() -> None:
+    """The same, through the file Qwen Code is pointed at rather than through a flag."""
+    agent = QwenCodeAgent(AgentConfig(model="m", effort="high"))
+    session = agent.new()
+
+    where = session._environment()[_SETTINGS]
+    settings = json.loads(open(where, encoding="utf-8").read())  # noqa: SIM115, PTH123
+
+    assert "hooks" not in settings
+    assert "disableAllHooks" not in settings
+    # And what the file was already for is still in it.
+    assert settings["model"]["reasoningEffort"] == "high"
+    assert agent.hooks._gate is None
 
 
 def test_a_backend_with_no_table_of_its_own_goes_on_watching_its_stream() -> None:

@@ -290,7 +290,7 @@ def test_a_model_that_is_gone_walks_no_account_before_it_takes_the_step(
     said: list[str] = []
     agent.watch(
         lambda _agent, _session, event: (
-            said.append(event.text) if event.kind == "tool" else None
+            said.append(event.text) if event.kind == "notice" else None
         )
     )
 
@@ -318,7 +318,7 @@ def test_a_turn_that_failed_for_nothing_anybody_named_steps_as_it_always_did(
     said: list[str] = []
     agent.watch(
         lambda _agent, _session, event: (
-            said.append(event.text) if event.kind == "tool" else None
+            said.append(event.text) if event.kind == "notice" else None
         )
     )
 

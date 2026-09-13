@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage
-from .hooks import EVERYWHERE, SUBAGENTS, WAITING, Moment, about
+from .hooks import EVERYWHERE, SUBAGENTS, WAITING, Moment, about, arriving
 
 if TYPE_CHECKING:
     import os
@@ -94,6 +94,24 @@ _AS_IT_GOES = {
     "cache_read": "cache_read_input_tokens",
     "cache_write": "cache_creation_input_tokens",
 }
+
+
+@dataclass(slots=True)
+class _Reaching:
+    """A tool call the model is still writing the arguments of.
+
+    Attributes:
+      marked: Claude's own id for the call, which is what pairs an agent this one started
+        with the result that ends it.
+      named: What the tool is called, which Claude says in the first fragment of all.
+      arriving: What of its arguments has come in.
+      said: Whether the row has gone out, so that the fragments after it do not send it again.
+    """
+
+    marked: str
+    named: str
+    arriving: str = ""
+    said: bool = False
 
 
 def _result_failure(said: dict[str, Any]) -> str | None:
@@ -205,6 +223,19 @@ class ClaudeCodeSession(StreamSessionBase):
         #: a sibling session between the two reads would be written down as a name the process
         #: was told about when the process was told nothing at all, and never asked again.
         self._telling: tuple[str, ...] = ()
+        #: Whether the process now up was given a hook table of its own, and whether the
+        #: command line just built gave one -- the same pair, for the same reason: a hook hung
+        #: or taken down between two turns is a process started under the wrong answer.
+        self._gated: bool | None = None
+        self._gating = False
+        #: The tool calls whose arguments are still arriving, by the block of the message each
+        #: is being written into. The index is Claude's own numbering of the blocks of one
+        #: message, under the call the message belongs to: an agent this one started writes
+        #: its messages on this same stream and numbers its own blocks from zero.
+        self._reaching: dict[tuple[str, int], _Reaching] = {}
+        #: The calls this turn has already said, by Claude's own id for each, so that the
+        #: whole of one arriving a moment later as part of a message is not a second row.
+        self._announced: set[str] = set()
 
     @property
     def named(self) -> str | None:
@@ -247,6 +278,14 @@ class ClaudeCodeSession(StreamSessionBase):
             "--output-format",
             "stream-json",
             "--verbose",
+            # A message arrives whole when the block it is a part of has finished, and a tool
+            # call's block is not finished until the whole of what it was called with has
+            # been written -- which for a `Write` is the file. Without this the turn says
+            # nothing from the moment the model reaches for something to the moment it has
+            # finished saying what it reached with, which is a minute of silence on a large
+            # edit and reads as a turn that has hung. With it the reach is announced as it
+            # happens, and :meth:`_streaming` is what reads it.
+            "--include-partial-messages",
             *self._holding(),
             "--permission-mode",
             _PERMITTED[self._agent.config.permission],
@@ -319,10 +358,14 @@ class ClaudeCodeSession(StreamSessionBase):
         waits to be told, so that is where humanize puts the moment -- pointed at
         `hmz hook --at <socket>`, which carries it back to the hooks hung on this agent.
 
-        Said whether or not anything is hung on that moment, and not made conditional on it:
-        a hook goes up and comes down while the agent runs, and a table that depended on what
-        was hung when the process started would be a table that had to restart the process --
-        so the socket is always there, and what is hung is asked at the moment it fires.
+        Said only where something is actually hung on that moment. A table is a program Claude
+        starts and then waits for before every tool it runs, one call after another -- so a
+        table written for hooks that are not there is a relay spawned per file read and a
+        quarter of a second added to each, for nothing. A hook hung or taken down between two
+        turns is answered the way a moved effort is, by ending this process and resuming the
+        conversation in one started under the new answer; one hung while a turn is running is
+        read off that turn's own stream instead, watching the tool rather than gating it,
+        which is what `Hooks.gated` says and what every backend without a table does anyway.
 
         Not for an anchored turn, whose Claude runs on another machine: the relay is a program
         on this one talking to a socket on this one, and a table naming it over there would be
@@ -336,15 +379,45 @@ class ClaudeCodeSession(StreamSessionBase):
         settings: dict[str, Any] = {
             "fastMode": self._agent.config.service_tier == "fast"
         }
-        # Seconds, which is the unit Claude Code reads this number in. Nothing at all for an
-        # anchored turn, and nothing for a gate that could not be served: either is a turn
-        # whose `PreToolUse` is read off the stream again rather than one pointed at a socket
-        # nothing is listening on.
-        if self._agent.anchor is None and (
-            table := self._agent.hooks.gate().table(WAITING)
-        ):
+        # Read once and kept, so that what the process is recorded as having been told is what
+        # this line actually tells it: a hook hung by a sibling session between two reads
+        # would otherwise be written down as a table the process never got.
+        self._gating = self._hooking()
+        # Seconds, which is the unit Claude Code reads this number in. Nothing at all for a
+        # gate that could not be served, which is a turn whose `PreToolUse` is read off the
+        # stream again rather than one pointed at a socket nothing is listening on.
+        if self._gating and (table := self._agent.hooks.gate().table(WAITING)):
             settings["hooks"] = table
         return settings
+
+    def _asking(self, moment: Moment) -> bool:
+        """Whether the Claude now running this conversation was given a table of its own.
+
+        What the process was told rather than what is hung now: `--settings` is read when
+        Claude starts, so a hook hung after that is one this process will never stop to ask
+        about, and the moment has to go on being read off this turn's own stream until the
+        turn after has started a Claude that was told.
+
+        Args:
+          moment: The moment.
+
+        Returns:
+          True where this process asks about it and waits to be told.
+        """
+        return bool(self._gated) and super()._asking(moment)
+
+    def _hooking(self) -> bool:
+        """Whether a Claude started now would be given a hook table of its own.
+
+        Returns:
+          True where this machine runs the turn and something is hung on the one moment a
+          table is for. Asked as a question of its own because two places need the same
+          answer: the line that builds the settings, and the one that says whether the
+          process now up was built under a different one.
+        """
+        return self._agent.anchor is None and self._agent.hooks.hooked(
+            Moment.PRE_TOOL_USE
+        )
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the user message Claude reads it as.
@@ -378,8 +451,10 @@ class ClaudeCodeSession(StreamSessionBase):
         self._counted, self._fed, self._seen = {}, Counter(), {}
         # And whatever was under the turn the last process was taking: it went with it.
         self._fleet = {}
+        self._reaching, self._announced = {}, set()
         self._at = self.effort
         self._offering = self._telling
+        self._gated = self._gating
 
     def _offered(self) -> tuple[str, ...]:
         """What a Claude started now would be told the flow's own callbacks are.
@@ -405,8 +480,15 @@ class ClaudeCodeSession(StreamSessionBase):
         same way. What is compared is the list the process was actually told, not whether it
         was told anything: a tool swapped for another is one the model has never heard of and
         one it can still reach for and be told is not there.
+
+        And so is the hook table: `--settings` is read when Claude starts, so a hook hung
+        after it started is one the CLI would never stop to ask about, and one taken down is a
+        relay still being spawned before every tool for nobody. The first turn after either
+        runs in a process told which it is.
         """
         if self._at is not None and self._at != self.effort:
+            return True
+        if self._gated is not None and self._gated != self._hooking():
             return True
         return self._offering is not None and self._offering != self._offered()
 
@@ -510,19 +592,29 @@ class ClaudeCodeSession(StreamSessionBase):
 
         A message carries a list of parts, and thinking, speaking and reaching for a tool can
         all be in the same one -- so every part is read, not the first that says anything.
+        What was thought and what was said are read there, whole: Claude closes each part with
+        a message of its own, so the utterance is already the utterance rather than fragments
+        of one. Only the reach for a tool is read out of the fragments, by `_streaming`, and
+        only because the fragments of that one are the whole of what is being waited for.
 
         Args:
           line: The line, as written.
 
         Yields:
-          What it said, which is nothing for a line saying nothing worth showing: a partial
-          chunk, a tool's result coming back, or something a later Claude has added.
+          What it said, which is nothing for a line saying nothing worth showing: a tool's
+          result coming back, a fragment of words still being written, or something a later
+          Claude has added.
         """
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
             return  # not ours: Claude prints the odd plain line among the JSON
-        if said.get("type") == "control_request":
+        if said.get("type") == "stream_event":
+            yield from self._streaming(
+                cast("dict[str, Any]", said.get("event") or {}),
+                str(said.get("parent_tool_use_id") or ""),
+            )
+        elif said.get("type") == "control_request":
             # Claude waits on the answer, so one left unanswered is a turn that never ends.
             self._answer(said)
         elif said.get("type") == "command_lifecycle":
@@ -556,6 +648,9 @@ class ClaudeCodeSession(StreamSessionBase):
                 self._adopt(self._named)  # a turn has landed, so the session is open
             tokens, risen = self._spent(said)
             self._settle(risen)
+            # The turn is over, so what it reached for is nothing the next one has to know
+            # about: a session takes thousands of turns, and these would grow with all of them.
+            self._reaching, self._announced = {}, set()
             yield Event(
                 kind="result",
                 text=str(said.get("result") or ""),
@@ -572,17 +667,16 @@ class ClaudeCodeSession(StreamSessionBase):
                 ):
                     yield Event(kind="reasoning", text=part["thinking"])
                 elif part.get("type") == "tool_use":
-                    # The name and what it was called on, which is what a tool call reads
-                    # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
-                    called: dict[str, Any] = part.get("input") or {}
-                    named = str(part.get("name") or "tool")
-                    said_as = f"{named} {about(called)}".strip()[:120]
-                    if named in _FLEET:
-                        marked = str(part.get("id") or "")
-                        self._fleet[marked] = said_as
-                        yield Event(kind="subagent", text=said_as, whose=marked)
+                    marked = str(part.get("id") or "")
+                    if marked and marked in self._announced:
+                        # Said as the model reached for it, rather than here where the whole
+                        # of what it reached with has finally arrived. Saying it again would
+                        # be two rows for one call.
                         continue
-                    yield Event(kind="tool", text=said_as)
+                    called: dict[str, Any] = part.get("input") or {}
+                    yield from self._called(
+                        marked, str(part.get("name") or "tool"), about(called)
+                    )
         elif said.get("type") == "user":
             # A tool answering, which is the only thing said back to Claude on this stream
             # that is worth reading: one of them is an agent of its own having finished.
@@ -592,6 +686,102 @@ class ClaudeCodeSession(StreamSessionBase):
                 marked = str(part.get("tool_use_id") or "")
                 if was := self._fleet.pop(marked, ""):
                     yield Event(kind="subagent-ends", text=was, whose=marked)
+
+    def _streaming(self, event: dict[str, Any], under: str) -> Iterator[Event]:
+        """Reads one piece of a message Claude is still writing.
+
+        `--include-partial-messages` is on for one thing, and this is it. A tool call is
+        announced here the moment the model reaches for it; in the message that carries the
+        call it is announced only once the arguments have all arrived, and for a `Write` those
+        arguments are the file. Between the two the turn says nothing whatever, which is a
+        minute of silence on a large edit and reads from outside as an agent that has hung.
+
+        Nothing else is read from here. What was thought and what was said arrive whole on the
+        message Claude closes each part with, and that is the utterance rather than the
+        fragments of one -- a row per fragment is a paragraph broken into fifty answers.
+
+        Args:
+          event: What the line carried, which is Anthropic's own streaming event.
+          under: The tool call this message is being written under -- "" for the agent's own
+            and the id of the call for an agent it started. Both are written on this one
+            stream, and each numbers the blocks of its own messages from zero.
+
+        Yields:
+          The call, as soon as there is enough of its arguments to say what it is about.
+        """
+        at = (under, int(cast("int", event.get("index") or 0)))
+        match event.get("type"):
+            case "content_block_start":
+                block = cast("dict[str, Any]", event.get("content_block") or {})
+                if block.get("type") == "tool_use":
+                    self._reaching[at] = _Reaching(
+                        marked=str(block.get("id") or ""),
+                        named=str(block.get("name") or "tool"),
+                    )
+            case "content_block_delta":
+                delta = cast("dict[str, Any]", event.get("delta") or {})
+                reaching = self._reaching.get(at)
+                if (
+                    reaching is None
+                    or reaching.said
+                    or delta.get("type") != "input_json_delta"
+                ):
+                    return
+                reaching.arriving += str(delta.get("partial_json") or "")
+                if words := arriving(reaching.arriving):
+                    reaching.said = True
+                    yield from self._called(reaching.marked, reaching.named, words)
+            case "content_block_stop":
+                reaching = self._reaching.pop(at, None)
+                if (
+                    reaching is None
+                    or reaching.said
+                    or reaching.marked in self._announced
+                ):
+                    # Said as the model reached for it, or said by the message that carries
+                    # the call whole -- which lands a moment before this on a Claude that is
+                    # keeping up. Either way this is the second time round.
+                    return
+                # Nothing among the arguments said anything early enough to say it with, and
+                # no message has carried the call. They have all arrived now, so they are read
+                # the way that message would have read them: one call reads as one row
+                # whichever of the two got there first.
+                reaching.said = True
+                try:
+                    whole = json.loads(reaching.arriving or "{}")
+                except json.JSONDecodeError:
+                    whole = {}
+                yield from self._called(
+                    reaching.marked,
+                    reaching.named,
+                    about(cast("dict[str, Any]", whole))
+                    if isinstance(whole, dict)
+                    else "",
+                )
+            case _:  # a message starting or ending, and the fragments of words
+                pass
+
+    def _called(self, marked: str, named: str, about_it: str) -> Iterator[Event]:
+        """One tool call, as the row a transcript has room for.
+
+        Args:
+          marked: Claude's own id for the call, which is what pairs an agent this one started
+            with the result that ends it.
+          named: What the tool is called.
+          about_it: What it was called on, as far as anybody knows it yet.
+
+        Yields:
+          The call: `Read src/x.py`, `Bash git status`. As a `subagent` where what it starts
+          is an agent of its own, since a fleet under a turn is agents rather than tool calls.
+        """
+        if marked:
+            self._announced.add(marked)
+        said_as = f"{named} {about_it}".strip()[:120]
+        if named in _FLEET:
+            self._fleet[marked] = said_as
+            yield Event(kind="subagent", text=said_as, whose=marked)
+            return
+        yield Event(kind="tool", text=said_as)
 
     def _answer(self, said: dict[str, Any]) -> None:
         """Answers something Claude asked of us over the same stream the turn is read from.

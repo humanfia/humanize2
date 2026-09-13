@@ -659,11 +659,13 @@ class Watchdog:
 
         As the retries and the fallbacks say themselves, and for the same reason: what a flow
         can see is what it can act on, and an agent quietly restarted under a watcher is a
-        watcher reading a lie.
+        watcher reading a lie. A `notice` for that reason too -- this is the line that says a
+        silence was noticed, so an interface that hid it with the working would hide it from
+        exactly the person sitting in front of the silence.
 
         Args:
           what: The step, said of the backend.
         """
         self._session._heard(
-            Event(kind="tool", text=f"{self._session._agent.backend} {what}")
+            Event(kind="notice", text=f"{self._session._agent.backend} {what}")
         )
