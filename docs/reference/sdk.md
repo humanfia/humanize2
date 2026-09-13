@@ -143,8 +143,9 @@ backend runs as one of them.
 
 ## Fallbacks
 
-`hmz.coganchor.fallbacks` — [where a turn goes](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken)
-when the place taking it cannot take it at all.
+`hmz.coganchor.fallbacks` — [where a turn
+goes](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken) when the place taking it cannot take
+it at all.
 
 | | |
 | --- | --- |

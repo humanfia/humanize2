@@ -99,12 +99,12 @@ class Saying:
   happened to can read it: a flow catches turns rather than transports, and the sentence a CLI
   failed with is the whole of what a person needs.
 - `Failed` MUST also carry which *kind* of failure it was and what a person does about it, as
-  `hmz.coganchor.backends.FAULTS` names the kinds, and MUST say both in its message. A kind rather than a
-  sentence, because the answer to each kind is a different answer -- a rate limit is waited out
-  and then taken to another account, a refused credential is not waited out at all, a retired
-  model is answered by another place and by nothing else -- and one that said only a sentence
-  is one every caller would have to read a message to act on. "" MUST mean nobody classified
-  it, which MUST be the failure a turn has always had: tried again exactly as the place says.
+  `hmz.coganchor.backends.FAULTS` names the kinds, and MUST say both in its message. A kind rather
+  than a sentence, because the answer to each kind is a different answer -- a rate limit is waited
+  out and then taken to another account, a refused credential is not waited out at all, a retired
+  model is answered by another place and by nothing else -- and one that said only a sentence is one
+  every caller would have to read a message to act on. "" MUST mean nobody classified it, which MUST
+  be the failure a turn has always had: tried again exactly as the place says.
 - Which kind it was MUST NOT be worked out here. This is what a turn says and what it cost,
   with no behaviour on it; deciding takes the backend, the exit status and, for a CLI that
   keeps its reason in a log of its own, that log -- none of which a value has. A backend that
@@ -275,16 +275,15 @@ class AgentConfig:
   with no account has always taken. It is a setting of the agent because it is the agent that
   signs in: two agents of one CLI on two accounts are two accounts running at once.
 - `web_search` MUST be whether this agent may search the web, and MUST be on where the flow
-  said nothing: that is what a coding agent has always been able to do. It
-  MUST mean the same thing on every backend that can express it, which means saying it in
-  both directions rather than only one -- a CLI whose own web search is off until it is asked
-  for MUST be asked for it, or on would mean two things. A backend that cannot be told MUST
-  refuse it off wherever the config arrives, the way one with no service tier to send refuses
-  `fast`: an agent that went on searching would be a setting that lies. Which backends those
-  are MUST be read off `hmz.coganchor.backends`, so that the one place that says what a CLI is is the
-  one place this is said too. A flow that declares it off MUST therefore be refused the
-  backends that cannot be told, before the first turn and by name, the way a place declaring
-  a `Goal` refuses a backend with no goal feature.
+  said nothing: that is what a coding agent has always been able to do. It MUST mean the same thing
+  on every backend that can express it, which means saying it in both directions rather than only
+  one -- a CLI whose own web search is off until it is asked for MUST be asked for it, or on would
+  mean two things. A backend that cannot be told MUST refuse it off wherever the config arrives, the
+  way one with no service tier to send refuses `fast`: an agent that went on searching would be a
+  setting that lies. Which backends those are MUST be read off `hmz.coganchor.backends`, so that the
+  one place that says what a CLI is is the one place this is said too. A flow that declares it off
+  MUST therefore be refused the backends that cannot be told, before the first turn and by name, the
+  way a place declaring a `Goal` refuses a backend with no goal feature.
 - What skills an agent carries MUST NOT be a setting of it, and MUST NOT be adjustable by
   whoever chose it: a skill installed on this machine is its CLI's own -- installed the way
   that CLI installs one, switched off the way that CLI switches one off -- and humanize MUST
@@ -305,13 +304,12 @@ class AgentConfig:
   applying to some of them.
 - An anchored turn whose CLI runs on the target MUST be given there what a supervised one is
   given here, and MUST be given it by the anchor rather than by the backend: the account's
-  variables, the account's credential files, and the skills the flow carries. Which of those
-  a turn needs is read off `hmz.coganchor.backends` and the provider, in `AgentBase.spawned`, so that a
-  backend added later is anchored by having its facts written down rather than by being taught
-  about anchors. The one thing that MUST NOT cross is the flow's own callbacks: the bridge
-  carrying them is a program on this machine speaking to a socket in this process, so a turn
-  offering them to a CLI on another machine MUST be refused where it is spawned rather than
-  taken without them.
+  variables, the account's credential files, and the skills the flow carries. Which of those a turn
+  needs is read off `hmz.coganchor.backends` and the provider, in `AgentBase.spawned`, so that a
+  backend added later is anchored by having its facts written down rather than by being taught about
+  anchors. The one thing that MUST NOT cross is the flow's own callbacks: the bridge carrying them
+  is a program on this machine speaking to a socket in this process, so a turn offering them to a
+  CLI on another machine MUST be refused where it is spawned rather than taken without them.
 
 ## `hooks.py`
 
@@ -342,8 +340,8 @@ stops and waits to be told, and `Gate` is what stands in that place.
 
 - A backend that takes a hook table meant for one run MUST have `PRE_TOOL_USE` fired from that
   table rather than off its stream, and MUST act on a refusal by not running the tool. Which
-  backends those are MUST be `Profile.hooks` in `hmz.coganchor.backends`, read from there rather than
-  declared on the driver a second time, and MUST be what puts `anchor:hooked` in `tags()`.
+  backends those are MUST be `Profile.hooks` in `hmz.coganchor.backends`, read from there rather
+  than declared on the driver a second time, and MUST be what puts `anchor:hooked` in `tags()`.
 - The moment MUST fire exactly once per tool call. A session MUST NOT also say it off the
   stream where a gate is serving it: one tool call putting the same hook twice is a flow whose
   hook counted two of everything.
@@ -448,11 +446,11 @@ A turn that has stopped saying anything, noticed and dealt with rather than wait
 - The clock MUST be patted by anything the backend sends, a line that turned into no event
   included: this is liveness rather than progress, and a CLI writing protocol nobody shows is
   a CLI that has not wedged.
-- A window MUST come from `hmz.coganchor.backends` rather than being chosen here, and MUST be generous.
-  A turn thinks for minutes and says nothing for most of them, so a window short enough to
-  catch a wedge quickly is a window that kills healthy turns -- and a wedge noticed late costs
-  the time it was wedged, where a healthy turn shot costs the work. `WATCHDOG` MUST override
-  every backend's own, and a window of zero or less MUST mean no watchdog at all.
+- A window MUST come from `hmz.coganchor.backends` rather than being chosen here, and MUST be
+  generous. A turn thinks for minutes and says nothing for most of them, so a window short enough to
+  catch a wedge quickly is a window that kills healthy turns -- and a wedge noticed late costs the
+  time it was wedged, where a healthy turn shot costs the work. `WATCHDOG` MUST override every
+  backend's own, and a window of zero or less MUST mean no watchdog at all.
 - The clock MUST NOT run while the turn is waiting on something that is not its backend. A
   turn stopped to ask a person is a turn its backend owes nothing -- the CLI is sitting there
   with nothing being asked of it -- and so is one whose event is in the hands of a watcher or
@@ -752,8 +750,8 @@ class SessionBase(ABC):
 - A turn that failed MUST be classified before anything is done about it, and each kind MUST
   get the answer that kind takes. `hmz.coganchor.backends.trouble` MUST be what reads it -- against
   signatures written down beside everything else that is true of a backend -- and
-  `hmz.coganchor.fallbacks.answers` MUST be what says what the kind is owed. A backend that named the
-  kind itself MUST be believed without any of that: it knows something no signature does.
+  `hmz.coganchor.fallbacks.answers` MUST be what says what the kind is owed. A backend that named
+  the kind itself MUST be believed without any of that: it knows something no signature does.
 - The exit status MUST be read before the streams for the failures where the process never got
   as far as saying anything: a shell answers 127 for a command it could not find and 126 for
   one it could not run, and a process that died on a signal has no status but the signal. A
@@ -883,11 +881,11 @@ class SessionBase(ABC):
   `session/fork` -- and MUST NOT be a transcript replayed into a session opened from nothing:
   a conversation re-read is turns paid for twice, and what it re-reads is not what was there.
 - It MUST raise `NotImplementedError` on a backend with no fork of its own, the way `pursue`
-  refuses one with no goal feature, and MUST NOT hand back a second handle on the one
-  conversation instead -- two flows each continuing what they take to be their own is a run
-  nothing downstream could explain. `forks` MUST say beforehand which backends can, so that a
-  flow may ask rather than catch, and MUST be read off `hmz.coganchor.backends`: the one place a fact
-  about a CLI is written down is the one place this is said.
+  refuses one with no goal feature, and MUST NOT hand back a second handle on the one conversation
+  instead -- two flows each continuing what they take to be their own is a run nothing downstream
+  could explain. `forks` MUST say beforehand which backends can, so that a flow may ask rather than
+  catch, and MUST be read off `hmz.coganchor.backends`: the one place a fact about a CLI is written
+  down is the one place this is said.
 - It MUST raise `RuntimeError` while no turn has landed here. A session that has got nowhere
   has no history to carry, and is one to open rather than one to fork.
 - The fork MAY be the child's first turn rather than a call of its own, since most of these
@@ -1144,8 +1142,8 @@ What a turn did, read from inside the runtime the CLI is running on: a file of h
 loaded before the CLI's own entry point, patching the calls a turn makes -- the processes it
 spawns, the files it reads and writes, the connections it opens.
 
-- Which CLIs take a preload and through which variable MUST be read off `hmz.coganchor.backends` rather
-  than written here a second time, and a CLI shipped with its runtime compiled in MUST take
+- Which CLIs take a preload and through which variable MUST be read off `hmz.coganchor.backends`
+  rather than written here a second time, and a CLI shipped with its runtime compiled in MUST take
   none: there is nothing to load a file into.
 - The file MUST be shipped with the package and MUST be found through the package rather than
   by a path relative to a module's own file, so that it is the same answer wherever humanize
@@ -1313,14 +1311,14 @@ class DummySession(CommandSessionBase): ...
   a flow brings MUST reach a session by being mounted where that backend reads them, which is
   `hmz.flows.skills` and `Profile.mounts`.
 - What a driver declares on its classes MUST be what is true of driving that CLI: which
-  moments it reaches, whether it has a goal feature of its own, whether it can be held to a
-  shape, whether it takes a tool the flow wrote, which service tiers it can express, and
-  whether a turn of it can be steered. Whether it forks a conversation, whether one survives
-  its process, whether it can be told not to search the web, whether it takes a hook table
-  meant for one run, whether its runtime takes a preload, and what says a file it ships is
-  the one a patch was written for are facts about the CLI rather than about driving it, and
-  MUST be read off `hmz.coganchor.backends` rather than declared here a second time: one fact written
-  in two places is one that goes on being right in only one of them.
+  moments it reaches, whether it has a goal feature of its own, whether it can be held to a shape,
+  whether it takes a tool the flow wrote, which service tiers it can express, and whether a turn of
+  it can be steered. Whether it forks a conversation, whether one survives its process, whether it
+  can be told not to search the web, whether it takes a hook table meant for one run, whether its
+  runtime takes a preload, and what says a file it ships is the one a patch was written for are
+  facts about the CLI rather than about driving it, and MUST be read off `hmz.coganchor.backends`
+  rather than declared here a second time: one fact written in two places is one that goes on being
+  right in only one of them.
 - One vocabulary MUST name both halves, so that whatever asks what a backend serves asks
   under one word: `goal`, `steer`, `shape`, `tools`, `fork`, `search`, `swarm`, `resume` and
   `moment:<name>` of an agent, and `anchor:<how>` of the way a turn's own commands are

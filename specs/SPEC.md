@@ -474,10 +474,10 @@ ANSWERS: tuple[Answer, ...]
 def answers(fault: str) -> Answer: ...
 ```
 
-The layer between an agent and its accounts: where a turn goes when the place taking it cannot
-take it at all, and how many times over it is taken again first. A layer of its own because it
-is about neither of the two places on its own, and not `hmz.coganchor.providers` because what it answers
-is not an account going down.
+The layer between an agent and its accounts: where a turn goes when the place taking it cannot take
+it at all, and how many times over it is taken again first. A layer of its own because it is about
+neither of the two places on its own, and not `hmz.coganchor.providers` because what it answers is
+not an account going down.
 
 - A place MUST be three things and no more: the CLI, the account it runs as, and the model it
   runs, written `CLI[@ACCOUNT]/MODEL`. Those are what a turn can fail for having named. How
