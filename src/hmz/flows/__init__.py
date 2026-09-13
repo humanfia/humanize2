@@ -7,11 +7,11 @@ copied, forked and edited whole, and what it needs to do its work travels with i
 
 Named rather than pathed: `hmz exec -f ralph_loop` is a name, and a path is what is left for
 a flow that is nowhere any of them are kept. A name is looked for in the places flows come
-from, which is every [flowverse](verses.py) there is -- the ones humanize ships, the ones its
-own repository holds, whatever has been added, and the flows of your own in `.humanize/flows`
-here and in your home directory. Those last two are `local` and `user`, and are flowverses
-like the rest of them: one place a flow is read from, one rule for what it is called, and one
-list to look in.
+from, which is every [flowverse](verses.py) there is -- humanize's own, which is `official`
+and is the handful in the package together with the repository of the rest, whatever has been
+added, and the flows of your own in `.humanize/flows` here and in your home directory. Those
+last two are `local` and `user`, and are flowverses like the rest of them: one place a flow is
+read from, one rule for what it is called, and one list to look in.
 
 Which of them a bare name means is nearest first -- yours, then everybody else's -- so a flow
 of your own may stand in for one of humanize's by taking its name, and `local/chat` is the
@@ -82,7 +82,6 @@ from .driving import (
     wanted,
 )
 from .verses import (
-    BUILTIN,
     FLOWS,
     LOCAL,
     MINE,
@@ -146,7 +145,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ALWAYS_DONE",
-    "BUILTIN",
     "BUILTIN_AT",
     "ENTRY",
     "EVERYWHERE",
@@ -252,6 +250,7 @@ __all__ = [
     "sub",
     "told",
     "wanted",
+    "within",
 ]
 
 #: The two modules of humanize's own that a flow reaches through here whole: what each CLI
@@ -346,9 +345,11 @@ def __getattr__(name: str) -> object:
     return getattr(import_module(where_), name)
 
 
-#: Where the flows humanize itself ships are: a directory of them, rather than beside this
-#: file -- what is beside this file is how a flow is found, which is not one. They are the
-#: whole of what is there, so there is no `flows/` in it to tell them from the rest.
+#: Where the flows humanize ships in the package are: a directory of them, rather than beside
+#: this file -- what is beside this file is how a flow is found, which is not one. They are the
+#: whole of what is there, so there is no `flows/` in it to tell them from the rest. Offered
+#: under `official` along with the repository of the rest of humanize's flows: which of the two
+#: places one of them is kept in is humanize's business rather than whoever is running it.
 BUILTIN_AT = Path(__file__).parent / "builtin"
 
 #: What a flow's directory holds the flow itself in. The rest of the directory is what it
@@ -636,17 +637,18 @@ def found() -> list[Offer]:
     """Every flow there is to run, and where each came from.
 
     Every place asked the same question, which is :func:`offers`, and asked it in the order
-    they are offered in: the flows humanize ships, then the ones its own repository holds,
-    then whatever flowverses have been added, then this project's own flows and yours. One
-    place works out what a flow is called and one place lists them, because two of either is
-    two things to drift apart -- and a name that has drifted is a name `-f` will not take.
+    they are offered in: the flows humanize ships, then whatever flowverses have been added,
+    then this project's own flows and yours. One place works out what a flow is called and one
+    place lists them, because two of either is two things to drift apart -- and a name that has
+    drifted is a name `-f` will not take.
 
     Returns:
-      One per flow. A flow humanize ships is called by a bare name and every other by
-      `<where it came from>/<name>` -- `official/rlar`, `local/scheduler` -- so a flow of
-      yours that happens to share a name with one of humanize's is a different flow here
-      rather than the same one, and is written down, offered and remembered under a name of
-      its own. A file that holds several says so, `<name>:<inside>` apiece.
+      One per flow. A flow humanize ships is called by a bare name, whichever of the two places
+      `official` is kept in it is in, and every other by `<where it came from>/<name>` --
+      `local/scheduler`, `theirs/rlar` -- so a flow of yours that happens to share a name with
+      one of humanize's is a different flow here rather than the same one, and is written down,
+      offered and remembered under a name of its own. A file that holds several says so,
+      `<name>:<inside>` apiece.
     """
     return [one for verse in flowverses() for one in offers(verse)]
 
@@ -671,6 +673,28 @@ def entry(under: Path, name: str) -> Path | None:
         return beside
     alone = under / f"{name}.py"
     return alone if alone.is_file() else None
+
+
+def within(one: Flowverse, name: str) -> Path | None:
+    """The file to run for the flow of that name in one flowverse, wherever it keeps them.
+
+    A flowverse keeps its flows in one directory, except `official`, which is humanize's own
+    and is kept in two: the handful in the package, and the repository of the rest. Asked here
+    rather than at each of the places that looks a flow up, so that both are searched in the
+    one order and a flow found while a list is drawn is the flow that runs.
+
+    Args:
+      one: The flowverse.
+      name: The flow, by the name it is offered under.
+
+    Returns:
+      The path to run, from the first of its directories to hold one, or None where none does.
+    """
+    for under in holds(one):
+        beside = entry(under, name)
+        if beside is not None:
+            return beside
+    return None
 
 
 def offered(under: Path) -> list[str]:
@@ -710,29 +734,33 @@ def offers(one: Flowverse) -> list[Offer]:
       one: The flowverse.
 
     Returns:
-      One per flow, by directory, alphabetically: `<flowverse>/<flow>`, except for the flows
-      humanize ships, which are called by a bare name. Yours are named the same way as anybody
-      else's -- `local/scheduler`, `user/scheduler` -- so that a flow of yours sharing a name
-      with one of humanize's is listed beside it under a name of its own rather than instead
-      of it. A flow that holds several names each of them, `<flow>:<inside>` apiece, and a
-      directory that holds none is not among them -- a directory of flows has directories
-      beside them that are not one.
+      One per flow, by directory, alphabetically: `<flowverse>/<flow>`, except for humanize's
+      own, which are called by a bare name. Which of the two places `official` is kept in a
+      flow of humanize's is in makes no difference to what it is called: the package's `chat`
+      and the repository's `rlar` are both humanize's, so both are said the same way and a flow
+      that moves between the two goes on answering to the name it always had. Yours are named
+      the same way as anybody else's -- `local/scheduler`, `user/scheduler` -- so that a flow of
+      yours sharing a name with one of humanize's is listed beside it under a name of its own
+      rather than instead of it. A flow that holds several names each of them,
+      `<flow>:<inside>` apiece, and a directory that holds none is not among them -- a directory
+      of flows has directories beside them that are not one.
 
-      Nothing at all for a flowverse that has not been fetched, which is not the same answer as
-      one that holds nothing, and is why :class:`Flowverse` says which it is.
+      Just the ones in the package for `official` before it has been fetched, and nothing at
+      all for any other flowverse that has not been, which is not the same answer as one that
+      holds nothing, and is why :class:`Flowverse` says which it is.
 
     Note:
-      Reading a flow means running it, so the entry point of every flow in the directory the
-      flowverse holds its flows in is run to find out what it holds -- and nothing outside it,
-      which is what that directory is for. Whoever added it is trusting that repository with
-      this machine; this is where that trust is spent.
+      Reading a flow means running it, so the entry point of every flow in the directories the
+      flowverse holds its flows in is run to find out what it holds -- and nothing outside
+      them, which is what those directories are for. Whoever added it is trusting that
+      repository with this machine; this is where that trust is spent.
     """
     from .verses import flows
 
     return [
-        Offer(one.name, name if one.name == BUILTIN else f"{one.name}/{name}", said)
+        Offer(one.name, name if one.name == OFFICIAL else f"{one.name}/{name}", said)
         for base in flows(one)
-        if (at_ := entry(holds(one), base)) is not None
+        if (at_ := within(one, base)) is not None
         for name, said in _named(at_, base)
     ]
 
@@ -816,14 +844,16 @@ def find(named_: str) -> str:
         # Named outright -- `official/rlar`, `local/scheduler` -- which is the one spelling
         # that says which place it came from, and so the one that cannot be stood in for.
         for verse in flowverses():
-            beside = entry(holds(verse), rest)
-            if whose == verse.name and beside is not None:
+            if whose != verse.name:
+                continue
+            beside = within(verse, rest)
+            if beside is not None:
                 return str(beside.resolve())
     else:
         # Nearest wins: this project, then yours, then whatever there is to run -- so a flow
         # of your own may stand in for one of humanize's by taking its name.
         for verse in nearest():
-            beside = entry(holds(verse), at_)
+            beside = within(verse, at_)
             if beside is not None:
                 return str(beside.resolve())
     # A path taken as given, in both the shapes a flow is: the directory it is, the file it is

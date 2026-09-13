@@ -128,8 +128,8 @@ HmzFlowShape.vue    flows/*              one flow's rounds, played: who takes a 
                                           whose session, and what it hands the next one
 ```
 
-What the shapes are read off is the flows themselves: `src/hmz/flows/builtin/` for the three
-humanize ships, and [humanfia/flowverse](https://github.com/humanfia/flowverse) for the rest.
+What the shapes are read off is the flows themselves: `src/hmz/flows/builtin/` for `chat`, the
+one humanize ships, and [humanfia/flowverse](https://github.com/humanfia/flowverse) for the rest.
 A `new` box is a session the flow opened for that turn and a `held` box is another turn of the
 one it had — which is most of what separates these flows from each other, and so is the thing
 the diagram draws largest.

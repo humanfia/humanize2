@@ -2,14 +2,14 @@
 pageClass: hmz-feature
 ---
 
-# official/fixed_juice_ralph
+# fixed_juice_ralph
 
 [`ralph_loop`](/flows/ralph-loop) with a governor on it: a fresh session every round, and
 between the rounds the [effort moved](/reference/agents#moving-the-effort-while-it-runs) a rung
 to hold the agent to `juice` output tokens per turn of the model.
 
 ```sh
-hmz exec -f official/fixed_juice_ralph -a claude/claude-opus-5:high "$(cat TASK.md)"
+hmz exec -f fixed_juice_ralph -a claude/claude-opus-5:high "$(cat TASK.md)"
 ```
 
 <HmzFlowShape flow="fixed_juice_ralph" />

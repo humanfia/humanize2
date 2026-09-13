@@ -227,7 +227,7 @@ and one in another flow is named with `sub`, which is the counterpart of
 [`load`](/weaver/calling-flows):
 
 ```python
-reviewing = sub("official/review")
+reviewing = sub("review")
 ```
 
 An atlas reaches an atlas and reaches an ordinary flow through nothing at all: `load` answers
@@ -262,7 +262,7 @@ Hmz().flows.check("review_loop")
 A flowverse may ship what compiling came to, beside the flow:
 
 ```python
-Hmz().flows.foretell("official/review")    # writes official/review/prophecy.pkl
+Hmz().flows.foretell("review")    # writes review/prophecy.pkl
 ```
 
 Where there is one, that is what runs. The compiling is where an atlas is refused, and a

@@ -63,7 +63,7 @@ The flows appear one place at a time, one list each. **←** and **→** step be
 `/flow` is **refused while a flow is running**. You get `no choosing a flow while a flow is
 running: ctrl+c twice stops it first`. Looking and leaving without choosing changes nothing.
 
-::: details What the three built-in flows are
+::: details What these three flows are
 | Flow | Agents | |
 | --- | --- | --- |
 | `chat` | 1 + you | one session; every line you type is a turn of it. What the interface opens on. |

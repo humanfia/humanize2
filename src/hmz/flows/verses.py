@@ -5,22 +5,27 @@ with the `__init__.py` that is the flow, whatever it imports beside it and the `
 brings. It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in it is offered
 under that name. Only that directory is read, so a repository is free to be a repository
 around it -- a README, a pyproject, a test suite -- without any of it being taken for a flow
-and run to find out. `builtin` is the one that has no repository around it, being the
-package's own, and is read where it stands.
+and run to find out.
 
-Four are always there, and none of them can be added or taken away. `builtin` is the handful
-humanize itself ships -- one agent talking, and the two shapes a loop over one agent takes.
-`official` is humanize's own repository of the rest, and is there whether or not it has been
-fetched yet: a list that only mentioned it once somebody had thought to add it would be a list
-that hid what there is. And `local` and `user` are the flows of your own: `.humanize/flows`
-here, and the one in your home directory.
+Three are always there, and none of them can be added or taken away. `official` is humanize's
+own, and is there whether or not it has been fetched yet: a list that only mentioned it once
+somebody had thought to add it would be a list that hid what there is. And `local` and `user`
+are the flows of your own: `.humanize/flows` here, and the one in your home directory.
+
+`official` is the one that is read from two places at once. `chat` is in the package, because
+an interface that has never reached a network still has to have something to open talking to;
+everything else humanize offers is in the repository, where it can change without a release.
+Which of the two a flow is in is humanize's business rather than anybody else's, so both are
+offered under the one name: `chat` and `rlar` are each one of humanize's flows, said the same
+way, and `official/chat` resolves the same as `official/rlar`. The package's own wins a name
+they both hold -- the one that is always there beats the one a fetch could take away.
 
 Those last two are places rather than repositories -- nothing fetches them, and what is in one
 is whatever you put there -- but they are flowverses all the same, because everything that goes
 looking for a flow has one question to ask and one list to ask it of. A flow of yours is read
-the way `builtin`'s are, offered under the name of the place it is in the way a flowverse's
-are, and looked in first: `local/chat` says which one it is, and a bare `chat` finds yours
-before humanize's.
+where it stands the way the package's own is, offered under the name of the place it is in the
+way a flowverse's are, and looked in first: `local/chat` says which one it is, and a bare
+`chat` finds yours before humanize's.
 
 Nothing here runs a flow, and nothing here reads one. It is the answer to "which flows are
 there, and where did each come from" -- and to the three things that can happen to a flowverse:
@@ -39,7 +44,6 @@ from pathlib import Path, PurePosixPath
 from hmz import home
 
 __all__ = [
-    "BUILTIN",
     "FLOWS",
     "LOCAL",
     "MINE",
@@ -48,6 +52,7 @@ __all__ = [
     "Flowverse",
     "add",
     "clone",
+    "edited",
     "fetch",
     "flowverses",
     "holds",
@@ -58,13 +63,11 @@ __all__ = [
     "under",
 ]
 
-#: What the flows humanize itself ships are listed under. Not a repository and not fetched
-#: from anywhere: they are in the package, and a name here means one file in it.
-BUILTIN = "builtin"
-
-#: What humanize's own repository of flows is called, and where it is. Always listed, whether
-#: or not it has been fetched: what there is to run is not the same question as what has been
-#: downloaded, and somebody who has never fetched it should still be able to see it and say so.
+#: What humanize's own flows are listed under, and where the repository of them is. Always
+#: listed, whether or not it has been fetched: what there is to run is not the same question as
+#: what has been downloaded, and somebody who has never fetched it should still be able to see
+#: it and say so. The handful in the package are listed under this name too -- one name for
+#: humanize's flows, whichever of the two places a given one happens to be kept in.
 OFFICIAL = "official"
 OFFICIAL_URL = "https://github.com/humanfia/flowverse"
 
@@ -81,20 +84,21 @@ MINE = {
     USER: "~/.humanize/flows",
 }
 
-#: The names a flowverse cannot be added under, being the four that are always listed. Two are
+#: The names a flowverse cannot be added under, being the three that are always listed. One is
 #: humanize's own and two are yours, and a repository cloned into any of their slots would be
 #: one nobody could reach.
-_ALWAYS = (BUILTIN, OFFICIAL, LOCAL, USER)
+_ALWAYS = (OFFICIAL, LOCAL, USER)
 
 #: The places whose flows are read where they stand rather than out of a `flows/` inside them.
 #: A fetched flowverse needs that directory to tell its flows from the repository around them;
 #: these have no repository around them, and a directory of flows has nothing to tell them from.
-_AS_THEY_STAND = (BUILTIN, LOCAL, USER)
+_AS_THEY_STAND = (LOCAL, USER)
 
 #: The directory a fetched flowverse keeps its flows in, and the only one read for them. A
 #: flowverse is a repository, and a repository has a README, a pyproject and a test suite in it:
 #: reading a flow means running it, so the ones to run are the ones somebody put here and
-#: nothing else. `builtin` has no repository around it and so has no need of this.
+#: nothing else. The flows in the package have no repository around them and so have no need
+#: of this.
 FLOWS = "flows"
 
 #: What a flowverse may be called: one directory name, and one that cannot climb out of the
@@ -114,15 +118,16 @@ class Flowverse:
       name: What it is called, which is the directory it is kept in and the name its flows are
         offered under.
       url: Where it is fetched from, or "" for one that is not fetched from anywhere -- the
-        flows humanize ships, and the two directories your own flows live in.
+        two directories your own flows live in.
       at: The directory it is kept in, which for a fetched one is the repository rather than
         the flows: what its flows are read from is :func:`holds`.
-      fetched: Whether it is there to be read. False for one named but never fetched, which
-        `official` is until somebody asks for it, and true for the ones fetched from nowhere:
-        a directory that is not there holds no flows, which is what its list of them says
-        rather than a download somebody is waiting for.
-      fixed: Whether it is always listed and cannot be removed: humanize's own two, and the
-        two your own flows live in.
+      fetched: Whether the repository has been cloned. False for one named but never fetched,
+        which `official` is until somebody asks for it, and true for the ones fetched from
+        nowhere: a directory that is not there holds no flows, which is what its list of them
+        says rather than a download somebody is waiting for. Not the same question as whether
+        it offers anything -- `official` offers the flows in the package either way.
+      fixed: Whether it is always listed and cannot be removed: humanize's own, and the two
+        your own flows live in.
     """
 
     name: str
@@ -137,22 +142,33 @@ def under() -> Path:
     return home() / "flowverses"
 
 
-def holds(one: Flowverse) -> Path:
-    """The directory one flowverse's flows are read from, and the one place that is worked out.
+def holds(one: Flowverse) -> tuple[Path, ...]:
+    """The directories one flowverse's flows are read from, and the one place that is worked out.
 
-    The `flows/` inside it, except for the places that are a directory of flows and nothing
-    else: the flows humanize ships, and the two your own live in. None of those has a
-    repository around them -- no README, no pyproject, no test suite to be kept out of the way
-    -- and so they are read where they stand.
+    The `flows/` inside it, except for the two places that are a directory of flows and nothing
+    else -- yours -- which have no repository around them, no README, no pyproject and no test
+    suite to be kept out of the way, and so are read where they stand.
+
+    More than one only for `official`, which is humanize's own flows and is kept in two places:
+    the handful in the package, read where they stand, and the repository of the rest. The
+    package's own come first, so that a name both hold is the one that is always there rather
+    than the one a fetch could take away.
 
     Args:
       one: The flowverse.
 
     Returns:
-      The path, whether or not there is anything there -- a repository with no `flows/` in it
-      is a flowverse holding nothing, which is a thing to say rather than a thing to raise.
+      The paths, in the order a name is looked for in them, whether or not there is anything
+      at any of them -- a repository with no `flows/` in it is a flowverse holding nothing,
+      which is a thing to say rather than a thing to raise.
     """
-    return one.at if one.name in _AS_THEY_STAND else one.at / FLOWS
+    from . import BUILTIN_AT
+
+    if one.name in _AS_THEY_STAND:
+        return (one.at,)
+    if one.name == OFFICIAL:
+        return (BUILTIN_AT, one.at / FLOWS)
+    return (one.at / FLOWS,)
 
 
 def where(name: str) -> Path:
@@ -180,16 +196,12 @@ def flowverses() -> list[Flowverse]:
     """Every place flows come from, in the order they are offered.
 
     Returns:
-      humanize's own two first -- the flows it ships, then its own repository of the rest --
-      then whatever else has been added, alphabetically, and last the flows of your own: this
-      project's, then the ones in your home directory. Four of them are always here: two are
-      humanize's, one of which is not fetched from anywhere and the other of which is what
-      there is to fetch, and two are directories of yours that are read wherever they are.
+      humanize's own first, then whatever else has been added, alphabetically, and last the
+      flows of your own: this project's, then the ones in your home directory. Three of them
+      are always here: humanize's, which is the one there is anything to fetch, and two
+      directories of yours that are read wherever they are.
     """
-    from . import BUILTIN_AT
-
     held = [
-        Flowverse(name=BUILTIN, url="", at=BUILTIN_AT, fetched=True, fixed=True),
         Flowverse(
             name=OFFICIAL,
             url=OFFICIAL_URL,
@@ -281,9 +293,9 @@ def add(url: str, name: str = "") -> Flowverse:
 
     Raises:
       ValueError: If the name is not one a flowverse may have, one is already called that, or
-        it is one of the four that are always listed -- two of humanize's own and the two your
-        own flows live in -- since a repository cloned into any of those slots is one nobody
-        could reach.
+        it is one of the three that are always listed -- humanize's own and the two your own
+        flows live in -- since a repository cloned into any of those slots is one nobody could
+        reach.
       OSError: If git is not there, or the fetch failed. What git said is attached, and
         whatever it had written before it failed is taken away again.
     """
@@ -291,13 +303,6 @@ def add(url: str, name: str = "") -> Flowverse:
     if not said:
         raise ValueError("no repository to fetch a flowverse from")
     called = name or _called(said)
-    if called == BUILTIN:
-        # Cloned there, it would be in nobody's list: the flows humanize ships are the package's
-        # and this name is spoken for, so the directory would sit there offering nothing and
-        # refusing to be taken away again.
-        raise ValueError(
-            f"{BUILTIN} is what the flows humanize ships are called; pick another name"
-        )
     if called == OFFICIAL:
         # This one is listed from the start with humanize's own URL against it, so a stranger's
         # repository here would be shown as humanize's own.
@@ -336,18 +341,24 @@ def fetch(name: str) -> Flowverse:
 
     Raises:
       ValueError: If there is no such flowverse, or it is one that is not fetched from
-        anywhere -- the flows humanize ships are in the package and your own are in a
-        directory, and neither is somewhere to fetch from.
+        anywhere -- your own flows are a directory you keep, which is not somewhere to fetch
+        from.
       OSError: If git is not there, or the fetch failed. What git said is attached.
     """
     one = named(name)
     if one is None:
         raise ValueError(f"no flowverse called {name!r}")
     if not one.url:
+        # Two ways to have no URL now that the package's own flows are under `official`:
+        # a directory of yours, which is not fetched from anywhere, and a directory under the
+        # flowverses home that is not a clone -- what a clone killed partway leaves behind.
+        # Telling somebody the second is their own flows directory is telling them to look in
+        # a place their problem is not in.
         said = (
             f"a directory of flows of your own, {MINE[name]}"
             if name in MINE
-            else "the flows humanize came with"
+            else "a directory here that is not a clone of anything; take it away and add it "
+            "again"
         )
         raise ValueError(f"{name} is {said}; there is nothing to fetch")
     if not one.fetched:
@@ -374,9 +385,8 @@ def remove(name: str) -> bool:
       Whether there was one to take away.
 
     Raises:
-      ValueError: If it is one of the four that are always there: humanize's own two, one
-        being the flows in the package and the other where the rest of them come from, and
-        the two directories your own flows live in, which are wherever you are.
+      ValueError: If it is one of the three that are always there: humanize's own, and the
+        two directories your own flows live in, which are wherever you are.
     """
     import shutil
 
@@ -398,16 +408,23 @@ def flows(one: Flowverse) -> list[str]:
       one: The flowverse.
 
     Returns:
-      One name per flow in the directory it holds them in, alphabetically -- a directory with
+      One name per flow in the directories it holds them in, alphabetically -- a directory with
       an `__init__.py` in it, or a single `.py` file, both of which are a module. A directory
       without an entry point is what the flows beside it import rather than a flow, and
       neither is a name that starts with an underscore. Nothing at all where there is no such
       directory: a repository somebody added that keeps its flows somewhere else holds none of
       them, which is what the list says.
+
+      One name apiece for `official`, which is kept in two places: a flow the package and the
+      repository both hold is one name here, and which of the two it resolves to is the order
+      :func:`holds` puts them in.
     """
     from . import offered
 
-    return offered(holds(one))
+    found_: list[str] = []
+    for under_ in holds(one):
+        found_.extend(name for name in offered(under_) if name not in found_)
+    return sorted(found_)
 
 
 def plain(url: str) -> str:
@@ -447,6 +464,40 @@ def refresh(at: Path) -> None:
     """
     _git("-C", str(at), "fetch", "--depth", "1", "origin", "HEAD")
     _git("-C", str(at), "reset", "--hard", "FETCH_HEAD")
+
+
+def edited(at: Path) -> bool:
+    """Whether a clone has anything written into it that fetching it again would undo.
+
+    A flowverse is a copy of somebody else's repository and a fetch resets the clone to what
+    that repository says now, so anything written into a flow there goes. That is a fair thing
+    to do on a key somebody pressed, and not a fair thing to do behind them: a weaver who has
+    added their own repository and is editing a flow in it would lose the morning to a fetch
+    nobody asked for. Whoever fetches without being asked asks this first.
+
+    Tracked files only, which is exactly what `reset --hard` takes back: a file somebody added
+    and never committed survives a fetch, and the `__pycache__` that reading a flow leaves
+    behind would otherwise make every repository without a `.gitignore` look edited forever.
+
+    Args:
+      at: The clone.
+
+    Returns:
+      Whether git has anything to report about it, and False where git cannot be asked -- a
+      directory that is not a clone has nothing in it that a fetch could take away, there
+      being no fetch.
+    """
+    try:
+        done = subprocess.run(
+            ["git", "-C", str(at), "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_PATIENCE,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.returncode == 0 and bool(done.stdout.strip())
 
 
 def clone(url: str, at: Path) -> None:

@@ -1,8 +1,8 @@
 """Choosing a flow out of the places flows come from.
 
-The flows are read a place at a time -- humanize's own, its repository of the rest, whatever
-else has been added, and then this project's and yours -- so what is checked here is that the
-arrows step between those places, and that the list holds the one being read and nothing else.
+The flows are read a place at a time -- humanize's own, whatever else has been added, and then
+this project's and yours -- so what is checked here is that the arrows step between those
+places, and that the list holds the one being read and nothing else.
 What can happen to a flowverse is `/flowverses` and is checked beside it: this page is about
 which flow to run.
 
@@ -12,6 +12,7 @@ lands rather than how it is drawn.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import subprocess
 import unittest.mock
@@ -21,7 +22,7 @@ import pytest
 from textual.widgets import Label, OptionList
 
 from hmz.coganchor.backends import Model
-from hmz.flows import OFFICIAL
+from hmz.flows import ENTRY, OFFICIAL
 from hmz.flows import verses as store
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Configures, Flows
@@ -136,17 +137,16 @@ def _fetched() -> bool:
 
 @pytest.mark.timeout(60)
 async def test_the_strip_is_the_places_flows_come_from() -> None:
-    """Two of them always: the package, and the repository the rest come from."""
+    """One of them always: humanize's own, which is both of the places it keeps flows."""
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert "builtin" in _places(sheet)
-        assert OFFICIAL in _places(sheet)
-        # And it opens on the place the flow it is set up on came from, which is the
-        # package: the flows humanize itself ships, and nothing from anywhere else.
-        assert sheet._where == "builtin"
-        assert _rows(sheet) == ["chat", "ralph_loop", "stateful_ralph"]
+        assert _places(sheet) == [OFFICIAL]
+        # And it opens on the place the flow it is set up on came from, which is humanize's.
+        assert sheet._where == OFFICIAL
+        # The half of it that is in the package, nothing having been fetched here.
+        assert _rows(sheet) == ["chat"]
 
 
 @pytest.mark.timeout(60)
@@ -157,23 +157,16 @@ async def test_the_arrows_step_between_the_places(theirs: Path) -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert _places(sheet) == ["builtin", OFFICIAL, "theirs"]
-
-        await driver.press("right")
-        await until(lambda: sheet._where == OFFICIAL, driver)
-        # The one that has not been fetched is a list of one row, saying what it waits for.
-        assert _rows(sheet) == []
-        assert "not fetched yet" in str(
-            sheet.query_one("#choices", OptionList).options[0].prompt
-        )
+        assert _places(sheet) == [OFFICIAL, "theirs"]
+        assert _rows(sheet) == ["chat"]
 
         await driver.press("right")
         await until(lambda: sheet._where == "theirs", driver)
         assert _rows(sheet) == ["theirs/loop"]
 
-        # And round again, which is what the far end of a strip of three is for.
+        # And round again, which is what the far end of a strip is for.
         await driver.press("right")
-        await until(lambda: sheet._where == "builtin", driver)
+        await until(lambda: sheet._where == OFFICIAL, driver)
         await driver.press("left")
         await until(lambda: sheet._where == "theirs", driver)
 
@@ -186,11 +179,11 @@ async def test_a_search_steps_to_the_places_it_found_something_in() -> None:
         sheet = await _open(app, driver)
 
         await driver.press("s")
-        await driver.press(*"ralph")
-        await until(lambda: _rows(sheet) == ["ralph_loop", "stateful_ralph"], driver)
+        await driver.press(*"cha")
+        await until(lambda: _rows(sheet) == ["chat"], driver)
 
         # Only the places holding one, so that nothing steps through empty lists.
-        assert _places(sheet) == ["builtin"]
+        assert _places(sheet) == [OFFICIAL]
 
 
 @pytest.mark.timeout(60)
@@ -229,7 +222,9 @@ async def test_a_flow_says_what_it_does_beside_its_name() -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
         drawn = str(
-            sheet.query_one("#choices", OptionList).get_option("builtin\x1fchat").prompt
+            sheet.query_one("#choices", OptionList)
+            .get_option("official\x1fchat")
+            .prompt
         )
 
         assert "one agent, one session" in drawn
@@ -264,10 +259,69 @@ async def test_what_was_never_fetched_is_fetched_as_the_menu_opens(
         await until(_fetched, driver)
         # And it left what was being read where it was: the menu opened on the place the
         # flow in force came from, and nobody asked to be taken anywhere else.
-        assert sheet._where == "builtin"
+        assert sheet._where == OFFICIAL
 
-        await _steps(app, driver, OFFICIAL)
-        await until(lambda: _rows(sheet) == ["official/loop"], driver)
+        # What came down is offered beside the half that was already here, under the one name.
+        await until(lambda: _rows(sheet) == ["chat", "loop"], driver)
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.usefixtures("freshening")
+async def test_what_is_already_here_is_fetched_again_as_the_interface_starts(
+    theirs: Path,
+) -> None:
+    """A flowverse only ever fetched on a keypress is one that is months behind.
+
+    Quietly: there is already a list of flows to show, nobody asked for a download, and the
+    prompt is up before any of it starts.
+    """
+    store.add(str(theirs))
+    written(theirs / store.FLOWS, "second", FLOW)
+    _git("add", "-A", at=theirs)
+    _git("commit", "-m", "another flow", at=theirs)
+    app = Humanize()
+
+    async with app.run_test() as driver:
+        added = store.named("theirs")
+        assert added is not None
+        await until(lambda: store.flows(added) == ["loop", "second"], driver)
+
+        # And not the one nobody has fetched: that first fetch is the flow menu's, which
+        # says how it went rather than doing it behind whoever opened the interface.
+        one = store.named(OFFICIAL)
+        assert one is not None
+        assert not one.fetched
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.usefixtures("freshening")
+async def test_a_flowverse_somebody_has_written_into_is_left_where_it_is(
+    theirs: Path,
+) -> None:
+    """A fetch resets the clone, and a weaver editing a flow in one would lose the morning."""
+    added = store.add(str(theirs))
+    (held,) = store.holds(added)
+    (held / "loop" / ENTRY).write_text(FLOW.replace("Somebody", "Mine now"))
+    written(theirs / store.FLOWS, "second", FLOW)
+    _git("add", "-A", at=theirs)
+    _git("commit", "-m", "another flow", at=theirs)
+    app = Humanize()
+
+    async with app.run_test() as driver:
+        # Pumped a while, what is being waited for here being something that must not happen.
+        for _ in range(40):
+            await driver.pause()
+            await asyncio.sleep(0.02)
+
+        assert "Mine now" in (held / "loop" / ENTRY).read_text()
+        assert store.flows(added) == ["loop"]  # nor what it would have fetched
+
+    # And with the edit put back the way the repository has it, the next start does fetch --
+    # so what held it back was the edit rather than nothing having run at all.
+    (held / "loop" / ENTRY).write_text(FLOW)
+    again = Humanize()
+    async with again.run_test() as driver:
+        await until(lambda: store.flows(added) == ["loop", "second"], driver)
 
 
 @pytest.mark.timeout(60)
@@ -414,7 +468,7 @@ async def test_a_flow_is_copied_here_to_be_changed(
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await onto(app, driver, "builtin\x1fchat")
+        await onto(app, driver, "official\x1fchat")
 
         await driver.press("f")
         await until(lambda: "copied to" in _under(sheet), driver)
@@ -440,11 +494,11 @@ async def test_copying_one_twice_says_the_copy_is_already_there(
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await onto(app, driver, "builtin\x1fchat")
+        await onto(app, driver, "official\x1fchat")
         await driver.press("f")
         await until(lambda: "copied to" in _under(sheet), driver)
 
-        await _steps(app, driver, "builtin")
-        await onto(app, driver, "builtin\x1fchat")
+        await _steps(app, driver, OFFICIAL)
+        await onto(app, driver, "official\x1fchat")
         await driver.press("f")
         await until(lambda: "already a flow of your own" in _under(sheet), driver)

@@ -108,8 +108,8 @@ whole flows gather the same way turns do:
 
 ```python
 await asyncio.gather(
-    load("official/rlar")([agents[0].clone()], one),
-    load("official/rlar")([agents[1].clone()], two),
+    load("rlar")([agents[0].clone()], one),
+    load("rlar")([agents[1].clone()], two),
 )
 ```
 

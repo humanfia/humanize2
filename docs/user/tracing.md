@@ -67,7 +67,7 @@ A Ralph loop of a hundred one-shot sessions reads as one agent, which is right. 
 reviewer at the same model and effort would read as one agent, which is not.
 
 That is what an [epic](#what-a-run-writes-down) is for. A trace of a run reads the run it is of,
-so `official/rlar` traces as `actor` and `reviewer` without being told anything.
+so `rlar` traces as `actor` and `reviewer` without being told anything.
 
 Driving agents by hand from Python, say so yourself:
 
@@ -118,7 +118,7 @@ head -3 "$run"epic.jsonl
 ```
 
 ```console
-{"event":"began","at":"...","flow":"official/rlar","task":"...","workspace":"...","resumable":false,"agents":[{"agent":"actor",...}]}
+{"event":"began","at":"...","flow":"rlar","task":"...","workspace":"...","resumable":false,"agents":[{"agent":"actor",...}]}
 {"event":"opened","at":"...","agent":"actor","backend":"claude","provider":"local","session":"0a1b2c3d-...","name":"actor-claude@local-0a1b2c3d-...","where":"sessions/actor-claude@local-0a1b2c3d-..."}
 {"event":"ended","at":"...","how":"done"}
 ```
@@ -185,8 +185,8 @@ epic.jsonl  epic.gen-plan_0a1b2c.jsonl
 The run's own record says what it called and which file to read it in:
 
 ```console
-{"event":"called","at":"...","flow":"official/humanize1:gen-plan","task":"...","epic":"epic.official-humanize1-gen-plan_0a1b2c.jsonl"}
-{"event":"returned","at":"...","flow":"official/humanize1:gen-plan","epic":"epic.official-humanize1-gen-plan_0a1b2c.jsonl"}
+{"event":"called","at":"...","flow":"humanize1:gen-plan","task":"...","epic":"epic.humanize1-gen-plan_0a1b2c.jsonl"}
+{"event":"returned","at":"...","flow":"humanize1:gen-plan","epic":"epic.humanize1-gen-plan_0a1b2c.jsonl"}
 ```
 
 A called flow's own record holds the same events, its `began` says which record is `under` it,

@@ -26,7 +26,7 @@ Ask a flow how many it wants without running it:
 ```python
 from hmz.flows import drives
 
-print(drives("official/rlar"))   # ('actor', 'reviewer')
+print(drives("rlar"))   # ('actor', 'reviewer')
 ```
 
 A `Person` place does **not** count. Nobody chooses what the person runs.
@@ -48,7 +48,7 @@ or, from a script with no terminal to press it at, `Hmz().verses.fetch("official
 ### `nothing in it is marked @flow(), and it holds …`
 
 The file holds [several flows](/reference/flows#several-flows-in-one-file), and none of them is
-under its own name. Say which one you want with a colon: `-f official/humanize1:gen-plan`.
+under its own name. Say which one you want with a colon: `-f humanize1:gen-plan`.
 
 ### `nothing in it is marked @flow()`
 

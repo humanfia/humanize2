@@ -110,8 +110,8 @@ Nearest wins: this project's flows, then yours, then whatever there is to run, s
 mean its own `chat` by `chat`. A name qualified by a flowverse is that flowverse's and is never
 stood in for.
 
-Two are always listed — the package's own, and humanize's repository of the rest, which is
-listed whether or not it has been fetched. A list that only mentioned it once somebody had
+One is always listed — `official`, the package's own `chat` plus humanize's repository of the
+rest, listed whether or not it has been fetched. A list that only mentioned it once somebody had
 thought to add it would be a list that hid what there is to run.
 
 ## Where the detail is

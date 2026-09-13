@@ -6,14 +6,20 @@
 // diagram plays. The catalogue and the diagrams then cannot disagree, and a flow added to the
 // flowverse is one entry here rather than a page and a drawing that drift apart.
 //
-// The shapes are read off the flows themselves: `src/hmz/flows/builtin/` for the three humanize
-// ships, and https://github.com/humanfia/flowverse for the rest. A session marked `new` is one
-// the flow opened for that turn; `held` is the same session taking another. That distinction is
-// the whole of what separates most of these from each other, so it is the thing the diagram
-// draws largest.
+// The shapes are read off the flows themselves: `src/hmz/flows/builtin/` for the one humanize
+// keeps in the package, and https://github.com/humanfia/flowverse for the rest. A session marked
+// `new` is one the flow opened for that turn; `held` is the same session taking another. That
+// distinction is the whole of what separates most of these from each other, so it is the thing
+// the diagram draws largest.
+//
+// All of them are offered under the one name, `official`, and all of them are run by a bare
+// name. Which of the two places a flow is kept in is humanize's business rather than anybody
+// else's -- what it changes is whether the flow is there before anything has been fetched,
+// which is the one thing `place` below is for.
 
-/** Where a flow comes from: the package, or the flowverse that is fetched. */
-export type Place = 'builtin' | 'official'
+/** Which of humanize's two places a flow is kept in: the package, or the repository it
+ *  fetches. Both are offered under `official`; this is where it lives, not what it is called. */
+export type Place = 'package' | 'flowverse'
 
 /** The small drawing that stands for a flow in the catalogue. */
 export type Family =
@@ -29,7 +35,7 @@ export type Family =
   | 'lanes'
 
 export interface Flow {
-  /** The name `-f` takes, qualified where it needs to be. */
+  /** The name `-f` takes, which for every flow of humanize's own is a bare one. */
   name: string
   /** The page under /flows/. */
   link: string
@@ -55,7 +61,7 @@ export const FLOWS: Flow[] = [
     said: 'One agent, one session, and every line typed between turns is a turn of it.',
     ends: 'you stop typing',
     keeps: '',
-    place: 'builtin',
+    place: 'package',
     family: 'talk',
   },
   {
@@ -65,7 +71,7 @@ export const FLOWS: Flow[] = [
     said: 'A fresh session every round, so nothing carries over but the repository.',
     ends: 'a budget in output tokens',
     keeps: 'rounds · output',
-    place: 'builtin',
+    place: 'flowverse',
     family: 'fresh',
     bench: 'ralph_loop',
   },
@@ -76,93 +82,93 @@ export const FLOWS: Flow[] = [
     said: 'One session, held for the whole run, re-sent the task every round.',
     ends: 'a budget in output tokens',
     keeps: 'rounds · output',
-    place: 'builtin',
+    place: 'flowverse',
     family: 'held',
     bench: 'stateful_ralph',
   },
   {
-    name: 'official/continue_loop',
+    name: 'continue_loop',
     link: '/flows/continue-loop',
     agents: '1',
     said: 'Sends the task once, then keeps nudging “continue” at the session that heard it.',
     ends: 'a budget in output tokens',
     keeps: 'rounds · output',
-    place: 'official',
+    place: 'flowverse',
     family: 'nudge',
     bench: 'continue_loop',
   },
   {
-    name: 'official/goal',
+    name: 'goal',
     link: '/flows/goal',
     agents: '1',
     said: 'Ralph, with the task set as the agent’s own goal: it decides when a turn is over.',
     ends: 'a budget in output tokens',
     keeps: 'rounds · output',
-    place: 'official',
+    place: 'flowverse',
     family: 'goal',
     bench: 'goal',
   },
   {
-    name: 'official/fixed_juice_ralph',
+    name: 'fixed_juice_ralph',
     link: '/flows/fixed-juice-ralph',
     agents: '1',
     said: 'Ralph with a governor: the effort moves a rung a round to hold an answer to a size.',
     ends: 'a budget in output tokens',
     keeps: 'rounds · output · effort',
-    place: 'official',
+    place: 'flowverse',
     family: 'governor',
     bench: 'fixed_juice_ralph',
   },
   {
-    name: 'official/flame_chase',
+    name: 'flame_chase',
     link: '/flows/flame-chase',
     agents: '2',
     said: 'Two agents take turns on the same task, each reading the repository rather than a history.',
     ends: 'a budget the pair spend between them',
     keeps: 'turn · rounds · output',
-    place: 'official',
+    place: 'flowverse',
     family: 'pair',
     bench: 'flame_chase',
   },
   {
-    name: 'official/rlar',
+    name: 'rlar',
     link: '/flows/rlar',
     agents: 'actor · reviewer',
     said: 'The actor remembers and the reviewer must not. The review is the actor’s next prompt.',
     ends: 'the reviewer agreeing the work is done',
     keeps: 'rounds · the review nobody acted on',
-    place: 'official',
+    place: 'flowverse',
     family: 'review',
     bench: 'rlar',
   },
   {
-    name: 'official/humanize1',
+    name: 'humanize1',
     link: '/flows/humanize1',
     agents: '1, then 2, then 2 + you',
     said: 'PolyArch/humanize as three flows: an idea, a plan both sides converged on, and a build under review.',
     ends: '--max rounds, for the loop of the three',
     keeps: 'the directory the loop is in, and its round',
-    place: 'official',
+    place: 'flowverse',
     family: 'phases',
   },
   {
-    name: 'official/parallel_flame_chase',
+    name: 'parallel_flame_chase',
     link: '/flows/parallel-flame-chase',
     agents: '7',
     said: 'One coordinator plans three isolated lanes, then leaves; six actors alternate and coordinate by report.',
     ends: 'the lanes running out of work, or you',
     keeps: 'the plan, the snapshots, whose turn each lane is on',
-    place: 'official',
+    place: 'flowverse',
     family: 'lanes',
   },
   {
-    name: 'official/parallel_flame_chase_mission',
+    name: 'parallel_flame_chase_mission',
     link: '/flows/parallel-flame-chase-mission',
     agents: '7',
     said: 'The same three lanes, with a fresh coordinator returning to audit outcomes, stalls and deadlines.',
     ends: 'the coordinator adjudicating the last mission, or you',
     keeps: 'the missions, the audits, and everything the base flow keeps',
-    place: 'official',
+    place: 'flowverse',
     family: 'lanes',
   },
 ]
@@ -302,7 +308,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   continue_loop: {
-    of: 'official/continue_loop',
+    of: 'continue_loop',
     lanes: [{ id: 'agent', name: 'the agent', note: 'one session, nudged' }],
     steps: [
       { id: 'c1', lane: 'agent', col: 0, label: 'the task', session: 'new' },
@@ -317,7 +323,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   goal: {
-    of: 'official/goal',
+    of: 'goal',
     lanes: [{ id: 'agent', name: 'the agent', note: 'run under a goal' }],
     steps: [
       {
@@ -346,7 +352,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   fixed_juice_ralph: {
-    of: 'official/fixed_juice_ralph',
+    of: 'fixed_juice_ralph',
     lanes: [{ id: 'agent', name: 'the agent', note: 'a new session, set effort' }],
     steps: [
       { id: 'j1', lane: 'agent', col: 0, label: 'round · high', session: 'new' },
@@ -361,7 +367,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   flame_chase: {
-    of: 'official/flame_chase',
+    of: 'flame_chase',
     lanes: [
       { id: 'one', name: 'the first agent', note: 'a fresh session a turn' },
       { id: 'two', name: 'the second', note: 'a fresh session a turn' },
@@ -400,7 +406,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   rlar: {
-    of: 'official/rlar',
+    of: 'rlar',
     lanes: [
       { id: 'actor', name: 'the actor', note: 'it has to remember' },
       { id: 'reviewer', name: 'the reviewer', note: 'it must not remember' },
@@ -448,7 +454,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   'humanize1-gen-idea': {
-    of: 'official/humanize1:gen-idea',
+    of: 'humanize1:gen-idea',
     lanes: [{ id: 'drafter', name: 'the drafter', note: 'one session' }],
     steps: [
       {
@@ -468,7 +474,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   'humanize1-gen-plan': {
-    of: 'official/humanize1:gen-plan',
+    of: 'humanize1:gen-plan',
     lanes: [
       { id: 'planner', name: 'the planner', note: 'one session throughout' },
       { id: 'analyst', name: 'the analyst', note: 'fresh, each reading' },
@@ -509,7 +515,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   'humanize1-rlcr': {
-    of: 'official/humanize1:rlcr',
+    of: 'humanize1:rlcr',
     lanes: [
       { id: 'builder', name: 'the builder', note: 'one session, the loop' },
       { id: 'reviewer', name: 'the reviewer', note: 'fresh, each round' },
@@ -550,7 +556,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   parallel_flame_chase: {
-    of: 'official/parallel_flame_chase',
+    of: 'parallel_flame_chase',
     lanes: [
       { id: 'co', name: 'the coordinator', note: 'plans once, then gone', tone: 6 },
       { id: 'l1a', name: 'lane 1 · a', note: 'the source, sole writer', tone: 1 },
@@ -597,7 +603,7 @@ export const SHAPES: Record<string, Shape> = {
   },
 
   parallel_flame_chase_mission: {
-    of: 'official/parallel_flame_chase_mission',
+    of: 'parallel_flame_chase_mission',
     lanes: [
       { id: 'co', name: 'the coordinator', note: 'plans, then audits', tone: 6 },
       { id: 'l1a', name: 'lane 1 · a', note: 'the source, sole writer', tone: 1 },

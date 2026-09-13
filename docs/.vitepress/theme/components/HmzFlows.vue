@@ -9,10 +9,13 @@ import { withBase } from 'vitepress'
 
 import { FLOWS, type Place } from '../flows'
 
+// All of these are humanize's own and all of them are said by a bare name; what the filter
+// separates is which of the two places one is kept in, which is the one thing that shows --
+// the package is there before anything has been fetched, and the repository is not.
 const WHERE: { id: Place | 'all'; said: string; note: string }[] = [
   { id: 'all', said: 'every flow', note: 'eleven, and humanize 1 is three of them' },
-  { id: 'builtin', said: 'in the package', note: 'the three humanize ships, there before anything is fetched' },
-  { id: 'official', said: 'official', note: 'humanfia/flowverse, fetched the first time somebody wants it' },
+  { id: 'package', said: 'in the package', note: 'chat, which is there before anything is fetched' },
+  { id: 'flowverse', said: 'the official flowverse', note: 'humanfia/flowverse, fetched the first time somebody wants it' },
 ]
 
 const place = ref<Place | 'all'>('all')
@@ -107,7 +110,7 @@ const note = computed(() => WHERE.find((one) => one.id === place.value)?.note ??
 
         <div class="head">
           <span class="place" :class="flow.place">{{
-            flow.place === 'builtin' ? 'ships with it' : 'the official flowverse'
+            flow.place === 'package' ? 'in the package' : 'the official flowverse'
           }}</span>
           <code>{{ flow.name }}</code>
         </div>
@@ -190,7 +193,7 @@ const note = computed(() => WHERE.find((one) => one.id === place.value)?.note ??
   margin-bottom: 10px;
 }
 
-/* The name gets a line of its own: `official/parallel_flame_chase_mission` is wider than a
+/* The name gets a line of its own: `parallel_flame_chase_mission` is wider than a
    third of the column, and a badge beside it would break it a word earlier still. */
 .head {
   display: block;
@@ -214,7 +217,7 @@ const note = computed(() => WHERE.find((one) => one.id === place.value)?.note ??
   color: var(--vp-c-text-3);
 }
 
-.place.official {
+.place.flowverse {
   color: var(--vp-c-brand-1);
 }
 

@@ -74,7 +74,7 @@ working.offers(
             name="chase",
             about="run the flame-chase loop on one task and report what it came to",
             takes=Chasing,
-            call=lambda said: load("official/flame_chase")(agents, said.task),
+            call=lambda said: load("flame_chase")(agents, said.task),
         )
     ]
 )
