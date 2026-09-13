@@ -23,7 +23,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from textual.screen import Screen
 from textual.widgets import Label, OptionList
 
 import hmz.tui.pick
@@ -54,6 +53,8 @@ from .test_app import into_agent, into_flows, onto, rows, until
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from textual.screen import Screen
 
 #: One installed CLI at two efforts, so that the sheets an agent is set up on have both a
 #: list to pick from and a rung to step along.
@@ -322,7 +323,7 @@ async def test_the_question_about_what_a_menu_holds_is_five_words() -> None:
         )
         # Every word in the box, keys and all, less the dot that separates two keys.
         words = said.replace("·", " ").split()
-        assert len(words) <= 5, words  # noqa: PLR2004 -- what `under five words` comes to
+        assert len(words) <= 5, words
 
 
 @pytest.mark.timeout(60)

@@ -106,6 +106,12 @@ for the flow to unwind — every conversation still open is closed under its tur
 backend's process going, and what the flow reads as a turn that failed. With nothing running,
 two presses leave; `/exit` is the other way out.
 
+**`/stop` is the same stop, typed, and asks once.** The key asks twice because a finger lands
+on it by mistake; typing a command out and sending it is that deliberation already made. It
+leaves no half-made gesture behind it either — a press before it and a press after it are not
+two presses of one — so the press after a `/stop` is the one that does not wait for the flow to
+unwind, exactly as it is after the second press, and a first press again once the flow is gone.
+
 **esc does not stop anything.** It is pressed to dismiss whatever is on the screen everywhere
 else in this interface, so it is not the key that ends a day's work: it opens
 [`/monitor`](#watching-the-run) instead, which is where the run is watched and where the
@@ -171,6 +177,7 @@ list appears under the editor with a line about each.
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
 | `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |
 | `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
+| `/stop` | | Stops the flow — the whole flow, not just the turn — which is what **ctrl+c** twice does. It is not asked twice: the key asks because a finger lands on it by mistake, and nothing is typed by mistake, so writing it out and sending it is the deliberation the second press stands in for. With nothing running it says so, which the key never does; a flow already told to stop and not yet gone is said to be stopping rather than told again, and the [third press](/user/stopping) is what is left for that one. |
 | `/exit` | | Leaves; a flow that is running can be left running. With one going it asks first what is to become of it: stop it and leave, or [let go of this terminal](/reference/daemon) and leave it running — the run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. That second answer is offered only where something outside this terminal is holding the run; where nothing is, closing the terminal is what closes the run, so the answer offered instead is staying here. With nothing running it is a window being closed, and asks nothing. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
@@ -942,7 +949,7 @@ on — one question has one answer, whichever way you came to it:
 | `<run> cannot be read back` | Its record is not one — a run that died mid-line left a line rather than an epic. |
 | `<flow> does not say it can be picked up` | Asked of the flow as it is today, not of what the run recorded — and a flow that will not load at all reads as one that says no. |
 | `<run> left nothing behind` | Its flow says it can be picked up, and that run either stopped before it wrote down where it had got to or [emptied what it wrote](/user/resuming#when-it-is-saved) — which is a flow saying the next run here starts clean. Starting from the top under a line saying which run it came from would be a record of something that did not happen, so it says what the next move is: say what to do, and the flow starts. |
-| `no picking a run up while a flow is running` | A run picked up is a flow started, and there is one going. [ctrl+c twice](/user/stopping) stops it first. |
+| `no picking a run up while a flow is running` | A run picked up is a flow started, and there is one going. [ctrl+c twice or `/stop`](/user/stopping) stops it first. |
 | `no picking a run up while the flow is still stopping` | ctrl+c twice has been pressed and the flow has not gone yet. It unwinds in its own time and writes down where it got to as it goes, so a run picked up from a state still moving under it is a round done twice. A flow that will not unwind at all is what the [third press](/user/stopping) is for. |
 
 `/resume` takes nothing after it. A line that names a run is said back rather than dropped —

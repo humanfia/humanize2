@@ -41,7 +41,7 @@ whole piece of work start to finish; everything under them is for looking up.
 | [History](/user/history) | Everything typed here before, on ↑ and ↓ |
 | [Exporting a run](/user/export) | **export it**, on a run of `/epics`: the whole run as one archive to send |
 | [What a project remembers](/user/settings) | Reopening finds it set up the way you left it |
-| [Stopping](/user/stopping) | **ctrl+c** twice ends the flow; what that does to a turn |
+| [Stopping](/user/stopping) | **ctrl+c** twice or **`/stop`** ends the flow; what that does to a turn |
 
 ## Setting an agent up
 
