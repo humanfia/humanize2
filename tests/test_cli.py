@@ -22,9 +22,12 @@ from hmz import cli
 #: names rather than as the directory each is in, because a directory is now several answers:
 #: `runtime` holds both what drives a run and the tracer that reads one back afterwards, and
 #: a budget saying `runtime` would stop noticing `hmz exec` paying for the second. A name
-#: here covers the modules inside it. `anchor` is in the list for being the one humanize
-#: spawns that a whole layer is behind: the target half of a session is this package with the
-#: anchor and nothing else on it.
+#: here covers the modules inside it. `internal anchor` is in the list for being the one
+#: humanize spawns that a whole layer is behind: the target half of a session is this package
+#: with the anchor and nothing else on it. A command is written here as the words that name
+#: it, because one of them is now two words deep -- and going through the door marked
+#: `internal` must cost nothing, since what it opens onto is the half that runs on a target
+#: where no other layer is installed.
 COMMANDS = [
     # The two leaves that say whether humanize reports its own failures and where the answer
     # is kept: a command that cannot report a crash is a crash nobody hears about. And what a
@@ -48,7 +51,15 @@ COMMANDS = [
             "hmz.sdk",
         },
     ),
-    ("anchor", {"hmz.coganchor"}),
+    ("internal anchor", {"hmz.coganchor"}),
+    # The other three the door opens onto, each of which must cost its own module and
+    # nothing else at all. They are here rather than left to the anchor's entry because a
+    # budget nobody wrote is a budget nothing enforces: `cred` reaches the accounts and
+    # `tools` and `hook` reach a socket, and any of the three could grow an import at the top
+    # of its module that the one measured command would never notice.
+    ("internal cred", set[str]()),
+    ("internal hook", set[str]()),
+    ("internal tools", set[str]()),
 ]
 
 
@@ -56,14 +67,14 @@ COMMANDS = [
 def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     command: str, layers: set[str]
 ) -> None:
-    """`hmz exec` must not pay for the interface, nor `hmz anchor` for any of it."""
+    """`hmz exec` must not pay for the interface, nor the anchor for any of it."""
     probe = (
         "import contextlib, io, sys\n"
         "from hmz import cli\n"
         # The help itself goes to stdout, so it is swallowed: what is wanted is the list below.
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         "    try:\n"
-        f"        cli.main([{command!r}, '--help'])\n"
+        f"        cli.main({[*command.split(), '--help']!r})\n"
         "    except SystemExit:\n"
         "        pass\n"
         "print(' '.join(m for m in sys.modules if m.startswith('hmz.')))\n"
@@ -90,10 +101,10 @@ def test_a_command_is_given_the_rest_of_the_line_untouched() -> None:
 
 
 def test_what_is_spawned_is_given_the_rest_of_the_line_untouched() -> None:
-    """It is routed as every other command is; being listed is the whole of the difference."""
+    """Routed exactly as every other command is, one word further in."""
     carry_out = unittest.mock.Mock(return_value=0)
-    with unittest.mock.patch.dict(cli._SPAWNED, {"anchor": carry_out}):
-        assert cli.main(["anchor", "--help", "-x", "claude"]) == 0
+    with unittest.mock.patch.dict(cli.INTERNAL, {"anchor": (carry_out, "")}):
+        assert cli.main(["internal", "anchor", "--help", "-x", "claude"]) == 0
     assert carry_out.call_args.args == (["--help", "-x", "claude"],)
 
 
@@ -101,8 +112,8 @@ def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
     def refused(_argv: list[str]) -> int:
         return 130
 
-    with unittest.mock.patch.dict(cli._SPAWNED, {"anchor": refused}):
-        assert cli.main(["anchor", "claude"]) == 130
+    with unittest.mock.patch.dict(cli.INTERNAL, {"anchor": (refused, "")}):
+        assert cli.main(["internal", "anchor", "claude"]) == 130
 
 
 @pytest.mark.parametrize("argv", [["--target", "ssh://build-box"], ["-f", "chat"]])
@@ -120,14 +131,14 @@ def test_a_line_of_flags_the_interface_does_not_take_is_a_usage_error(
 def test_a_line_that_names_something_that_is_not_a_command_is_a_usage_error(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """And says which there are, which is now the one there is."""
+    """And says which there are, which is every one of them and not the typed ones only."""
     with pytest.raises(SystemExit) as stopped:
         cli.main(["fly"])
 
     assert stopped.value.code == 2
     said = capsys.readouterr().err
     assert "hmz" in said
-    assert "exec" in said
+    assert all(command in said for command in cli.COMMANDS)
 
 
 def test_a_line_naming_no_command_opens_the_interface() -> None:
@@ -202,24 +213,62 @@ def test_the_help_lists_every_command(
     # The line that opens the interface says nothing about what it opens on, so there is
     # nothing here to say it with: what to run is chosen at the prompt.
     assert not any(flag in shown for flag in ("--flow", "--agent", "--config"))
-    # And nothing humanize spawns for itself: a listing offering the supervisor a turn is
-    # run under would be offering a way to run something that is not humanize.
-    assert not any(spawned in shown for spawned in cli._SPAWNED)
+    # Including the door onto what humanize spawns for itself, which is in the listing under
+    # one name: a listing that showed only the line a person types would be describing a
+    # different program from the one that runs, and the four behind it are exactly the
+    # processes somebody debugging a run finds in their process table.
+    assert "internal" in shown
+
+
+def test_the_listing_shows_every_command_there_is() -> None:
+    """Nothing is routed that the help does not name: the old `_SPAWNED` is gone."""
+    assert set(cli.COMMANDS) == {"exec", "internal"}
 
 
 @pytest.mark.parametrize("spawned", ["anchor", "cred", "hook", "tools"])
-def test_what_humanize_spawns_for_itself_is_carried_out_but_not_listed(
+def test_what_humanize_spawns_for_itself_is_listed_under_the_one_name(
     spawned: str,
 ) -> None:
-    """A turn taken as an account is spawned as one of these; nobody types one."""
+    """A turn taken as an account is spawned as one of these; nobody types one by hand."""
+    # Not a command of its own at the top: four more entries there would read as four more
+    # things to do with humanize, which is what gathering them behind one door answers.
     assert spawned not in cli.COMMANDS
-    # Still a line that runs: it is a command line because a process is started by one.
+    assert spawned in cli.INTERNAL
     with pytest.raises(SystemExit) as stopped:
-        cli.main([spawned, "--help"])
+        cli.main(["internal", spawned, "--help"])
 
     assert stopped.value.code == 0
 
 
+def test_the_internal_listing_names_all_four(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """What the door opens onto is written down, which is the whole point of opening it."""
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["internal", "--help"])
+
+    assert stopped.value.code == 0
+    shown = capsys.readouterr().out
+    # Written out rather than read off the table the help is built from: an assertion that
+    # iterates `INTERNAL` cannot fail whatever is in it, which is a check that would go on
+    # passing through the very change it exists to catch.
+    assert all(spawned in shown for spawned in ("anchor", "cred", "hook", "tools"))
+
+
+def test_a_line_naming_no_internal_command_is_a_usage_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`hmz internal` on its own does nothing, and says what it would have taken."""
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["internal"])
+
+    assert stopped.value.code == 2
+    assert "hmz internal" in capsys.readouterr().err
+
+
 def test_what_is_spawned_carries_out_what_it_was_given() -> None:
     """The supervisor a turn under an account runs in, reached the way humanize reaches it."""
-    assert cli.main(["cred", "--map=/house/x=/store/y", "--", "true"]) in (0, 1)
+    assert cli.main(["internal", "cred", "--map=/house/x=/store/y", "--", "true"]) in (
+        0,
+        1,
+    )

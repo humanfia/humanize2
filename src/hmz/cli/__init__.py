@@ -7,14 +7,21 @@ There is one command anybody types, and everything else humanize keeps is walked
 prompt: a listing with a noun in it for every store would be a second interface to learn, and
 the one with the sheets in it is the interface.
 
+The other command in the listing is `hmz internal`, which is the four lines humanize spawns
+for itself gathered under one name. They are listed rather than hidden because a command
+nobody can discover is a command nobody can debug, and a listing that leaves out half of what
+a program runs says something untrue about it. What they are is said instead of concealed:
+one door marked `internal`, so that `hmz --help` is the whole of what this program does and
+still reads as one command anybody types.
+
 A command imports what it needs when it is the one asked for, and no earlier. Two things turn
 on that: `hmz exec` must not pay for the terminal interface it is not opening, and
-`hmz anchor serve` is what the zipapp bootstrapped onto a target runs, where coganchor is the
-only layer present and the architecture is whatever the target happens to be.
+`hmz internal anchor serve` is what the zipapp bootstrapped onto a target runs, where
+coganchor is the only layer present and the architecture is whatever the target happens to be.
 
 A command whose line takes a parser of its own has a module of its own here, so that reaching
 one of them costs nothing for the others -- which is what `anchor.py`, `cred.py`, `hook.py` and
-`tools.py`, the four humanize spawns for itself, are. `exec` has none: the line it takes is
+`tools.py`, the four under `hmz internal`, are. `exec` has none: the line it takes is
 read by :func:`hmz.runtime.runner.flow_and_agents`, since the terminal interface starts a flow from
 that same line.
 
@@ -34,7 +41,7 @@ if TYPE_CHECKING:
 
     from hmz.daemon import Held
 
-__all__ = ["APART", "COMMANDS", "apart", "main", "many", "opens"]
+__all__ = ["APART", "COMMANDS", "INTERNAL", "apart", "main", "many", "opens"]
 
 #: What says whether a run may be held apart from the terminal at all, for a machine that
 #: would rather it went with the window. `off`, `0` or `no`; anything else is silence, and
@@ -188,6 +195,44 @@ def _hook(argv: list[str]) -> int:
     from .hook import hook
 
     return hook(argv)
+
+
+def _internal(argv: list[str]) -> int:
+    """Routes to whichever of the lines humanize spawns for itself was named.
+
+    The same routing as the top of the line, one level down, and for the same reason: a name
+    it knows is handed the rest of the line untouched, so that `hmz internal anchor --help` is
+    answered by the anchor's own parser rather than eaten by this one, and reaching one of
+    them loads no module of any other. Anything else -- a name nobody has, or nothing at all
+    -- is answered by a parser built here, which lists the four and exits.
+
+    Args:
+      argv: What followed `internal`, beginning with the name of one of them.
+
+    Returns:
+      That command's exit status.
+    """
+    if not argv or argv[0] not in INTERNAL:
+        import argparse
+
+        # Its own parser rather than a subparser of the one at the top: the top-level help
+        # names the commands and not what they take, so this is where the four are written
+        # out, and it is reached only when somebody asks about them.
+        parser = argparse.ArgumentParser(
+            prog="hmz internal",
+            description="What humanize spawns for itself: an agent's turn on another "
+            "machine, a turn under an account, and the two relays a coding agent reaches a "
+            "flow's own callbacks and hooks through. Each is a command line because a "
+            "process is started by one, and none of them is a line to type.",
+            epilog="Run `hmz internal COMMAND --help` for what a command takes.",
+        )
+        commands = parser.add_subparsers(metavar="COMMAND", required=True)
+        for name, (_, summary) in INTERNAL.items():
+            commands.add_parser(name, help=summary, add_help=False)
+        # Says which there are and exits, so nothing below this runs.
+        parser.parse_args(argv)
+
+    return INTERNAL[argv[0]][0](argv[1:])
 
 
 def _line() -> ArgumentParser:
@@ -347,28 +392,41 @@ def _at_a_terminal() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
-#: Each command, as what carries it out and the line a listing shows it as. There is one:
-#: running a flow in a directory is what a line is for, and everything else humanize keeps is
-#: walked at the prompt rather than typed. There is no command for the terminal interface
-#: either: naming nothing at all is how it opens.
-COMMANDS = {
-    "exec": (_exec, "run an agent flow in this directory"),
+#: What humanize spawns for itself, each as what carries it out and the line `hmz internal`
+#: shows it as. A turn taken as an account runs the CLI with the paths it keeps its
+#: credentials at pointed into that account's directory, and the supervisor doing the pointing
+#: has to be a process of its own -- it forks the program and takes the signal handling with
+#: it, which a flow pumping turns from threads of its own has none to lend. A flow's own
+#: callbacks are the same shape the other way round: a CLI takes a tool by starting a program,
+#: so there is a program, and it does nothing but carry the protocol back to the process the
+#: callbacks are in. A moment of a flow's is that same shape once more: a CLI takes a hook by
+#: starting a program and waiting for what it says, which is the one place a `PreToolUse` can
+#: be refused rather than watched. An anchored turn is the fourth: `AnchorConfig.command()`
+#: renders one for every turn whose work lands on another machine, and the zipapp
+#: bootstrapped onto a target answers it by running `hmz internal anchor serve`. All four are
+#: a command line because there is no other way to start a process, and none of them is a line
+#: anybody types -- which is a reason to keep them together under one name and behind one
+#: sentence saying so, and not a reason to keep them out of the listing. A command that is not
+#: in the listing is one nobody can look up when it is the thing that failed, and every one of
+#: these fails where a person is reading: a relay that could not reach a flow, a supervisor
+#: whose program was not there, a target that answered nothing.
+INTERNAL = {
+    "anchor": (_anchor, "take a turn whose work lands on another machine"),
+    "cred": (_cred, "run a program with its credentials answered from elsewhere"),
+    "hook": (_hook, "carry one moment of a coding agent's hook table to a flow"),
+    "tools": (_tools, "carry a coding agent's tool calls to the flow whose they are"),
 }
 
-#: What humanize spawns for itself, carried out like any command and listed as none of them.
-#: A turn taken as an account runs the CLI with the paths it keeps its credentials at pointed
-#: into that account's directory, and the supervisor doing the pointing has to be a process of
-#: its own -- it forks the program and takes the signal handling with it, which a flow pumping
-#: turns from threads of its own has none to lend. A flow's own callbacks are the same shape
-#: the other way round: a CLI takes a tool by starting a program, so there is a program, and it
-#: does nothing but carry the protocol back to the process the callbacks are in. A moment of a
-#: flow's is that same shape once more: a CLI takes a hook by starting a program and waiting
-#: for what it says, which is the one place a `PreToolUse` can be refused rather than watched.
-#: An anchored turn is the fourth: `AnchorConfig.command()` renders one for every turn whose
-#: work lands on another machine, and the zipapp bootstrapped onto a target answers it by
-#: running `hmz anchor serve`. All four are a command line because there is no other way to
-#: start a process, and none of them is a line anybody types.
-_SPAWNED = {"anchor": _anchor, "cred": _cred, "hook": _hook, "tools": _tools}
+#: Each command, as what carries it out and the line a listing shows it as. One is for
+#: anybody: running a flow in a directory is what a line is for, and everything else humanize
+#: keeps is walked at the prompt rather than typed. The other is the door onto :data:`INTERNAL`
+#: -- one entry rather than four, so that what a person may type stays one line long while
+#: what humanize runs stays something they can read. There is no command for the terminal
+#: interface either: naming nothing at all is how it opens.
+COMMANDS = {
+    "exec": (_exec, "run an agent flow in this directory"),
+    "internal": (_internal, "what humanize spawns for itself; not a line to type"),
+}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -395,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
         ["-h"],
     ):
         return _tui(arguments)
-    if arguments[0] not in COMMANDS and arguments[0] not in _SPAWNED:
+    if arguments[0] not in COMMANDS:
         if arguments == ["--version"]:
             # Read from the installed metadata, which costs more to reach than everything
             # else here put together -- so it is reached only when it is what was asked for.
@@ -410,13 +468,15 @@ def main(argv: list[str] | None = None) -> int:
 
         # The same line `hmz` itself takes, with the commands added: one help, saying both
         # what may be opened and what may be run, since both are `hmz` and somebody typing
-        # `hmz --help` is asking about the whole of it. It knows the commands by name and not
-        # by what they take -- each one answers `hmz COMMAND --help` itself.
+        # `hmz --help` is asking about the whole of it. Every command is in it, including the
+        # door onto what humanize spawns for itself -- a listing that showed only the line a
+        # person types would be describing a different program from the one that runs. It
+        # knows the commands by name and not by what they take -- each one answers
+        # `hmz COMMAND --help` itself.
         parser = _line()
         commands = parser.add_subparsers(metavar="COMMAND", required=True)
         for name, (_, summary) in COMMANDS.items():
             commands.add_parser(name, help=summary, add_help=False)
         parser.parse_args(arguments)
 
-    carries = _SPAWNED.get(arguments[0])
-    return (carries or COMMANDS[arguments[0]][0])(arguments[1:])
+    return COMMANDS[arguments[0]][0](arguments[1:])

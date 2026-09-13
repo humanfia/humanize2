@@ -88,7 +88,7 @@ def serve_forever(host: str, port: int, table: ExportTable, token: str | None) -
         # Not a message but a handshake: whoever started this reads the port it landed on
         # off this line, a port of 0 having been the way to ask for any free one.
         print(  # noqa: T201
-            f"hmz anchor serve listening {bound[0]} {bound[1]}",
+            f"hmz internal anchor serve listening {bound[0]} {bound[1]}",
             file=sys.stderr,
             flush=True,
         )

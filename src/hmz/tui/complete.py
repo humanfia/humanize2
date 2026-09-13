@@ -8,8 +8,8 @@ starts one. A flow anywhere else is a path, and a path is typed: looking for one
 reading every Python file below here to see which declare a flow, which is a guess, and far
 too slow to make between keystrokes.
 
-`hmz anchor` is not offered: it is not something to do to a flow while it runs, and it takes
-a command line of its own. What a run left behind is `/epics`, which is where the runs are.
+`hmz internal anchor` is not offered: it is not something to do to a flow while it runs, and
+it takes a command line of its own. What a run left behind is `/epics`, which is where the runs are.
 """
 
 from __future__ import annotations

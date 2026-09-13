@@ -308,8 +308,8 @@ Read [Remote execution](/reference/remote-execution).
 
 **Isolation here is about environment, not permission.** A container gives the agent a
 different toolchain and a different filesystem, and mounts your workspace into it. It does not
-stop the agent editing that workspace, and an `hmz anchor` export bounds which files a request
-may name but does not confine the commands that request can run. Read
+stop the agent editing that workspace, and an `hmz internal anchor` export bounds which files a
+request may name but does not confine the commands that request can run. Read
 [Security](/user/security).
 
 ## Writing a machine of your own

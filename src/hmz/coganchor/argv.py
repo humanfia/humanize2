@@ -1,4 +1,4 @@
-"""The `hmz anchor` line, both ways round: read into settings, and written back out.
+"""The `hmz internal anchor` line, both ways round: read into settings, and written back out.
 
 Here rather than in the command line, because the two directions have to agree and only one
 of them is a command line. :meth:`~hmz.coganchor.anchor.AnchorConfig.command` renders a
@@ -22,7 +22,7 @@ __all__ = ["parser", "render", "settings"]
 
 
 def parser() -> ArgumentParser:
-    """Builds the parser for `hmz anchor`, whose every option is a setting of the session.
+    """Builds the parser for `hmz internal anchor`, whose every option is a setting of the session.
 
     Returns:
       A parser whose result is what :class:`~hmz.coganchor.anchor.AnchorConfig` takes.
@@ -31,9 +31,14 @@ def parser() -> ArgumentParser:
     import os
 
     built = argparse.ArgumentParser(
-        prog="hmz anchor",
-        description="Run a coding agent on this machine that acts on another one.",
-        epilog="Example: hmz anchor --target ssh://build-box claude --model opus",
+        prog="hmz internal anchor",
+        # Wrapped by hand: the raw formatter below keeps the epilog's own line breaks,
+        # and pays for that by not re-wrapping the description either.
+        description="Run a coding agent on this machine that acts on another one.\n"
+        "humanize renders this line for every turn whose work lands\n"
+        "elsewhere; it is not one to type by hand.",
+        epilog="What humanize renders looks like this:\n"
+        "  hmz internal anchor --target ssh://build-box claude --model opus",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     built.add_argument(
@@ -217,7 +222,7 @@ def settings(args: Namespace) -> AnchorConfig:
 
 
 def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
-    """Writes the settings back out as the `hmz anchor` line that would read as them.
+    """Writes the settings back out as the `hmz internal anchor` line that would read as them.
 
     The interpreter is named explicitly, so the child is the one humanize is installed in
     whether or not the console script is on PATH.
@@ -262,7 +267,7 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
         options.append("--force")
     if config.native:
         options.append("--native")
-    return [sys.executable, "-m", "hmz", "anchor", *options, *argv]
+    return [sys.executable, "-m", "hmz", "internal", "anchor", *options, *argv]
 
 
 def _pair(said: str) -> tuple[str, str]:

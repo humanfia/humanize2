@@ -370,7 +370,12 @@ def test_claude_is_told_about_the_callbacks_on_its_own_command_line(
     (argv,) = _starts(claude)
     held = json.loads(argv[argv.index("--mcp-config") + 1])
     assert list(held["mcpServers"]) == ["humanize"]
-    assert held["mcpServers"]["humanize"]["args"][:2] == ["-m", "hmz"]
+    assert held["mcpServers"]["humanize"]["args"][:4] == [
+        "-m",
+        "hmz",
+        "internal",
+        "tools",
+    ]
     # And what the person at this machine has configured is left alone: adding ours is not
     # the same as taking theirs away.
     assert "--strict-mcp-config" not in argv

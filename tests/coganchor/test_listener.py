@@ -156,7 +156,7 @@ def test_the_port_it_landed_on_is_announced_to_whoever_started_it(
 
     said = capsys.readouterr().err
 
-    assert f"hmz anchor serve listening 127.0.0.1 {held.port}" in said
+    assert f"hmz internal anchor serve listening 127.0.0.1 {held.port}" in said
     assert held.port != 0
 
 
@@ -216,7 +216,7 @@ def test_a_session_presenting_the_secret_is_served(
 def test_a_session_presenting_the_wrong_secret_is_refused(
     serving: Callable[[str | None], _Listening],
 ) -> None:
-    """An `hmz anchor` port is equivalent to a shell on that machine, so this is the door."""
+    """An `hmz internal anchor` port is equivalent to a shell on that machine, so this is it."""
     held = serving(TOKEN)
 
     with pytest.raises(OSError, match="token"):

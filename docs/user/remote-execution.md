@@ -9,8 +9,8 @@ cooperation: it is told none of this and takes part in none of it.
      this machine                              the target
 ┌────────────────────┐                   ┌────────────────────┐
 │  claude / codex …  │                   │                    │
-│        ↓ syscalls  │                   │                    │
-│  ┌──────────────┐  │   one channel     │  hmz anchor serve  │
+│        ↓ syscalls  │                   │  hmz internal      │
+│  ┌──────────────┐  │   one channel     │    anchor serve    │
 │  │  supervisor  │──┼──────────────────▶│         ↓          │
 │  └──────────────┘  │  ssh / docker /   │  files, processes, │
 │   local mirror     │  tcp / a pipe     │  the network       │
@@ -28,7 +28,7 @@ the agent sees are the target's own.
 Ask the target what it is before you run anything against it:
 
 ```sh
-hmz anchor --check --target ssh://build-box
+hmz internal anchor --check --target ssh://build-box
 ```
 
 ```console
@@ -42,7 +42,7 @@ workspace   /home/me/code/myproject (184 entries)
 Then run an agent against it:
 
 ```sh
-hmz anchor --target ssh://build-box claude
+hmz internal anchor --target ssh://build-box claude
 ```
 
 The agent runs here while its commands run on the build box. Inside the workspace it sees the
@@ -54,7 +54,7 @@ either spelling reaches the same file.
 Everything after the agent's name is the agent's own:
 
 ```sh
-hmz anchor --target ssh://gpu-01 codex exec "run the test suite"
+hmz internal anchor --target ssh://gpu-01 codex exec "run the test suite"
 ```
 
 ## Targets
@@ -70,8 +70,8 @@ humanize ships the target half as a zipapp and caches it there by digest. It nee
 installation. The two halves refuse to run against each other if their versions disagree.
 
 ::: details It cannot connect
-Run `ssh build-box` yourself first. `hmz anchor` uses your own ssh config, agent and keys, and
-it adds nothing. Then check that there is a Python 3.12 or newer there; it need not be on the
+Run `ssh build-box` yourself first. `hmz internal anchor` uses your own ssh config, agent and
+keys, and it adds nothing. Then check that there is a Python 3.12 or newer there; it need not be on the
 `PATH`, since humanize looks where a Mac and a Homebrew keep one too. See
 [Troubleshooting](/user/troubleshooting#the-target-cannot-be-reached).
 :::
@@ -103,7 +103,7 @@ it adds nothing. Then check that there is a Python 3.12 or newer there; it need 
 Name what must stay here with `--local-path` or `--local-exec`:
 
 ```sh
-hmz anchor --target ssh://build-box \
+hmz internal anchor --target ssh://build-box \
     --local-path /home/me/code/myproject/.venv \
     --local-exec /usr/bin/rg \
     claude
@@ -136,8 +136,8 @@ config = ClaudeCodeAgentConfig(
 )
 ```
 
-Every option of `hmz anchor` is a field of `AnchorConfig`, and every field is an option. A flow
-spawns what an operator would have typed. Settings no session could run under are refused where
+Every option of `hmz internal anchor` is a field of `AnchorConfig`, and every field is an
+option. A flow spawns what an operator would have typed. Settings no session could run under are refused where
 they are *written*, so a flow that misspells a target hears about it as it configures its
 agents rather than hours into the loop.
 
@@ -190,11 +190,11 @@ happens in the only names the far end has.
 /tmp/elsewhere is not inside /srv/project, which is the workspace this agent's turns land in
 ```
 
-The same paths are flags on `hmz anchor`. Where the project lives at a different path there,
-name both:
+The same paths are flags on `hmz internal anchor`. Where the project lives at a different path
+there, name both:
 
 ```sh
-hmz anchor --target ssh://build-box \
+hmz internal anchor --target ssh://build-box \
     --workspace /home/me/code/myproject \
     --remote-path /srv/build/myproject \
     claude
@@ -212,7 +212,7 @@ hmz anchor --target ssh://build-box \
 Where there is no ssh and no container, run the target half on the far machine:
 
 ```sh
-hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+hmz internal anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ```
 
 It needs only a POSIX system and a recent `python3`. No root, no compiler, nothing installed.
@@ -220,7 +220,7 @@ It needs only a POSIX system and a recent `python3`. No root, no compiler, nothi
 Then connect from here:
 
 ```sh
-hmz anchor --target tcp://build-box:7777 --workspace /srv/project --token "$SECRET" claude
+hmz internal anchor --target tcp://build-box:7777 --workspace /srv/project --token "$SECRET" claude
 ```
 
 A `tcp://` target is **cheap to reconnect**, which matters for a loop of short turns. A backend
@@ -248,6 +248,6 @@ looked for if it finds none.
 
 - [Containers](/user/containers) — the same arrangement, with a container as the target
 - [Remote execution reference](/reference/remote-execution) — what is and is not guaranteed
-- [CLI › `hmz anchor`](/reference/cli#hmz-anchor)
+- [CLI › `hmz internal anchor`](/reference/cli#hmz-internal-anchor)
 - [Troubleshooting](/user/troubleshooting#the-target-cannot-be-reached)
 - [humanize in CI](/user/ci)

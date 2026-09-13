@@ -80,7 +80,7 @@ const BANDS: Band[] = [
     chips: [
       'this machine',
       'a container of its own',
-      'a remote target through hmz anchor',
+      'a remote target through hmz internal anchor',
       'worktrees',
     ],
   },
