@@ -22,6 +22,8 @@ from hmz.coganchor.agents import (
     PiAgent,
     PiAgentConfig,
     Usage,
+    unreadable,
+    unwatched,
 )
 
 #: A model nobody lists, which is what leaves a run's bill unreadable. What is priced comes
@@ -184,6 +186,40 @@ def test_what_ran_out_is_held_once_it_has(priced: str) -> None:
     agent._meter._total.clear()
 
     assert ledger.over() == "0.001M output tokens"
+
+
+@pytest.mark.parametrize(
+    ("effective", "declared", "asked"),
+    [
+        # A flow with no opinion, left with no cap: nobody has said anything, so ask.
+        (Allowance(), None, True),
+        # A flow that wrote `Allowance()` in its own file: it has said so, so do not.
+        (Allowance(), Allowance(), False),
+        # A flow that declared a cap and had it overridden away. It said what a run of it is
+        # worth; it did not say a run of it under nothing is what it is for -- so ask, or a
+        # flow declaring six hours would be the one flow nobody is warned about zeroing.
+        (Allowance(), Allowance(hours=6), True),
+        # And anything that caps something is not the question at all.
+        (Allowance(hours=1), None, False),
+    ],
+)
+def test_who_is_asked_about_a_run_nothing_will_stop(
+    effective: Allowance, declared: Allowance | None, asked: bool
+) -> None:
+    """The claim is read off the flow rather than off whether it said anything."""
+    assert unwatched(effective, declared) is asked
+
+
+def test_a_cap_nothing_can_read_is_said_however_it_was_handed_in() -> None:
+    """Taken as it is given, a generator would be drained by the first field looked for.
+
+    And the whole of what this is for is saying that a cap will never bite, so answering ""
+    for a run whose caps nothing can read is the one wrong answer it has.
+    """
+    written = unreadable(name for name in ("tokens", "dollars"))
+
+    assert "tokens" in written
+    assert "dollars" in written
 
 
 def test_an_unbounded_run_reads_no_meter_at_all() -> None:

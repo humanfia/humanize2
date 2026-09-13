@@ -8,7 +8,15 @@ from .agy import (
     AntigravityCLIAgentConfig,
     AntigravityCLISession,
 )
-from .allowance import DEFAULT, MILLION, Allowance, Ledger, Reading, unwatched
+from .allowance import (
+    DEFAULT,
+    MILLION,
+    Allowance,
+    Ledger,
+    Reading,
+    unreadable,
+    unwatched,
+)
 from .base import (
     WINDOW,
     AgentBase,
@@ -208,5 +216,6 @@ __all__ = [
     "ZcodeSession",
     "anchored",
     "isolated",
+    "unreadable",
     "unwatched",
 ]

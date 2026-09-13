@@ -143,7 +143,10 @@ class Allowance:
             one's own spelling of its cap.
           dollars: What it has cost, or None where nothing in it can be priced. None never
             reaches the cap: a bill nobody can read is not a bill of nothing, and stopping a
-            run on one would be stopping it for a figure that was never measured.
+            run on one would be stopping it for a figure that was never measured. A run only
+            part of which is priced hands in a floor, so such a cap is reached late rather
+            than early -- which is the direction to be wrong in, a run stopped for money it
+            had not spent being worse than one that overran by what nobody could price.
 
         Returns:
           Why the run is over its allowance -- `6h`, `2M output tokens`, `$50` -- or "" while
@@ -282,7 +285,11 @@ class Ledger:
             # None rather than 0.00 where nothing could be priced, which is a bill nobody can
             # read and not a run that was free.
             dollars=sum(billed) if billed else None,
-            floor=bool(billed) and priced < len(enrolled),
+            # Counted on what was actually billed rather than on what could be: a model the
+            # list holds but not for the kinds this run spent on is priced and still adds
+            # nothing, and a bill short of one of those is short exactly as one short of a
+            # model nobody lists at all.
+            floor=bool(billed) and len(billed) < len(enrolled),
             blind=frozenset(blind),
         )
 
@@ -447,7 +454,11 @@ def unreadable(blind: Iterable[str]) -> str:
     Returns:
       One line about them, or "" where every cap that was set can be read.
     """
-    said = [f"{name} ({_UNREADABLE[name]})" for name in FIELDS if name in set(blind)]
+    # Read into a set once. Taken as it is given, a generator would be drained by the first
+    # field and every later one would look in nothing -- which would answer "" for a run whose
+    # caps nothing can read, and saying that is the whole of what this is for.
+    wanted = set(blind)
+    said = [f"{name} ({_UNREADABLE[name]})" for name in FIELDS if name in wanted]
     return f"nothing here can read {' or '.join(said)}" if said else ""
 
 
@@ -462,9 +473,14 @@ def unwatched(effective: Allowance, declared: Allowance | None) -> bool:
 
     Args:
       effective: What the run will actually be held to.
-      declared: What the flow itself said, or None for a flow with no opinion.
+      declared: What the flow itself said, or None for a flow with no opinion. Only an
+        `Allowance()` written out is the claim: a flow that declared a cap and had it
+        overridden away has said nothing about running under none.
 
     Returns:
       Whether nothing will stop this run and nobody has said that is what they meant.
     """
-    return not effective.bounded and declared is None
+    # `declared is None` is a flow with no opinion, and a declaration that caps something is
+    # a flow whose opinion this run has overridden -- neither is a flow saying an unbounded run
+    # is what it is for. Only `Allowance()` written out says that, and only it is exempt.
+    return not effective.bounded and (declared is None or declared.bounded)
