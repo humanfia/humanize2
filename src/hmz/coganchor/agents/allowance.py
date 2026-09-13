@@ -239,9 +239,15 @@ class Ledger:
             self._agents.add(agent)
 
     def agents(self) -> tuple[AgentBase, ...]:
-        """Every agent still enrolled, as a tuple nothing else can change under a reader."""
+        """Every agent still enrolled that spends anything this is reckoned in.
+
+        Which leaves out the person at the prompt. They run no model, so there is no token,
+        no dollar and no minute of this that is theirs -- and counting them would also mark
+        every cap in a run of theirs unreadable, since a person reports no tokens and is on
+        no price list.
+        """
         with self._lock:
-            return tuple(self._agents)
+            return tuple(one for one in self._agents if type(one).spends)
 
     def reads(self) -> Reading:
         """What the run has spent up to this moment.
@@ -324,13 +330,16 @@ class Ledger:
         Once and once only, and the flag is set before anything is stopped: stopping an agent
         closes its sessions, and a session closing reads the ledger, so a second pass through
         here is the ordinary way in rather than an unlikely one.
+
+        The person at the prompt is not among them. They spend nothing, so stopping them
+        saves nothing -- and it would cost the run the one agent that could be told it had
+        stopped: a flow that is a conversation would raise on the line where it said so.
         """
         with self._lock:
             if self._stopping:
                 return
             self._stopping = True
-            enrolled = tuple(self._agents)
-        for agent in enrolled:
+        for agent in self.agents():
             agent.stop()
 
 
