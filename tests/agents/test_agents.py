@@ -31,6 +31,7 @@ from hmz.coganchor.agents import (
     Question,
     Stopped,
 )
+from hmz.coganchor.agents.codenames import SAID
 from hmz.coganchor.machines import AnchoredConfig
 from tests.stubs import HereAnchor, ShellAgent
 
@@ -205,10 +206,12 @@ def test_an_agent_is_one_agent_apart_from_its_configuration() -> None:
     actor, reviewer = _EchoAgent(CONFIG), _EchoAgent(CONFIG)
     assert actor.id != reviewer.id
     assert actor.config == reviewer.config
-    # A flow that names its agents keeps those names across restarts; one left unnamed is
-    # called after a Chrysos Heir, so a trace of two of them still reads as two.
+    # A flow that names its agents keeps those names across restarts; one left unnamed draws
+    # a designation out of Amphoreus, so a trace of two of them still reads as two.
     assert _EchoAgent(CONFIG, name="actor").id == "actor"
-    assert re.fullmatch(r"[A-Z][a-z]+(?:[A-Z][a-z]+)+[0-9]{3}", actor.id)
+    assert actor.id in SAID or re.fullmatch(
+        r"[A-Z][a-z]+(?:[A-Z][a-z]+)+[0-9]{3}", actor.id
+    )
 
 
 def test_an_agent_remembers_every_session_it_opened() -> None:

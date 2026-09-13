@@ -1083,30 +1083,36 @@ A [flow](/reference/flows#how-many-agents-and-what-they-are-for) that declares i
 ### The name nobody gave it
 
 An agent nobody named still needs one nothing else answers to, and what it gets is a codename out
-of Amphoreus — a Greek word for what a Chrysos Heir was made to be, and three digits behind it:
+of Amphoreus — a designation off the electrical signals *Honkai: Star Rail* logs, or a Greek word
+and three digits built by the rule those designations are spelled by:
 
 ```text
-NeiKos496   PhiLia093   SkeMma720   KykLos204   MetaKratos881
+NeiKos496   PhiLia093   Golem99   Utop13   ScreW   KykLos204   MetaKratos881
 ```
 
-Twelve of those are codes *Honkai: Star Rail* says out loud, and while any of the twelve is still
-free they come up half the time — against the once in eleven thousand the written-down words alone
-would give them by chance, since a name is only a joke to somebody who recognises it. The rest are
-those same roles under some other number: another epic of a story that has run 33,550,336 of
-them, which is the fifth perfect number, as 496 is the third.
+Twenty-nine of those are designations the story says out loud: the twelve Chrysos Heirs, two heirs
+of earlier recurrences, twelve signals logged in the cycles before there were heirs at all, and
+the three outsiders who walked into the experiment rather than being run by it. While any of the
+twenty-nine is still free they come up half the time — against the once in eleven thousand the
+written-down words alone would give them by chance, since a name is only a joke to somebody who
+recognises it. The rest are those same roles under some other number: another epic of a story that
+has run 33,550,336 of them, which is the fifth perfect number, as 496 is the third.
 
-The word is built rather than looked up. Morphemes join at the capital — `Apo` and `Ria` are
-`ApoRia`, which is an heir's, so `Meta` and `Kratos` are `MetaKratos`, which is a word the same
-rule makes and the story merely never needed. That is what makes the supply endless: a process
-that has used the short words up is answered with a longer one built the same way, and **never
-with a hex tail**. There is no last code, so there is nothing to fall back to.
+A canon code is copied verbatim, in whatever shape the story spells it — `Golem99` carries two
+digits, `Imora8` one, `ScreW` none — because tidying one up would hand out a name the story never
+gave. A generated code has nothing to copy, so it keeps the rule, and its word is built rather
+than looked up. Morphemes join at the capital — `Apo` and `Ria` are `ApoRia`, which is an heir's,
+so `Meta` and `Kratos` are `MetaKratos`, which is a word the same rule makes and the story merely
+never needed. That is what makes the supply endless: a process that has used the short words up is
+answered with a longer one built the same way, and **never with a hex tail**. There is no last
+code, so there is nothing to fall back to.
 
 No code is handed out twice in one process either. Two agents left unnamed are two agents, and a
 trace that read them as one would read a flow reviewing its own work as a flow arguing with
 itself.
 
 A name given where the agent was made is kept, and `builder` says what `NeiKos496` does not — so
-name the ones whose roles matter and let the rest be heirs.
+name the ones whose roles matter and let the rest draw.
 
 ## The person as an agent
 
