@@ -22,33 +22,32 @@ from hmz import cli
 #: names rather than as the directory each is in, because a directory is now several answers:
 #: `runtime` holds both what drives a run and the tracer that reads one back afterwards, and
 #: a budget saying `runtime` would stop noticing `hmz exec` paying for the second. A name
-#: here covers the modules inside it. `internal anchor` is in the list for being the one
-#: humanize spawns that a whole layer is behind: the target half of a session is this package
-#: with the anchor and nothing else on it. A command is written here as the words that name
-#: it, because one of them is now two words deep -- and going through the door marked
-#: `internal` must cost nothing, since what it opens onto is the half that runs on a target
-#: where no other layer is installed.
+#: here covers the modules inside it; a package walked through on the way to one is in
+#: `WALKED` below and covers nothing, which is how `runtime` is reached without being let in.
+#: `internal anchor` is in the list for being the one humanize spawns that a whole layer is
+#: behind: the target half of a session is this package with the anchor and nothing else on
+#: it. A command is written here as the words that name it, because one of them is now two
+#: words deep -- and going through the door marked `internal` must cost nothing, since what
+#: it opens onto is the half that runs on a target where no other layer is installed.
 COMMANDS = [
     # The two leaves that say whether humanize reports its own failures and where the answer
     # is kept: a command that cannot report a crash is a crash nobody hears about. And what a
     # flow is, which is where the refusal a line naming no flow is answered with is written.
     # Naming it must not cost the drivers: what a flow imports from `coganchor` is fetched
     # when a flow names it, not when the line is read -- which is why the facts about the
-    # CLIs are here and nothing else of that layer is. And the SDK, which is the one object
-    # every way in holds: it reaches a layer only from inside the call that needs it, so
-    # naming it costs nothing but itself.
+    # CLIs are here and nothing else of that layer is. And the front door of the runtime,
+    # which is the one object every way in holds: it reaches a layer only from inside the
+    # call that needs it, so naming it costs nothing but itself.
     (
         "exec",
         {
-            "hmz.coganchor",
             "hmz.coganchor.backends",
             "hmz.flows",
-            "hmz.runtime",
+            "hmz.runtime.doing",
             "hmz.runtime.kept",
             "hmz.runtime.runner",
             "hmz.runtime.settings",
             "hmz.runtime.telemetry",
-            "hmz.sdk",
         },
     ),
     ("internal anchor", {"hmz.coganchor"}),
@@ -61,6 +60,14 @@ COMMANDS = [
     ("internal hook", set[str]()),
     ("internal tools", set[str]()),
 ]
+
+#: The packages every budget is walked through on the way to a module inside one, and which
+#: cost their own `__init__` and nothing else. Named here rather than worked out from the
+#: budgets, because being a package is not what makes one free: each of these three is a
+#: front door that fetches what it offers when it is named, and `hmz/tui/__init__.py` hands
+#: through the whole interface -- so a rule that let any package in for the sake of a module
+#: under it would let that one in too, the day something here is budgeted a module of it.
+WALKED = {"hmz", "hmz.coganchor", "hmz.runtime"}
 
 
 @pytest.mark.parametrize(("command", "layers"), COMMANDS, ids=lambda value: value)
@@ -88,7 +95,8 @@ def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     assert not {
         name
         for name in reached
-        if not any(name == one or name.startswith(f"{one}.") for one in allowed)
+        if name not in WALKED
+        and not any(name == one or name.startswith(f"{one}.") for one in allowed)
     }
 
 

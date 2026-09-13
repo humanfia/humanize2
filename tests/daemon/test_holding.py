@@ -411,6 +411,58 @@ def test_what_is_running_here_is_answered_off_what_was_written_down(
 
 
 @pytest.mark.timeout(60)
+def test_what_flows_are_running_is_asked_of_the_runtime_rather_than_of_the_run(
+    holding: Holding, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This is the process they run in, so it is this that answers rather than what it holds.
+
+    Which is why nothing was registered here to say so: what is running is read out of the
+    runtime by whoever was asked about the run.
+    """
+
+    class Drove:
+        flow = "rlar"
+
+    monkeypatch.setattr("hmz.flows.running", lambda: (Drove(),))
+    asking = holding.terminal(joining=False)
+
+    asking.says(CONTROL, {"do": "status"})
+
+    assert json.loads(asking.hears(CONTROL))["flows"] == ["rlar"]
+
+
+@pytest.mark.timeout(60)
+def test_a_run_with_no_flow_in_it_says_so_rather_than_saying_nothing(
+    holding: Holding,
+) -> None:
+    """An empty list rather than a missing key: whoever asked is reading an answer."""
+    asking = holding.terminal(joining=False)
+
+    asking.says(CONTROL, {"do": "status"})
+
+    assert json.loads(asking.hears(CONTROL))["flows"] == []
+
+
+@pytest.mark.timeout(60)
+def test_a_runtime_that_will_not_say_is_a_run_running_nothing_rather_than_no_answer(
+    holding: Holding, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A status nobody can read is worse than one that says a run is running no flows."""
+
+    def raising() -> tuple[object, ...]:
+        raise RuntimeError("not today")
+
+    monkeypatch.setattr("hmz.flows.running", raising)
+    asking = holding.terminal(joining=False)
+
+    asking.says(CONTROL, {"do": "status"})
+
+    said = json.loads(asking.hears(CONTROL))
+    assert said["ok"]
+    assert said["flows"] == []
+
+
+@pytest.mark.timeout(60)
 def test_whatever_is_holding_the_run_may_add_to_what_is_said_about_it(
     holding: Holding,
 ) -> None:

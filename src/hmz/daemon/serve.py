@@ -152,7 +152,8 @@ class Held:
         self._stops: Callable[[], None] | None = None
         self._saying: Callable[[], dict[str, Any]] | None = None
 
-    # -- what the interface being held is told about, which is the whole of `hmz.sdk.Session`
+    # -- what the interface being held is told about, which is the whole of
+    # `hmz.daemon.session.Session`
 
     @property
     def attached(self) -> int:
@@ -564,14 +565,34 @@ class Held:
             one.sendall(spoken(CONTROL, answer))
 
     def _status(self) -> dict[str, Any]:
-        """What there is to say about this run, for somebody asking from outside it."""
+        """What there is to say about this run, for somebody asking from outside it.
+
+        Which flows are running is asked of the runtime here rather than handed in as a hook,
+        because this is the process they are running in: whoever is drawing would only be
+        asking the same question on the way past, and a thing asked once is a thing answered
+        one way. What is drawn is still whoever is drawing's, and says itself through
+        :meth:`says`.
+        """
         said: dict[str, Any] = dict(where.held(self._at))
         said["attached"] = self.attached
+        said["flows"] = self._flows()
         hook = self._saying
         if hook is not None:
             with contextlib.suppress(Exception):
                 said.update(hook())
         return said
+
+    def _flows(self) -> list[str]:
+        """Every flow of the run being held here, oldest first, and none where none is.
+
+        Answered rather than raised however it goes: a status nobody can read is worse than
+        one that says a run it could not ask about is running no flows.
+        """
+        with contextlib.suppress(Exception):
+            from hmz.runtime import Hmz
+
+            return [one.flow for one in Hmz().flows.running()]
+        return []
 
     def _closing(self, selector: selectors.BaseSelector, one: socket.socket) -> None:
         """Takes one socket off the list and closes it."""

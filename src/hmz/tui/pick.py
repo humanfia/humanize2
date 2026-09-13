@@ -74,9 +74,9 @@ if TYPE_CHECKING:
     # them being read as the other.
     from hmz.coganchor.fallbacks import Falls as Step
     from hmz.coganchor.providers import Provider
+    from hmz.daemon import Hmz
     from hmz.flows import Flowverse, Offer, Place
     from hmz.runtime.epic import Ran
-    from hmz.sdk import Hmz
 
     from .monitor import Monitor, Under
 
@@ -3136,7 +3136,7 @@ def _hmz() -> Hmz:
     Made where it is wanted rather than held: it costs nothing until something is asked of
     it, and a sheet that reads a store twice reads the same store both times.
     """
-    from hmz.sdk import Hmz
+    from hmz.daemon import Hmz
 
     return Hmz()
 
@@ -6102,7 +6102,7 @@ def exported(ran: Ran) -> tuple[Path, int, str]:
 
     Beside the run rather than in this directory: an epic is what a run was, and the trace of
     that run belongs with the sessions it points at and the state it left. A trace of what a
-    directory holds whoever opened it is :meth:`hmz.sdk.epics.Epics.trace` with no sessions
+    directory holds whoever opened it is `Hmz().epics.trace` with no sessions
     named, and a trace written somewhere else is its `output`: both are Python, there being no
     run here to hang either on.
 
@@ -6189,7 +6189,7 @@ class Epics(Sheet[Doing]):
             finished. None for nothing to ask, which is nothing running.
         """
         super().__init__()
-        from hmz.sdk import Hmz
+        from hmz.daemon import Hmz
 
         runs = Hmz(workspace).epics
         #: Newest first: what somebody opening this came to look at is the run that has just

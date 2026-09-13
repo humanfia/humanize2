@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import time
+import unittest.mock
 from typing import TYPE_CHECKING
 
 import pytest
@@ -140,9 +141,32 @@ def test_what_is_running_is_answered_without_attaching(held: daemon.Daemon) -> N
 
     assert said["pid"] == held.pid
     assert said["attached"] == 0
-    # And whatever the run itself says about what it is, which the interface answers with
-    # the flows it has running.
+    # Which flows are running is the daemon's own answer, this being the process they would
+    # be running in. The stand-in runs none.
+    assert said["flows"] == []
+    # And whatever the run itself says about what it is, which is the one thing here the
+    # daemon is told rather than asks.
     assert said["kind"] == "a stand-in"
+
+
+def test_a_run_that_will_not_answer_says_the_same_things_about_itself(
+    held: daemon.Daemon,
+) -> None:
+    """One that is starting up or is wedged is read off what is written beside its socket.
+
+    The same questions answered either way, so that whoever asked reads an answer rather
+    than working out which of the two they were given.
+    """
+    assert _until(lambda: "kind" in held.status())
+    answered = held.status()
+    with unittest.mock.patch.object(daemon.Daemon, "asked", return_value={}):
+        written = held.status()
+
+    assert written["pid"] == held.pid
+    assert written["attached"] == 0
+    assert written["flows"] == []
+    # Less what only the run itself could have said, which is why it is asked at all.
+    assert set(written) < set(answered)
 
 
 def test_letting_go_from_outside_lets_every_terminal_go(held: daemon.Daemon) -> None:

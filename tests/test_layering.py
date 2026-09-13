@@ -7,17 +7,20 @@ as, the machine its turns land on and the anchor onto that machine -- and it is 
 `flows` and `runtime` are written against. A flow is written against `flows` and names
 nothing else, which is what makes `flows` the layer that names the agents rather than the
 flow doing it; `runtime` is what reads a command line into a run, drives it, writes it down
-as an epic and reads the whole of it back afterwards. Nothing points both ways, which is
-checked here too.
+as an epic and reads the whole of it back afterwards -- and composes all of that into the one
+object above it, which is what every way in holds. Nothing points both ways, which is checked
+here too.
 
 And the target half runs on the target, which may be any architecture, while
 :mod:`hmz.coganchor.linux` picks a register map at import time and refuses any architecture it
 has not got one for -- so the serving half must not reach the rest of `coganchor`, nor may
 anything a caller imports to configure one.
 
-The rules are on the layers alone. Above them sit the ways in, and above those the command
-line, which joins them and so may name any of them -- and which is checked instead by what a
-run of it actually loads.
+The rules are on the layers alone. Above them sit the ways in: the interface, which reaches
+the runtime through the daemon holding the run it is drawing, and the command line, which
+joins them and so may name any of them -- and which is checked instead by what a run of it
+actually loads. `sdk` is above all of it and is the way in from outside; what says so is that
+nothing below it names it.
 """
 
 from __future__ import annotations
@@ -51,7 +54,9 @@ ALLOWED: dict[str, set[str]] = {
     # What a run is: driving one, writing it down as it happens, and reading it back
     # afterwards. Held open as its own modules rather than closed as one layer, because what
     # humanize reports about itself lives here and every layer may reach for it -- including
-    # the one this names.
+    # the one this names. The front door names only the modules beside it, which is what a
+    # front door is: `hmz.runtime.Hmz` is handed through out of `doing`, and nothing above
+    # this may reach past it to a module it did not mean to name.
     "hmz.runtime": set(),
     # What an agent is written down as, which is a shape and a file and nothing else: the
     # interface keeps them and a command line reads the same ones, so it sits under both.
@@ -104,27 +109,29 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.runtime.epic",
         "hmz.runtime.telemetry",
     },
-    # humanize as one object, which is what the command line, the daemon and the interface
-    # all hold. It is above the layers and below the ways in, so it may name any of them and
-    # none of them may name it -- which is what keeps `hmz exec` from paying for a tracer:
-    # everything here is reached from inside the call that needs it.
-    "hmz.sdk": {
+    # humanize as one object: one workspace and everything that can be done in it, composed
+    # out of the layers beside it. It is the front door of the runtime rather than a layer of
+    # its own -- everything here is one place several callers would otherwise each have
+    # written the same answer, and every rule it composes is still written where it is
+    # carried out. Everything is reached from inside the call that needs it, which is what
+    # keeps `hmz exec` from paying for a tracer.
+    "hmz.runtime.doing": {
         "hmz.coganchor",
         "hmz.flows",
-        "hmz.runtime",
         "hmz.runtime.epic",
         "hmz.runtime.exporting",
-        "hmz.runtime.kept",
         "hmz.runtime.runner",
         "hmz.runtime.settings",
         "hmz.runtime.telemetry",
         "hmz.runtime.tracing",
     },
-    # The run held where a terminal closing cannot end it, which knows nothing of what a run
-    # is: it is handed something that opens one and returns when it is over. A leaf, so that
-    # the half of humanize which is a process and a socket can be read without any of the
-    # half that drives coding agents.
-    "hmz.daemon": set(),
+    # The run held where a terminal closing cannot end it. How one is opened is still none of
+    # its business -- it is handed something that opens one and returns when it is over -- but
+    # what a run is, is: this is the process a run of the workspace happens in, so it is where
+    # the runtime is reached from, and what is running here is a question it answers itself.
+    # The front door and nothing past it, so that the half of humanize which is a process and
+    # a socket costs the layers it asks and not the ones beside them.
+    "hmz.daemon": {"hmz.runtime"},
     "hmz.tui": {
         # The agents, the facts about them, the accounts they run as, what a turn falls back
         # to and what a token costs -- all of which are one layer now, and all of which the
@@ -132,8 +139,8 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.coganchor",
         "hmz.flows",
         # The runs of this directory, which `/epics` lists and picks one up from, and how big
-        # a bundle of one came out. Writing one is asked of `sdk` like everything else the
-        # interface does rather than draws; how many bytes it came to is said in words.
+        # a bundle of one came out. Writing one is asked of the runtime like everything else
+        # the interface does rather than draws; how many bytes it came to is said in words.
         "hmz.runtime.epic",
         "hmz.runtime.exporting",
         # The agents written down under a name, which the Agents page of `/flow` walks and
@@ -143,13 +150,23 @@ ALLOWED: dict[str, set[str]] = {
         # thing here with somebody to ask -- and where what it does that nobody meant is
         # noticed. The reporter names nothing above itself.
         "hmz.runtime.telemetry",
-        # humanize as one object, which is what starts a flow, gathers a trace of one that
-        # has ended, and walks every store the sheets show. Everything the interface does
-        # rather than draws is asked of it -- which is why the runner and what humanize
-        # remembers are not named here: the sheets reach both through this and nothing here
-        # may reach past it to them.
-        "hmz.sdk",
+        # What holds a run where a terminal closing cannot end it, and through it humanize as
+        # one object: what starts a flow, gathers a trace of one that has ended, and walks
+        # every store the sheets show. Everything the interface does rather than draws is
+        # asked of it -- which is why the runner and what humanize remembers are not named
+        # here: the sheets reach both through this and nothing here may reach past it to
+        # them. Through the daemon and not around it because a run of this workspace is held
+        # in a process of its own and this interface is what is drawing in it -- so the thing
+        # holding the run is the thing it asks, and a run held apart from a terminal and a run
+        # in the terminal somebody typed `hmz` in are one interface rather than two.
+        "hmz.daemon",
     },
+    # How a tool that is not humanize reaches humanize: the runtime, straight at it, and a run
+    # held apart from a terminal, reached over the socket beside it. Nothing below names it,
+    # which is what tells a seam somebody outside reaches in through from a seam every way in
+    # has to pass through -- it composes nothing and restates nothing, and hands through what
+    # the two front doors under it already offer.
+    "hmz.sdk": {"hmz.daemon", "hmz.runtime"},
 }
 
 #: What reaching the target half costs besides: the two modules of the command line that route

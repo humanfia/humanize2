@@ -8,6 +8,7 @@
 ├── attach.py
 ├── proto.py
 ├── serve.py
+├── session.py
 └── where.py
 ```
 
@@ -44,13 +45,30 @@ def start(
 ) -> Daemon: ...
 ```
 
+Expose `Daemon`, `Held`, `Session`, `running`, `daemons`, `start` -- and `Hmz`, which is
+`hmz.runtime`'s and is handed through under this name.
+
 A run held where a terminal closing cannot end it, and the terminals that come and go from it.
 
-- Nothing here MUST know what a run is. What it holds is a callable that opens one and
-  returns when it is over, so that the interface and this stay apart: an interface draws on a
-  terminal, and whether that terminal is somebody's ssh session or one of these is not a
-  thing it has to be told. That is what makes it a leaf, and what makes the interface running
-  under one identical to the interface running under none.
+- How a run is opened MUST go on being none of this. What it holds is a callable that opens
+  one and returns when it is over, so that what draws and what holds stay apart: an interface
+  draws on a terminal, and whether that terminal is somebody's ssh session or one of these is
+  not a thing it has to be told. That is what makes the interface running under one identical
+  to the interface running under none.
+- What a run *is* MUST be this package's. It is the process a run of the workspace happens in,
+  so it MUST be where the runtime is reached from: `Hmz` MUST be offered here, and the
+  interface it holds MUST ask it for everything it does rather than draws. It MUST be the same
+  object handed through rather than anything of this package's own, and it MUST be fetched
+  when it is named rather than imported at the top: a line asking which runs are being held
+  must not pay for the flows, the drivers and the traces.
+- It MUST be a name and not a message. The interface being held draws inside this process, so
+  a round trip from it to here would be a process asking itself -- the protocol on the socket
+  is for the terminals outside, and MUST NOT grow a second one for what is already in hand.
+- What is running here MUST be answered here. The flows are running in this process, so a
+  status is this package's to answer out of the runtime rather than one it is handed by
+  whatever it is holding; what has been *drawn* is still whatever is drawing's, and says
+  itself. A run that cannot be asked MUST answer as one running nothing rather than as one
+  that cannot be read: a status nobody can read is worse than a thin one.
 - It MUST be one daemon per workspace. Two runs of one project in one directory are two flows
   writing over each other's epic, and a daemon somebody cannot find is a daemon nobody can
   stop. It MUST be held by a lock rather than by looking: looking is what leaves a window
@@ -177,7 +195,7 @@ def hosts(
 
 The run on its pseudoterminal, and the terminals that come and go from it.
 
-- `Held` MUST be what `hmz.sdk.Session` asks for and no less, since it is what the interface
+- `Held` MUST be what `session.Session` asks for and no less, since it is what the interface
   is handed.
 - A terminal that has just arrived MUST be drawn for from the top. It has none of what was
   drawn before it: it is in whatever modes the shell left it in, at whatever size it happens
@@ -227,3 +245,23 @@ This terminal, reading a run somebody else is holding.
   been told its own size reports zero of both, which is not a terminal one column wide -- it
   is one that has not said, and what a full-screen program does about that is assume the
   ordinary eighty by twenty-four.
+
+## `session.py`
+
+```python
+@runtime_checkable
+class Session(Protocol):
+    @property
+    def attached(self) -> int: ...
+
+    def detach(self) -> int: ...
+```
+
+A run being read from a terminal, as whatever is holding the run sees it.
+
+- It MUST be a protocol rather than `Held` itself. A run held apart from a terminal and a run
+  in the process somebody typed `hmz` in are one interface drawing on one terminal: one is
+  handed one of these and the other is handed none, and what is drawing says so where the
+  question is asked rather than being written twice.
+- It MUST be the whole of what an interface has to know about being held somewhere: how many
+  terminals are reading, and how to let go of them without stopping anything.
