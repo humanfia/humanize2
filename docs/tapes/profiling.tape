@@ -16,7 +16,7 @@ Set TypingSpeed 40ms
 Hide
 Type "cd /work/demo && clear" Enter
 Type "hmz" Enter
-Wait+Screen /Say what to do/
+Wait+Screen /ctrl\+c exit/
 Show
 
 Sleep 400ms

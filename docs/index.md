@@ -58,8 +58,8 @@ $ralph_loop Fix the bug in calc.py.
 your line held. Two questions answer what runs it: which flow — which the line already named —
 and then what its one agent is: the CLI you are already logged into, which of its models, and
 how hard it should think. The models offered are the ones **your account** may name, asked of
-the CLI itself rather than written into humanize. `save` on the last row starts the flow, on the line you
-typed.
+the CLI itself rather than written into humanize. `save`, the row below the agents, starts the
+flow on the line you typed — as **shift+enter** or **ctrl+j** does from anywhere on the menu.
 
 You answer that once. What you chose is remembered for this directory, so the next `hmz` here
 opens on it and `Fix the bug in calc.py.` is the whole of what you type.

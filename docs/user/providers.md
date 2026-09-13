@@ -74,12 +74,15 @@ that CLI's own accounts with `as local` first:
      2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      3. work                      login
 
-   a to make one · Enter to choose · Esc to cancel · s to search
+        add                       an account
+
+   a add · enter choose · esc back · s search
 ```
 
 `as local` is always the first row, and it is what every agent ran as before there were any
-accounts. **a** makes one without leaving the question: the same walk `/providers` runs, minus
-the question the `cli` row has already answered, coming back with the new account chosen.
+accounts. **a**, and the `add` row below the list, make one without leaving the question: the
+same walk `/providers` runs, minus the question the `cli` row has already answered, coming back
+with the new account chosen.
 
 ## What moves, and what does not
 

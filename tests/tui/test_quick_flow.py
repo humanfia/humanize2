@@ -21,7 +21,7 @@ from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.app import _COMMANDS, Editor
 from hmz.tui.complete import offered
-from hmz.tui.pick import Flows
+from hmz.tui.pick import _SAVE, Flows
 from hmz.tui.selecting import Transcript
 from tests.stubs import ShellAgent, written
 
@@ -145,7 +145,7 @@ async def saves(app: Humanize, driver: Pilot[None]) -> None:
     """
     sheet = cast("Flows", app.screen)
     await until(lambda: sheet._inside, driver)
-    await opens(app, driver, "save")
+    await opens(app, driver, _SAVE)
     await until(lambda: not isinstance(app.screen, Flows), driver)
 
 
