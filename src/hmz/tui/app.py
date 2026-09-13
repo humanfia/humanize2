@@ -2,8 +2,8 @@
 
 Laid out the way Claude Code is, and no wider: a transcript the width of the terminal, an
 editor under it between two rules, and a status line under that. Nothing sits beside them --
-how the run is going is on `/monitor`, and `/flow` both chooses the loop and, a page along,
-sets what each of its agents runs.
+how the run is going is on `/monitor`, and `/flow` both chooses the loop and, inside the one
+it opens, sets what each of its agents runs.
 
 The transcript is a tab per agent, and one more where all of them appear together. A flow
 drives several agents and each of them holds as many conversations as it likes; every agent's
@@ -2377,31 +2377,29 @@ class Humanize(App[None]):
     async def action_flow(self, named: str = "", *, opening: int = 0) -> None:
         """Opens the flow menu: which flow runs, and what each of its agents is.
 
-        One menu of two pages rather than a walk of a sheet per question. Nothing in it is
-        applied until it is saved on the way out, so opening it to look at the flows and
-        walking back out again leaves the interface exactly as ready to be typed at as it was.
+        One menu walked into rather than a sheet per question: the flows, and the agents of
+        the one that is opened. Nothing in it is applied until it is saved on the way out, so
+        opening it to look at the flows and walking back out again leaves the interface
+        exactly as ready to be typed at as it was.
 
-        Not refused while a flow runs. The page that chooses one is shut then -- a flow is
-        chosen in order to be started, and there is one going -- but the page its agents are
-        set up on is open, that being where somebody halfway through a run finds out that an
+        Not refused while a flow runs. Choosing one is not offered then -- a flow is chosen in
+        order to be started, and there is one going -- so it opens inside the agents of the
+        flow that is going, that being where somebody halfway through a run finds out that an
         agent is thinking too little or is allowed too much.
 
         Args:
           named: A flow of your own, as a path, to open the menu already holding.
-          opening: Which page to open on, counting from zero.
         """
         running = bool(self._agents)
         if named and running:
             self.show("hmz: a flow is running; no choosing a flow", "red")
             return
-        chosen = await self._chooses(named, running=running, opening=opening)
+        chosen = await self._chooses(named, running=running)
         if chosen is None:
             return  # walked out without saving, which changes nothing at all
         self._took_flow(chosen, running=running)
 
-    async def _chooses(
-        self, named: str, *, running: bool, opening: int = 0
-    ) -> Chosen | None:
+    async def _chooses(self, named: str, *, running: bool) -> Chosen | None:
         """Puts the flow menu up and answers with whatever it was saved holding.
 
         Called from a worker, since it waits on a sheet: `/flow` opens it to be answered, and
@@ -2410,8 +2408,7 @@ class Humanize(App[None]):
 
         Args:
           named: A flow to open the menu already holding, or "" for the one in force.
-          running: Whether a flow is running, which is what shuts the page that chooses one.
-          opening: Which page to open on, counting from zero.
+          running: Whether a flow is running, which is what takes the flows away.
 
         Returns:
           The flow, its agents and how the flow itself is set up, or None for a menu walked
@@ -2436,7 +2433,10 @@ class Humanize(App[None]):
                 self.settings.flows(),
                 unavailable=frozenset(unavailable),
                 running=running,
-                opening=opening,
+                # A flow that was named has been chosen, so what is left to answer is what
+                # drives it -- and one named as a path is not in the list to choose from at
+                # all, so a menu that opened on that list would be offering to undo it.
+                inside=bool(named),
             )
         )
 
@@ -2445,10 +2445,10 @@ class Humanize(App[None]):
         """Starts one flow on what was typed after its name, setting it up first if it needs to.
 
         The whole of what `$ralph_loop fix the build` is: that flow, said that. A
-        flow this workspace has already set up runs on the spot -- the menu would be two pages
-        of answers already given -- and one it has not opens that menu on it, holding the line
-        that was typed until it is saved, since a flow nobody has answered for is a flow with
-        no agents to run on.
+        flow this workspace has already set up runs on the spot -- the menu would be answers
+        already given -- and one it has not opens that menu inside it, holding the line that
+        was typed until it is saved, since a flow nobody has answered for is a flow with no
+        agents to run on.
 
         Args:
           named: The flow, by the name it is offered under.
@@ -2734,13 +2734,14 @@ class Humanize(App[None]):
         """Opens the places flows come from, which is what `/flowverses` is for.
 
         Not which flow to run -- that is `/flow`, where the arrows step between these places
-        and the list holds the one being read. This is the other question: what places there
-        are, what one of them holds, and the three things that can happen to one. Not refused
-        while a flow runs: a flowverse fetched now is a flowverse the next run may reach for,
-        and nothing here touches the flow that is going.
+        and the list holds the one being read, and where `v` opens this same menu. A command
+        as well, because that is the way in while a flow runs: choosing a flow is not offered
+        then, so neither is the list `v` is a key of. Not refused while one is going either --
+        a flowverse fetched now is a flowverse the next run may reach for, and nothing here
+        touches the flow that is running.
         """
         for one in await self.push_screen_wait(Flowverses()) or ():
-            self.show(one)
+            self.show(f"[dim]{one}[/dim]")
 
     @work
     async def action_epics(self) -> None:

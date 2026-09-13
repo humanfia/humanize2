@@ -57,9 +57,9 @@ A setting that is **written** carries a caret under the cursor, where the next l
 land. A setting that is **stepped** does not, so a blank setting does not read as one nothing
 can be typed into.
 
-`/flow` walks through this between choosing the flow and landing on its agents page. That is
-the only place it can: only the flow just chosen says what there is to set. The two pages are
-halves of one question, and each asks only its own.
+`/flow` walks through this between choosing the flow and landing inside its agents. That is
+the only place it can: only the flow just chosen says what there is to set. The flow and what
+drives it are halves of one question, and each asks only its own.
 
 ## Set it from a file
 

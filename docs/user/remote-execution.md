@@ -168,8 +168,8 @@ def run(agents: Agents, task: str) -> None:
                 suppress=True)
 ```
 
-Whoever runs that flow then picks the machine on the `where` row of the agent's own sheet, on
-the agents page of `/flow`. The row appears only for a `Remote` place. It lists the containers
+Whoever runs that flow then picks the machine on the `where` row of the agent's own sheet,
+reached by opening that flow in `/flow`. The row appears only for a `Remote` place. It lists the containers
 running and the hosts in your `~/.ssh/config`, and anything else is typed:
 
 | Typed | Where the work goes |

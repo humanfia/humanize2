@@ -21,7 +21,7 @@ from textual.widgets import Label, OptionList
 from hmz.flows import LOCAL, OFFICIAL, USER, flowverses
 from hmz.flows import verses as store
 from hmz.tui import Humanize
-from hmz.tui.pick import Fetches, Flowverses, Holds
+from hmz.tui.pick import Fetches, Flows, Flowverses, Holds
 from tests.stubs import written
 
 from .test_app import onto, rows, until
@@ -320,3 +320,73 @@ async def test_what_happened_while_it_was_open_is_said_in_the_transcript(
         await until(lambda: not isinstance(app.screen, Flowverses), driver)
 
         assert "theirs is no longer here" in _transcript(app)
+
+
+@pytest.mark.timeout(60)
+async def test_the_places_are_walked_to_from_the_flows(theirs: Path) -> None:
+    """`v` on the flows opens them, and esc comes back to the list it was opened from.
+
+    Which is where somebody is when they want them: a flow that is not in the list is a place
+    that has not been added yet, and a menu reached only by a command they must already know
+    about is a menu they do not reach. What happened to the places is said under the flows,
+    since the flows are a different list afterwards.
+    """
+    store.add(str(theirs))
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/flow")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        menu = app.screen
+        assert isinstance(menu, Flows)
+
+        await driver.press("v")
+        await until(lambda: isinstance(app.screen, Flowverses), driver)
+        assert rows(app) == ["builtin", OFFICIAL, "theirs", LOCAL, USER]
+
+        await onto(app, driver, "theirs")
+        await driver.press("d")
+        await driver.press("d")
+        await until(
+            lambda: (
+                "no longer here" in str(app.screen.query_one("#tuning", Label).content)
+            ),
+            driver,
+        )
+        await driver.press("escape")
+        await until(lambda: app.screen is menu, driver)
+
+        assert not menu._inside  # back on the flows, which is where `v` was pressed
+        assert "theirs is no longer here" in str(
+            menu.query_one("#tuning", Label).content
+        )
+        assert "theirs" not in str(menu.query_one("#tabs", Label).content)
+
+
+@pytest.mark.timeout(60)
+async def test_the_places_do_not_open_over_a_fetch_the_flows_started() -> None:
+    """Two clones of one flowverse land in one directory, and the loser takes the winner's.
+
+    The flows fetch whatever has never been fetched as they open, and the places fetch what
+    they are asked to. Both at once is git refusing the second for finding the path taken, and
+    tidying up after that failure takes the first one's work away with it.
+    """
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/flow")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        menu = app.screen
+        assert isinstance(menu, Flows)
+        menu._fetching = OFFICIAL  # as catching up on fetches leaves it while it runs
+        menu._fill()
+
+        await driver.press("v")
+        await until(
+            lambda: (
+                "open once it is done" in str(menu.query_one("#tuning", Label).content)
+            ),
+            driver,
+        )
+
+        assert app.screen is menu  # and nothing opened over it
