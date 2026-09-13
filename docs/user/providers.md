@@ -33,7 +33,7 @@ list says about the account afterwards](/demo/accounts.gif)
 4. **Run one flow as both accounts at the same time.**
 
 ```sh
-hmz exec -f official/flame_chase \
+hmz exec -f flame_chase \
     -a claude@anthropic/claude-opus-5:max \
     -a claude@deepseek/deepseek-chat:high \
     "fix the build"

@@ -2,14 +2,14 @@
 pageClass: hmz-feature
 ---
 
-# official/rlar
+# rlar
 
 An actor works in one session and a fresh reviewer reads its work. The actor must remember and
 the reviewer must not — and the review **is** the actor's next prompt, word for word, so what
 the reviewer noticed is what the actor hears.
 
 ```sh
-hmz exec -f official/rlar \
+hmz exec -f rlar \
     -a claude/claude-opus-5:high -a claude/claude-opus-5:high "$(cat TASK.md)"
 ```
 
@@ -61,5 +61,5 @@ A run the reviewer agreed with keeps nothing at all. What is over is not carried
 ## See also
 
 - [Answers in a shape](/features/shapes) — how the reviewer is held to that model
-- [official/flame_chase](/flows/flame-chase) — two agents both working, rather than one reviewing
-- [official/humanize1](/flows/humanize1) — the same idea, with the review hung on a hook
+- [flame_chase](/flows/flame-chase) — two agents both working, rather than one reviewing
+- [humanize1](/flows/humanize1) — the same idea, with the review hung on a hook

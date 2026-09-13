@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.flows import BUILTIN, ENTRY, FLOWS, LOCAL, OFFICIAL, USER, NotAFlow
+from hmz.flows import ENTRY, FLOWS, LOCAL, OFFICIAL, USER, NotAFlow
 from hmz.sdk import Hmz
 from tests.stubs import written
 
@@ -99,7 +99,7 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_the_places_are_listed_in_the_order_their_flows_are_offered() -> None:
-    assert [one.name for one in Hmz().verses.all()] == [BUILTIN, OFFICIAL, LOCAL, USER]
+    assert [one.name for one in Hmz().verses.all()] == [OFFICIAL, LOCAL, USER]
 
 
 def test_a_name_is_looked_up_in_a_different_order_than_the_flows_are_offered_in() -> (
@@ -115,10 +115,10 @@ def test_a_name_is_looked_up_in_a_different_order_than_the_flows_are_offered_in(
 def test_a_place_is_found_by_name_and_a_name_none_answers_to_is_nothing() -> None:
     verses = Hmz().verses
 
-    found = verses.find(BUILTIN)
+    found = verses.find(OFFICIAL)
 
     assert found is not None
-    assert found.name == BUILTIN
+    assert found.name == OFFICIAL
     assert verses.find("not-a-flowverse") is None
 
 
@@ -171,19 +171,20 @@ def test_a_place_taken_away_is_gone_and_taking_it_away_twice_says_so(
     assert not verses.remove("theirs")
 
 
-def test_the_two_that_are_always_there_cannot_be_taken_away() -> None:
+def test_the_ones_that_are_always_there_cannot_be_taken_away() -> None:
     with pytest.raises(ValueError, match="not one to take away"):
-        Hmz().verses.remove(BUILTIN)
+        Hmz().verses.remove(OFFICIAL)
 
 
 def test_a_place_that_has_not_been_fetched_holds_nothing_rather_than_failing() -> None:
+    """Except for the flows humanize keeps in the package, which are there either way."""
     verses = Hmz().verses
     official = verses.find(OFFICIAL)
     assert official is not None
 
     if official.fetched:
         pytest.skip("humanize's own flowverse has been fetched on this machine")
-    assert verses.holds(official) == []
+    assert [one.name for one in verses.holds(official)] == ["chat"]
 
 
 def test_what_was_signed_into_a_url_is_not_what_is_printed_of_it() -> None:

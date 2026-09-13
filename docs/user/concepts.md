@@ -189,8 +189,8 @@ See [An atlas](/weaver/atlas).
 single `.py`. The repository is cloned into `~/.humanize/flowverses/<name>/` and offered as
 `<name>/<flow>`.
 
-Two are always there: `builtin`, the handful in the package, and `official`, where the rest of
-the flows humanize offers come from. `official` is listed whether or not it has been fetched,
+One is always there: `official`, which holds `chat` from the package and, once fetched, the
+rest of the flows humanize offers. `official` is listed whether or not it has been fetched,
 because what there is to run is not the same question as what has been downloaded. Add as many
 more as you like; `/flowverses` is where they are added, fetched and taken away, and `/flow`'s
 arrows step between them, because that is which list of flows is being read.

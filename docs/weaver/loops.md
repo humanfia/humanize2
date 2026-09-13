@@ -64,7 +64,7 @@ There are **no flows to choose from while a flow is running**: `/flow` opens ins
 of the one that is going, and `/flow ralph_loop` is refused outright with `hmz: a flow is
 running; no choosing a flow`. Looking and leaving without choosing changes nothing.
 
-::: details What the three built-in flows are
+::: details What these three flows are
 | Flow | Agents | |
 | --- | --- | --- |
 | `chat` | 1 + you | one session; every line you type is a turn of it. What the interface opens on. |

@@ -2419,24 +2419,31 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
 )
 async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    tmp_path: Path,
 ) -> None:
     """Every model of every CLI is longer than a screen, so the letters go into it."""
+    for name in ("chatter", "chatty", "loop"):
+        written(tmp_path / ".humanize" / "flows", name, FLOW)
     app = Humanize()
     async with app.run_test() as driver:
         await into_flows(app, driver)
         sheet = app.screen
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
+        # On to this project's own flows, there being more than one of those to narrow: the
+        # page opens on the place the flow in force came from, which is humanize's own.
+        await driver.press("right")
+        await until(lambda: listing.option_count == 3, driver)
         every = listing.option_count
 
         await driver.press("s")
-        await driver.press("r", "a", "l", "p", "h", "_")
+        await driver.press("c", "h", "a", "t", "t", "e")
         await driver.pause()
-        assert [one for one in rows(app) if one] == ["builtin\x1fralph_loop"]
+        assert [one for one in rows(app) if one] == ["local\x1flocal/chatter"]
 
         await driver.press("backspace")  # and one letter back is a wider list again
         await driver.pause()
-        # `ralph` is in `stateful_ralph` too, which the underscore had ruled out.
+        # `chatty` is in it too, which the last letter had ruled out.
         assert len([one for one in rows(app) if one]) > 1
 
         await driver.press("z", "z")  # narrowed to nothing rather than to everything

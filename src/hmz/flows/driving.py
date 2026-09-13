@@ -1963,21 +1963,32 @@ def _unfetched(named: str) -> str:
       named: What was asked for, as it was written.
 
     Returns:
-      The reason: that the flowverse it named has not been fetched yet, where that is what
-      happened, and otherwise that there is no such file. A flowverse is offered before it is
-      fetched -- `official` is there from the start -- so "no such file" would be the answer
-      to a name that is right, given by the one thing that knows it has not been downloaded.
+      The reason: that a flowverse it could have come from has not been fetched yet, where
+      that is what happened, and otherwise that there is no such file. A flowverse is offered
+      before it is fetched -- `official` is there from the start -- so "no such file" would be
+      the answer to a name that is right, given by the one thing that knows it has not been
+      downloaded.
+
+      A name that said which place it came from is a question about that place alone. A bare
+      one is looked for in every one of them, and humanize's own flows are said by a bare name
+      now, so the first run on a machine that has fetched nothing is exactly where one of them
+      goes missing -- and "no such file" is the least useful thing to say about it.
     """
     from . import flowverses
 
     whose, _, rest = named.partition("/")
-    for verse in flowverses():
-        if verse.name == whose and rest and not verse.fetched:
-            return (
-                f"the {whose} flowverse has not been fetched yet -- open /flowverses and "
-                "press r on it"
-            )
-    return "no flow to read: a flow is a directory with an __init__.py in it"
+    waiting = [
+        one.name
+        for one in flowverses()
+        if one.url and not one.fetched and (one.name == whose if rest else True)
+    ]
+    if not waiting:
+        return "no flow to read: a flow is a directory with an __init__.py in it"
+    said = " and ".join(waiting)
+    which = "flowverse has" if len(waiting) == 1 else "flowverses have"
+    return (
+        f"the {said} {which} not been fetched yet -- open /flowverses and press r on it"
+    )
 
 
 def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:

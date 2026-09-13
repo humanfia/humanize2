@@ -56,6 +56,6 @@ to fix and carry on from, not one that is over.
 ## See also
 
 - [stateful_ralph](/flows/stateful-ralph) — one session instead, re-sent the task each round
-- [official/fixed_juice_ralph](/flows/fixed-juice-ralph) — this loop with a governor on it
-- [official/goal](/flows/goal) — this loop, with each round run as the agent's own goal
+- [fixed_juice_ralph](/flows/fixed-juice-ralph) — this loop with a governor on it
+- [goal](/flows/goal) — this loop, with each round run as the agent's own goal
 - [Loops](/weaver/loops) — writing one of these yourself

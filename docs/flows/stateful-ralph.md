@@ -46,5 +46,5 @@ stopped rather than declared over, with what it kept left alone for the run that
 ## See also
 
 - [ralph_loop](/flows/ralph-loop) — a session of its own each round
-- [official/continue_loop](/flows/continue-loop) — one session too, nudged rather than re-sent the task
+- [continue_loop](/flows/continue-loop) — one session too, nudged rather than re-sent the task
 - [Picking a run up](/user/resuming) — what a resumable flow may and may not carry

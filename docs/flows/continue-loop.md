@@ -2,7 +2,7 @@
 pageClass: hmz-feature
 ---
 
-# official/continue_loop
+# continue_loop
 
 Sends the task once, then keeps nudging `continue` at the session that heard it. The same one
 session as [`stateful_ralph`](/flows/stateful-ralph), told to carry on rather than told what to
@@ -10,7 +10,7 @@ do again — which is what a person at a prompt actually types, and is a differe
 the task however similar it looks.
 
 ```sh
-hmz exec -f official/continue_loop -a kimi/kimi-code/k3:high "$(cat TASK.md)"
+hmz exec -f continue_loop -a kimi/kimi-code/k3:high "$(cat TASK.md)"
 ```
 
 <HmzFlowShape flow="continue_loop" />
@@ -43,4 +43,4 @@ the agent went on to say is the backend's own log to keep, not this flow's.
 ## See also
 
 - [stateful_ralph](/flows/stateful-ralph) — the same session, re-sent the task rather than nudged
-- [official/goal](/flows/goal) — the backend's own way of not stopping
+- [goal](/flows/goal) — the backend's own way of not stopping

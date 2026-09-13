@@ -2,7 +2,7 @@
 pageClass: hmz-feature
 ---
 
-# official/humanize1
+# humanize1
 
 [PolyArch/humanize](https://github.com/PolyArch/humanize) — the Claude Code plugin humanize
 grew out of — as three flows, each set up on its own agents and stopping on its own. `gen-idea`
@@ -10,11 +10,11 @@ opens a loose idea into a repo-grounded draft, `gen-plan` turns that draft into 
 sides have converged on, and `rlcr` builds the plan under review until nothing is left to say.
 
 ```sh
-hmz exec -f official/humanize1:gen-idea -a claude/claude-opus-5:max \
+hmz exec -f humanize1:gen-idea -a claude/claude-opus-5:max \
     "add undo/redo to the editor"
-hmz exec -f official/humanize1:gen-plan \
+hmz exec -f humanize1:gen-plan \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "add undo/redo to the editor"
-hmz exec -f official/humanize1:rlcr \
+hmz exec -f humanize1:rlcr \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "build it"
 ```
 
@@ -91,5 +91,5 @@ write another, and between their turns there is nothing to carry on from.
 ## See also
 
 - [The moments of a turn](/features/hooks) — what a `STOP` hook is, and the six others
-- [official/rlar](/flows/rlar) — the same actor-and-reviewer shape, without the plugin's format
+- [rlar](/flows/rlar) — the same actor-and-reviewer shape, without the plugin's format
 - [A flow that calls a flow](/weaver/calling-flows) — running one of these three from inside another flow

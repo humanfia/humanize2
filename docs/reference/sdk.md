@@ -134,6 +134,7 @@ the one `/flow` steps between with its arrows.
 | `fetch(name)` | Fetches one again, or for the first time. |
 | `remove(name)` | Takes one away, flows and all. |
 | `holds(one)` | What it holds, by the name each flow is offered under. **This reads the flows**, which means running them. |
+| `edited(one)` | Whether anything has been written into its clone that fetching it again would undo. What anything fetching without being asked to asks first. |
 | `where(name)` | The directory it is kept in. |
 | `plain(url)` | A URL with whatever was signed into it taken out. |
 | `whence(one, nowhere="-")` | Where it came from, as it may be shown to somebody — asked of which flowverse it is rather than of whether its URL is empty. |

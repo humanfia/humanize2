@@ -160,11 +160,11 @@ another model is refused before its first turn, as one handed the wrong number o
 
 ## Try this
 
-`official/humanize1` takes twenty-three settings, grouped into three phases. Fetch the official
+`humanize1` takes twenty-three settings, grouped into three phases. Fetch the official
 flowverse, `/flow` it, choose it, and look at what a large one of these is:
 
 ```
-/flow official/humanize1:gen-idea
+/flow humanize1:gen-idea
 ```
 
 ## See also

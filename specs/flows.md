@@ -45,17 +45,23 @@ is the other flows, and none of it came with that one.
 
 ## `builtin/`
 
-The flows humanize itself ships: a directory of flows and nothing else.
+The flows humanize keeps in the package: a directory of flows and nothing else.
 
 - Its flows MUST be read where they stand rather than from a `flows/` inside it. A fetched
   flowverse needs that directory to tell its flows from the repository around them; there is
   no repository around these, and a directory holding nothing else has nothing to tell them
   from.
 
-- It MUST hold only the flows that show what a flow is -- one agent talking, and the shapes a
-  loop over one agent takes. Everything else humanize offers MUST live in the official
+- It MUST hold `chat` and nothing else. That is what humanize does before anything has been
+  fetched, and a first run that had to clone before it could say hello is a first run that
+  fails without a network. Everything else humanize offers MUST live in the official
   flowverse: a flow is content, and content that can change without a release is content that
   keeps up.
+
+- It MUST NOT be a place of its own as far as anybody running a flow is concerned. Which of
+  its two places a flow of humanize's is kept in is humanize's business, so this directory and
+  the official flowverse MUST be listed, offered and resolved as the one place, `official`,
+  and a flow moved from here to there MUST go on answering to the name it always had.
 
 ## `__init__.py`
 
@@ -157,12 +163,12 @@ def __getattr__(name: str) -> object: ...
   the functions its nodes are, and those are in the flow's own Python -- so a directory
   holding a prophecy and no entry point MUST NOT be a flow, the same way one holding neither
   is not.
-- A flow MUST be found by name: the ones humanize ships by a bare name, and every other by the
-  place it came from -- `official/rlar`, `local/scheduler`. The flows of your own MUST be a
-  place like any other, so that one rule says what a flow is called and one list says where
-  they are. Nearest MUST win -- this project's flows, then yours, then whatever there is to
-  run -- so that a project may mean its own `chat` by `chat`. A name qualified by the place it
-  came from MUST be that place's, and MUST NOT be stood in for.
+- A flow MUST be found by name: humanize's own by a bare name, wherever of its two places it
+  is kept, and every other by the place it came from -- `local/scheduler`, `theirs/rlar`. The
+  flows of your own MUST be a place like any other, so that one rule says what a flow is called
+  and one list says where they are. Nearest MUST win -- this project's flows, then yours, then
+  whatever there is to run -- so that a project may mean its own `chat` by `chat`. A name
+  qualified by the place it came from MUST be that place's, and MUST NOT be stood in for.
 - A flow MUST be run to be read, with its own directory and the directory the flows are in
   importable while it runs and only while: what a flow imports is not something the rest of
   the process should be able to.
@@ -1067,7 +1073,7 @@ def flowverses() -> list[Flowverse]: ...
 def nearest() -> list[Flowverse]: ...
 
 
-def holds(one: Flowverse) -> Path: ...
+def holds(one: Flowverse) -> tuple[Path, ...]: ...
 
 
 def add(url: str, name: str = "") -> Flowverse: ...
@@ -1085,6 +1091,9 @@ def flows(one: Flowverse) -> list[str]: ...
 def plain(url: str) -> str: ...
 
 
+def edited(at: Path) -> bool: ...
+
+
 def clone(url: str, at: Path) -> None: ...
 
 
@@ -1098,10 +1107,10 @@ def refresh(at: Path) -> None: ...
 - The flows of your own MUST be two places here like any other, `local` for `.humanize/flows`
   where humanize is being run and `user` for the one in your home directory. They are
   directories rather than repositories -- nothing fetches them, and what is in one is whatever
-  you put there -- so they MUST be read where they stand the way `builtin` is, and MUST NOT be
-  fetched, added under, or taken away. Everything that goes looking for a flow MUST have one
-  list to look in: a place of yours that had to be listed separately is a second rule for what
-  a flow is called, which is a name that will not resolve.
+  you put there -- so they MUST be read where they stand the way the package's own are, and
+  MUST NOT be fetched, added under, or taken away. Everything that goes looking for a flow MUST
+  have one list to look in: a place of yours that had to be listed separately is a second rule
+  for what a flow is called, which is a name that will not resolve.
 - These places MUST have two orders, and both MUST be written down here: the order they are
   offered in, which is humanize's own first and yours last, and the order a name is looked up
   in, which is nearest first. A place missing from either is a flow that is offered and cannot
@@ -1113,25 +1122,33 @@ def refresh(at: Path) -> None: ...
   none. A repository is a repository -- a README, a pyproject, a test suite, whatever sets the
   tests up -- and reading a flow means running it, so what is run MUST be what somebody put
   where the flows go rather than every `.py` file that came down with it.
-- Where the flows of one are MUST be worked out in one place, `builtin`'s reading of its own
-  directory included: everything that goes looking for a flow asks that one place, so an
-  exception written down once is an exception rather than a rule to remember.
-- Four MUST always be listed: `builtin`, which is the package's own and is fetched from
-  nowhere, `official`, which is humanize's repository of the rest, and the two the flows of
+- Where the flows of one are MUST be worked out in one place, the package's own reading of its
+  own directory included: everything that goes looking for a flow asks that one place, so an
+  exception written down once is an exception rather than a rule to remember. A place MAY be
+  read from more than one directory, and `official` MUST be, being the flows in the package
+  together with the repository of the rest; the package's own MUST come first, so that a name
+  both hold resolves to the one that is always there rather than the one a fetch could take
+  away.
+- Three MUST always be listed: `official`, which is humanize's own, and the two the flows of
   your own live in. None MUST be removable, and `official` MUST be listed whether or not it has
   been fetched -- a list that only mentioned it once somebody had thought to add it would be a
-  list that hid what there is to run.
+  list that hid what there is to run -- and the flows it keeps in the package MUST be offered
+  whether or not it has been, since what has been downloaded is not the question.
 - A name MUST be one directory name, and one that could climb out of the directory they are
   kept in MUST be refused wherever it is given.
-- None of the four that are always listed MUST be a name a flowverse can be added under.
-  Cloned into `builtin` a repository would be in nobody's list, since that name is skipped when
-  they are listed; cloned into `official` it would be shown against humanize's own URL; cloned
-  into either of yours it would be listed under a name that is read from a directory somewhere
-  else and never looked at. All MUST be refused where the name is given rather than discovered
+- None of the three that are always listed MUST be a name a flowverse can be added under.
+  Cloned into `official` a repository would be shown against humanize's own URL; cloned into
+  either of yours it would be listed under a name that is read from a directory somewhere else
+  and never looked at. All MUST be refused where the name is given rather than discovered
   afterwards.
 - Fetching one again MUST take what the repository says now rather than merge into it: a
   flowverse is a copy of somebody else's repository, not a branch of your own, and a merge
   nobody asked for is a fetch that fails the next time it is run.
+- Whether a clone has anything written into it that such a fetch would undo MUST be answerable
+  here, for whatever fetches without being asked to: resetting a clone is a fair thing to do on
+  a key somebody pressed and not a fair thing to do behind them. It MUST be the tracked files
+  alone, that being what is taken back -- the `__pycache__` reading a flow leaves behind would
+  otherwise make every repository without a `.gitignore` look edited for good.
 - A fetch that failed MUST leave the list as it was and say what git said. Nothing here MUST
   wait on the network without a limit -- and since a clone called off for reaching that limit
   is killed rather than allowed to fail, what it had written by then MUST be taken away here:

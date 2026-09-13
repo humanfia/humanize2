@@ -969,16 +969,18 @@ ALLOWED_WARNINGS = {"rlar": {"unbounded-loop"}}
 
 def _swept() -> list[object]:
     """One parameter per flow humanize ships or the official flowverse holds now."""
-    places = [("builtin", BUILTIN_AT)]
+    places = [("package", BUILTIN_AT)]
     places.extend(
-        (verse.name, hmz.flows.holds(verse))
+        ("official", under)
         for verse in hmz.flows.flowverses()
         if verse.name == hmz.flows.OFFICIAL and verse.fetched
+        for under in hmz.flows.holds(verse)
+        if under != BUILTIN_AT
     )
     held: list[object] = []
     seen_official = False
     for whose, under in places:
-        seen_official = seen_official or whose == hmz.flows.OFFICIAL
+        seen_official = seen_official or whose == "official"
         for name in hmz.flows.offered(under):
             at = entry(under, name)
             if at is None:

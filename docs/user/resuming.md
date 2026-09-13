@@ -58,7 +58,7 @@ one](/reference/flows#a-flow-that-calls-another-flow) is two flows, each keeping
 side by side in the one file and neither writing the other's:
 
 ```json
-{"nightly": {"round": 12}, "official/rlar": {"seen": ["src/pay.py"]}}
+{"nightly": {"round": 12}, "rlar": {"seen": ["src/pay.py"]}}
 ```
 
 The key is the name the flow was run under, so `-f nightly` and the path to that same file are

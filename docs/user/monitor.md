@@ -122,7 +122,7 @@ an agent with a turn open, `○` one that has stopped.
 **On the status line, left**: whose turn it is and how long it has been going; between turns,
 the flow and how long the run has been going. A flow that [called
 another](/reference/flows#a-flow-that-calls-another-flow) names both, innermost last — `chat ▸
-official/rlar`.
+rlar`.
 
 **Under the agent lines**: what the run has cost and the rate it is costing it at, per model,
 over a recent window — so a flow that has stopped reads as stopped. See [Cost and
@@ -161,7 +161,7 @@ Which flows are running, innermost last:
 from hmz.flows import running
 
 running()                       # one Running(flow, since, depth, under) apiece
-[one.flow for one in running()] # ["chat", "official/rlar"]
+[one.flow for one in running()] # ["chat", "rlar"]
 ```
 
 Asked from inside a flow this is the branch that flow is on — the flow somebody started, then
