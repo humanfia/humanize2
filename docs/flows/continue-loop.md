@@ -31,11 +31,11 @@ and the next round sends the task rather than nudging a session that never got i
 
 ## What ends it
 
-The flow takes no settings of its own. What ends a run of it is the run's
-[allowance](/features/allowances) — hours, millions of output tokens, dollars — held to at the
-edges of every turn of the session rather than implemented here. It declares **ten million
-output tokens** as what a run of it is worth by default; `-c budget.yaml` with a `budget:`
-mapping in it, or the **budget** row in `/flow`, says otherwise.
+The run's [allowance](/features/allowances) — hours, millions of output tokens, dollars — held
+to at the edges of every turn of the session rather than implemented here; the flow itself takes
+no settings at all. It declares **ten million output tokens** as what a run of it is worth by
+default, and `-c budget.yaml` with a `budget:` mapping in it, or the **budget** row in `/flow`,
+says otherwise.
 
 ## What it keeps
 

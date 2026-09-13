@@ -26,13 +26,12 @@ point: a [trace](/features/tracing) reads the run as two sets of sessions rather
 
 ## What ends it
 
-The flow takes no settings of its own. What ends a run of it is the run's
-[allowance](/features/allowances) — hours, millions of output tokens, dollars. The **two spend
-it between them** rather than apiece, and that is the ordinary case rather than this flow's own
-arithmetic: an allowance is the run's money, and every agent of a run spends out of the one
-reckoning whichever of them was writing. It declares **ten million output tokens** as what a run
-of it is worth by default; `-c budget.yaml` with a `budget:` mapping in it, or the **budget** row
-in `/flow`, says otherwise.
+The run's [allowance](/features/allowances) — hours, millions of output tokens, dollars. The
+**two spend it between them** rather than apiece, and that is now the ordinary case rather than
+this flow's own arithmetic: an allowance is the run's money, and every agent of a run spends out
+of the one reckoning whichever of them was writing. The flow itself takes no settings; it
+declares **ten million output tokens** as what a run of it is worth by default, which `-c
+budget.yaml` with a `budget:` mapping in it, or the **budget** row in `/flow`, overrides.
 
 ## What it keeps
 

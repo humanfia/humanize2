@@ -979,7 +979,21 @@ def test_everything_offered_is_reachable() -> None:
 #: Every warning a flow humanize ships or the official flowverse holds is allowed to keep.
 #: rlar's loop is ended by its reviewer alone, which is the flow's own documented shape --
 #: and exactly the shape the checker exists to point at, so the warning stands.
-ALLOWED_WARNINGS = {"rlar": {"unbounded-loop"}}
+ALLOWED_WARNINGS = {
+    "rlar": {"unbounded-loop"},
+    # Four loops whose only end is the run's allowance being spent. That is legal -- a turn
+    # taken once it is spent raises -- and it is still worth saying, because such a loop stops
+    # rather than finishes and how long it takes is a number somebody else set.
+    "continue_loop": {"unbounded-loop"},
+    "fixed_juice_ralph": {"unbounded-loop"},
+    "flame_chase": {"unbounded-loop"},
+    "goal": {"unbounded-loop"},
+    # And two that do decide to stop -- three rounds answering with nothing -- and keep what
+    # they kept when they do, on purpose: a loop that stalled is one to fix and carry on from.
+    # Which is the judgement `state-kept` exists to make somebody state, and they state it.
+    "ralph_loop": {"state-kept"},
+    "stateful_ralph": {"state-kept"},
+}
 
 
 def _swept() -> list[object]:

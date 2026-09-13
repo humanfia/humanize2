@@ -899,7 +899,7 @@ def _kept(mark: _Mark, read: _Read, state: str) -> Iterator[Finding]:
                 wrote = wrote or node.lineno
             elif node.func.attr in {"clear", "pop", "popitem"}:
                 cleared = True
-    if wrote and not cleared:
+    if wrote and not cleared and _finishes(mark.node):
         yield Finding(
             "state-kept",
             "warning",
@@ -909,6 +909,29 @@ def _kept(mark: _Mark, read: _Read, state: str) -> Iterator[Finding]:
             "leaves what the next run here opens on, so a loop that has ended clears "
             "what it kept",
         )
+
+
+def _finishes(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Whether this flow has any way of ending that is the flow deciding it is done.
+
+    A loop with no `break`, no `return` and no `raise` in it cannot decide anything: what ends
+    it is the run's allowance being spent, and a run stopped for that is a run to pick up
+    rather than one that is over. So there is nothing for it to clear, and telling it to clear
+    would be telling it to throw away the state that makes picking it up worth doing.
+
+    Args:
+      node: The entry point.
+
+    Returns:
+      Whether some loop in it can be left from inside. A flow with no constant-true loop at
+      all falls off its own end, which is a flow that finished.
+    """
+    loops = [
+        loop
+        for loop in _whiles(node.body)
+        if isinstance(loop.test, ast.Constant) and loop.test.value
+    ]
+    return not loops or any(_exits(loop.body, ()) for loop in loops)
 
 
 def _settings(
