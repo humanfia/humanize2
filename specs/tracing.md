@@ -42,7 +42,7 @@ tool call rather than the process.
 tracing.collect(workspace=None, *, sessions=None, agents=None, output=None, start=None, end=None, profile=None)
 ```
 
-Gathers the sessions asked for and returns the trace as a document. `hmz.sdk.Epics.trace` and `hmz.sdk.Epics.traced` are shells around it, and what the interface offers on a run is reached through them.
+Gathers the sessions asked for and returns the trace as a document. `hmz.runtime.doing.epics.Epics.trace` and `.traced` are shells around it, and what the interface offers on a run is reached through them.
 
 Args:
 

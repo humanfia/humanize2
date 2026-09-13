@@ -22,7 +22,7 @@ a quickstart apiece: [run a flow](/#run-a-flow), [weave a flow](/#weave-a-flow),
 
 | | |
 | --- | --- |
-| [SDK](/reference/sdk) | `Hmz`: humanize as one object, which every way in goes through |
+| [SDK](/reference/sdk) | How a tool that is not humanize reaches humanize: `Hmz` straight at the runtime, `Daemons` over a held run |
 | [Flows](/reference/flows) | The directory a flow is, what `@flow` takes, and what the loop it holds may do |
 | [Agents](/reference/agents) | Driving a coding agent from Python: an agent is settings, a session is memory |
 | [Machines](/reference/machines) | Where an agent's turns land — here, a container, or a machine already running |

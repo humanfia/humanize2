@@ -55,8 +55,10 @@ def test_what_it_is_asked_for_is_what_it_loads() -> None:
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
 
+    # The runtime, because that is where `Hmz` is written and this hands it through rather
+    # than keeping a copy -- and nothing under the runtime, which is the whole of the point.
     reached = {name.split(".")[1] for name in result.stdout.split()}
-    assert reached == {"sdk"}
+    assert reached == {"runtime", "sdk"}
 
 
 def test_the_places_flows_come_from_are_the_four_that_are_always_there() -> None:

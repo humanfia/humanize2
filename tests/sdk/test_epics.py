@@ -19,8 +19,7 @@ import pytest
 
 from hmz.coganchor.agents import AgentConfig
 from hmz.runtime.runner import Runner
-from hmz.sdk import Hmz
-from hmz.sdk.epics import Epics
+from hmz.sdk import Epics, Hmz
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:

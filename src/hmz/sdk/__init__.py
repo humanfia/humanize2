@@ -1,22 +1,32 @@
-"""The SDK: humanize as one object, which every other way in is a way of reaching.
+"""The SDK: how a tool that is not humanize reaches humanize.
 
     from hmz.sdk import Hmz
 
     hmz = Hmz()
     hmz.run("chat", [], "say hello").run()
 
-One class rather than a dozen modules. :class:`Hmz` is a workspace and everything that can be
-done in it: what is remembered about it, the flows there are to run, the accounts those run
-as, the runs that have already happened, and the run happening now. The layers under it stay
-where they are and go on being what they were; this is the one place they are composed.
+There are two ways to reach a run from out here, and both are offered.
 
-The command line calls it, the daemon calls it, and the terminal interface reaches it through
-the daemon holding the run -- so that what humanize can do is one list rather than four.
+:class:`Hmz` is the runtime, straight at it, in the process that asked: a workspace and
+everything that can be done in it. It is the same object the command line holds -- so a tool
+that wants what `hmz exec` does, or what a sheet of the interface does, writes the call rather
+than the command line, and a tool with something better in mind than either has what it would
+need to write its own.
 
-Everything but :class:`Hmz` itself is fetched when it is named, for the reason a workspace's
-own layers are: a command line that only lists the places flows come from must not pay for the
-runs, the accounts and the traces to do it, and naming this package is how every command
-begins.
+:class:`Daemons` is a run held where a terminal closing cannot end it -- a process of its own,
+per workspace, reached over its socket. That is what a tool looking after a run somebody else
+started asks: what is being held here, what it is running, letting go of the terminals on it,
+stopping it. A run held that way outlives the program that asked for it.
+
+Nothing under this names it. What is here is not a layer humanize is built out of -- every
+answer is written where it is carried out, in :mod:`hmz.runtime` and :mod:`hmz.daemon`, and
+this restates none of it. That is the whole of the difference between this and the seam every
+way in used to pass through: a seam somebody outside reaches in through is a different job,
+and doing both at once was doing this one badly.
+
+Everything here is fetched when it is named, for the reason a workspace's own layers are: a
+tool that only lists the places flows come from must not pay for the runs, the accounts and
+the traces to do it.
 """
 
 from __future__ import annotations
@@ -24,47 +34,53 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hmz.sdk.accounts import Accounts
-    from hmz.sdk.core import Hmz
-    from hmz.sdk.epics import Epics
-    from hmz.sdk.fallbacks import Fallbacks
-    from hmz.sdk.flows import Flows, Flowverses
-    from hmz.sdk.running import Run
-    from hmz.sdk.session import Session
+    from hmz.daemon import Daemon, Held, Session
+    from hmz.runtime import Accounts, Epics, Fallbacks, Flows, Flowverses, Hmz, Run
+    from hmz.sdk.daemons import Daemons
 
 __all__ = [
     "Accounts",
+    "Daemon",
+    "Daemons",
     "Epics",
     "Fallbacks",
     "Flows",
     "Flowverses",
+    "Held",
     "Hmz",
     "Run",
     "Session",
 ]
 
-#: Which module each of them is written in. One entry per name this package offers, so that
-#: `from hmz.sdk import Hmz` costs the one module `Hmz` is in rather than all of them.
+#: Which front door each of them is behind: the runtime, reached straight, and the daemon
+#: holding a run apart from a terminal. The name of the layer rather than the module inside it
+#: that happens to hold the class, so that what is offered out here follows what is done in
+#: there -- and one entry apiece, so that `from hmz.sdk import Hmz` costs the one module `Hmz`
+#: is in rather than every layer humanize has.
 _WRITTEN = {
-    "Accounts": "hmz.sdk.accounts",
-    "Epics": "hmz.sdk.epics",
-    "Fallbacks": "hmz.sdk.fallbacks",
-    "Flows": "hmz.sdk.flows",
-    "Flowverses": "hmz.sdk.flows",
-    "Hmz": "hmz.sdk.core",
-    "Run": "hmz.sdk.running",
-    "Session": "hmz.sdk.session",
+    "Accounts": "hmz.runtime",
+    "Daemon": "hmz.daemon",
+    "Daemons": "hmz.sdk.daemons",
+    "Epics": "hmz.runtime",
+    "Fallbacks": "hmz.runtime",
+    "Flows": "hmz.runtime",
+    "Flowverses": "hmz.runtime",
+    "Held": "hmz.daemon",
+    "Hmz": "hmz.runtime",
+    "Run": "hmz.runtime",
+    "Session": "hmz.daemon",
 }
 
 
 def __getattr__(name: str) -> object:
-    """Hands through what this package offers, out of the module it is written in.
+    """Hands through what this package offers, out of the layer it is written in.
 
     Args:
       name: What was asked for.
 
     Returns:
-      The same object that module holds, so that there is one of each however it was reached.
+      The same object that layer holds, so that there is one of each however it was reached --
+      a tool that named this and humanize itself are holding one class, not two that agree.
 
     Raises:
       AttributeError: If nothing here is called that, as for any other module.

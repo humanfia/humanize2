@@ -62,8 +62,8 @@ from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from hmz.coganchor.prices import money, refresh
+from hmz.daemon import Hmz
 from hmz.runtime import telemetry
-from hmz.sdk import Hmz
 
 from .btw import AgentProgress, FlowSnapshot, Observation, compact, format_snapshot
 from .complete import about, hinted, offered, takes
@@ -105,8 +105,8 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from hmz.coganchor.agents import AgentBase, Board, Event, Question, SessionBase
+    from hmz.daemon import Session
     from hmz.flows import Place
-    from hmz.sdk import Session
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
@@ -896,7 +896,9 @@ class Humanize(App[None]):
         #: there is no telling what those are without asking it.
         #: humanize, as the one object everything the interface does goes through: the
         #: flows there are, the agents and accounts they run as, the runs already made here
-        #: and the run being started now. A command line holds the same object.
+        #: and the run being started now. Reached through the daemon, which is the process a
+        #: run of this workspace is held in and so where the interface asks for one. A
+        #: command line holds the same object, reached the short way.
         self.hmz = Hmz()
         #: What this workspace was last set up to run, so that opening it again finds it
         #: that way rather than back at the default.

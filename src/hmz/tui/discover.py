@@ -2,7 +2,7 @@
 
 Installed backends are found here, and optional backends somebody can add are named separately
 so the picker can teach them how. An effort a model does not take is not offered against it.
-What each backend runs is what that backend last said it runs, which the SDK's accounts keep --
+What each backend runs is what that backend last said it runs, which the runtime accounts keep --
 read off the disk here, because asking means starting a coding agent and a prompt cannot wait
 on one.
 
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hmz.coganchor.backends import named, profiles, program, speaking
-from hmz.sdk import Hmz
+from hmz.daemon import Hmz
 
 if TYPE_CHECKING:
     from hmz.coganchor.backends import Model

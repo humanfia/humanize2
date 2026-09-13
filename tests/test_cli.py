@@ -22,30 +22,29 @@ from hmz import cli
 #: names rather than as the directory each is in, because a directory is now several answers:
 #: `runtime` holds both what drives a run and the tracer that reads one back afterwards, and
 #: a budget saying `runtime` would stop noticing `hmz exec` paying for the second. A name
-#: here covers the modules inside it. `anchor` is in the list for being the one humanize
-#: spawns that a whole layer is behind: the target half of a session is this package with the
-#: anchor and nothing else on it.
+#: here covers the modules inside it; a package on the way to one is loaded to reach it and
+#: covers nothing, which is how `runtime` can be walked through without being let in.
+#: `anchor` is in the list for being the one humanize spawns that a whole layer is behind:
+#: the target half of a session is this package with the anchor and nothing else on it.
 COMMANDS = [
     # The two leaves that say whether humanize reports its own failures and where the answer
     # is kept: a command that cannot report a crash is a crash nobody hears about. And what a
     # flow is, which is where the refusal a line naming no flow is answered with is written.
     # Naming it must not cost the drivers: what a flow imports from `coganchor` is fetched
     # when a flow names it, not when the line is read -- which is why the facts about the
-    # CLIs are here and nothing else of that layer is. And the SDK, which is the one object
-    # every way in holds: it reaches a layer only from inside the call that needs it, so
-    # naming it costs nothing but itself.
+    # CLIs are here and nothing else of that layer is. And the front door of the runtime,
+    # which is the one object every way in holds: it reaches a layer only from inside the
+    # call that needs it, so naming it costs nothing but itself.
     (
         "exec",
         {
-            "hmz.coganchor",
             "hmz.coganchor.backends",
             "hmz.flows",
-            "hmz.runtime",
+            "hmz.runtime.doing",
             "hmz.runtime.kept",
             "hmz.runtime.runner",
             "hmz.runtime.settings",
             "hmz.runtime.telemetry",
-            "hmz.sdk",
         },
     ),
     ("anchor", {"hmz.coganchor"}),
@@ -74,10 +73,19 @@ def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     reached = set(result.stdout.split())
     assert reached, "the command imported nothing, so this checks nothing"
     allowed = layers | {"hmz.cli"}
+    # A package a budgeted module is inside was loaded on the way to it and is let through
+    # for that alone: importing `hmz.runtime.runner` runs `hmz/runtime/__init__.py`, and a
+    # budget that had to say so would be saying the whole directory beneath it as well.
+    through = {
+        ".".join(one.split(".")[:cut])
+        for one in allowed
+        for cut in range(1, len(one.split(".")))
+    }
     assert not {
         name
         for name in reached
-        if not any(name == one or name.startswith(f"{one}.") for one in allowed)
+        if name not in through
+        and not any(name == one or name.startswith(f"{one}.") for one in allowed)
     }
 
 
