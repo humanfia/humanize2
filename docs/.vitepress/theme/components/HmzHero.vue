@@ -8,10 +8,10 @@
 // child to reach past it -- the default theme's own sponsor and team blocks do the same.
 import { onUnmounted, ref } from 'vue'
 
-const LINE = 'pip install git+https://github.com/humanfia/humanize2.git'
+const LINE = 'pip install git+https://github.com/humanfia/humanize.git'
 
 // Same-page fragments, so no `withBase`: these resolve against whatever the page is served as,
-// which under `base: '/humanize2/'` is the only spelling that stays right.
+// which under `base: '/humanize/'` is the only spelling that stays right.
 const ROLES = [
   { href: '#run-a-flow', name: 'Run a flow', under: 'point agents at your repository' },
   { href: '#weave-a-flow', name: 'Weave a flow', under: 'write the Python a flow is' },

@@ -12,8 +12,8 @@ Python included.
 ## Clone it, and install the hooks
 
 ```sh
-git clone https://github.com/humanfia/humanize2.git
-cd humanize2
+git clone https://github.com/humanfia/humanize.git
+cd humanize
 uv sync
 uv run pre-commit install
 ```

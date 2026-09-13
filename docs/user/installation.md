@@ -17,20 +17,20 @@ Linux on x86-64 or aarch64 here plus `python3` on the far machine.
 ::: code-group
 
 ```sh [pip]
-pip install git+https://github.com/humanfia/humanize2.git
+pip install git+https://github.com/humanfia/humanize.git
 ```
 
 ```sh [pipx]
-pipx install git+https://github.com/humanfia/humanize2.git
+pipx install git+https://github.com/humanfia/humanize.git
 ```
 
 ```sh [uv tool]
-uv tool install git+https://github.com/humanfia/humanize2.git
+uv tool install git+https://github.com/humanfia/humanize.git
 ```
 
 ```sh [from a checkout]
-git clone https://github.com/humanfia/humanize2.git
-cd humanize2
+git clone https://github.com/humanfia/humanize.git
+cd humanize
 uv sync
 ```
 

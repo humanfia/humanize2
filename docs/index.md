@@ -25,7 +25,7 @@ humanize holds no API key and talks to no model provider itself, so you log in t
 already log in.
 
 ```sh
-pip install git+https://github.com/humanfia/humanize2.git
+pip install git+https://github.com/humanfia/humanize.git
 ```
 
 Then make something for it to fix. `calc.py` subtracts where it should add, and that bug is the
@@ -219,8 +219,8 @@ test](/weaver/tutorials/checked-build) is the shortest useful flow there is, sta
 ## Work on humanize
 
 ```sh
-git clone https://github.com/humanfia/humanize2.git
-cd humanize2
+git clone https://github.com/humanfia/humanize.git
+cd humanize
 uv sync
 uv run pre-commit install
 ```

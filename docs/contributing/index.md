@@ -1,7 +1,7 @@
 # Contributing
 
 PRs accepted. Ask a question or discuss a substantial change first in
-[issues](https://github.com/humanfia/humanize2/issues).
+[issues](https://github.com/humanfia/humanize/issues).
 
 ## Tutorials
 
@@ -13,8 +13,8 @@ PRs accepted. Ask a question or discuss a substantial change first in
 ## Set up
 
 ```sh
-git clone https://github.com/humanfia/humanize2.git
-cd humanize2
+git clone https://github.com/humanfia/humanize.git
+cd humanize
 uv sync
 uv run pre-commit install
 ```

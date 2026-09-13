@@ -9,7 +9,7 @@
 import { onUnmounted, ref } from 'vue'
 import { withBase } from 'vitepress'
 
-const LINE = 'pip install git+https://github.com/humanfia/humanize2.git'
+const LINE = 'pip install git+https://github.com/humanfia/humanize.git'
 
 const copied = ref(false)
 let clearing: ReturnType<typeof setTimeout> | undefined
