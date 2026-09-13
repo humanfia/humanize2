@@ -4632,6 +4632,7 @@ class Clis(Picks):
 
     def rows(self) -> list[tuple[str, str, str]]:
         """Every CLI that could take this one's turns, and what each of them runs."""
+        from hmz.flows.checking import catalogue
         from hmz.flows.driving import comes_to
 
         needs: frozenset[Moment] = (
@@ -4646,6 +4647,10 @@ class Clis(Picks):
             if self._place is not None and self._place.needs is not None
             else frozenset()
         )
+        # Read once for the whole list rather than once per CLI: the catalogue is built off
+        # the live interface with `inspect` every time it is asked for, and asking it twelve
+        # times to answer one question is eleven walks of the same modules.
+        catalogued = catalogue() if serving else ()
         listed: list[tuple[str, str, str]] = []
         for backend in sorted(self._agents):
             drives = _drives(backend)
@@ -4653,7 +4658,7 @@ class Clis(Picks):
                 continue
             if pursuing and not drives.pursues:
                 continue
-            if serving and not serving <= comes_to(backend):
+            if serving and not serving <= comes_to(backend, catalogued=catalogued):
                 continue
             listed.append(
                 (

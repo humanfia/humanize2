@@ -328,7 +328,14 @@ class Watch:
         Args:
           held: The connection.
         """
-        with held, held.makefile("rb") as stream:
+        # A runtime that was killed rather than closed resets the connection, which is a read
+        # that raises rather than one that ends. Either is the process being gone, and neither
+        # is worth a traceback out of a thread in the middle of somebody's flow.
+        with (
+            contextlib.suppress(OSError, ValueError),
+            held,
+            held.makefile("rb") as stream,
+        ):
             while (line := stream.readline(_LONGEST)) != b"":
                 self.tells(line.decode("utf-8", "replace"))
 

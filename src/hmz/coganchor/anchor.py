@@ -198,7 +198,8 @@ class AnchorConfig:
         Raises:
           ValueError: If the target cannot be read, the work's own connections are neither
             kept local nor sent to the target, a path is answered with something that is not
-            a path, or a credential or a directory is to be put somewhere that is not a place.
+            a path, a variable to run without is not a variable name, or a credential or a
+            directory is to be put somewhere that is not a place.
         """
         from hmz.coganchor.transport import Target
 
@@ -212,6 +213,12 @@ class AnchorConfig:
                 raise ValueError(
                     f"unsupported redirect {'='.join(pair)!r}; expected two absolute paths"
                 )
+        for name in self.hushes:
+            # `env -u NAME` is what takes one off on the target, and `env` refuses a name
+            # with an `=` in it -- so one written that way is a turn that would not start,
+            # said here instead where the settings are read.
+            if not name or "=" in name:
+                raise ValueError(f"unsupported hush {name!r}; expected a variable name")
         for name, whence in self.projects:
             if not name or "=" in name or not whence.startswith("/"):
                 raise ValueError(
@@ -514,7 +521,7 @@ def drive(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     link = transport.connect(target, [export], config.token)
     client = RemoteClient(link.channel)
     kept: list[str] = []
-    emptied: list[str] = []
+    making: set[str] = set()
     session = ""
     # What this turn writes its claims on carried directories under. One per turn rather than
     # per session: a turn is what plants them and a turn is what gives them up.
@@ -531,12 +538,12 @@ def drive(command: Sequence[str], config: AnchorConfig | None = None) -> int:
         if config.projects:
             session = _session(client, workspace)
             said |= _projected(client, config.projects, session, workspace)
-        kept, emptied = _carried(client, config.carries, workspace, whose)
+        _carried(client, config.carries, workspace, whose, kept, making)
         log.info("driving %s on %s", program, target.describe())
         argv = [*_wrapping(config.hushes, said), program, *command[1:]]
         return _drives(client, argv, started_in, dict(os.environ))
     finally:
-        _swept(client, session, kept, emptied, workspace, whose)
+        _swept(client, session, kept, sorted(making, reverse=True), workspace, whose)
         client.close()
         link.close()
 
@@ -746,7 +753,9 @@ def _carried(
     carries: Sequence[tuple[str, str]],
     workspace: str,
     whose: str,
-) -> tuple[list[str], list[str]]:
+    planted: list[str],
+    making: set[str],
+) -> None:
     """Puts what the flow brings into the target's copy of the workspace, for this turn.
 
     Inside the workspace, so these go through the filesystem calls the target already
@@ -766,19 +775,20 @@ def _carried(
       carries: What to put there, as `(the directory on this machine, where it goes)`.
       workspace: The workspace, as the target names it.
       whose: What this turn writes its claims under, which nothing else answers to.
-
-    Returns:
-      What this turn has a claim on, and which of the directories above it had to be made to
-      hold it. Two lists because they come away differently: a claim is given up and what it
-      was on goes only with the last of them, and a directory goes only if it is empty -- one
-      the project already had is the project's, and a turn ending is not a reason for it to
-      disappear.
+      planted: Filled in with what this turn has a claim on, as each claim is taken. Given
+        rather than answered with, because what has been planted has to be sweepable even
+        when this does not return: a round trip that times out part way through would
+        otherwise leave the directories it had already claimed in somebody's project with
+        nobody left holding the note to take them away.
+      making: Filled in the same way with the directories above those which had to be made
+        to hold them. Kept apart because the two come away differently: a claim is given up
+        and what it was on goes only with the last of them, and a directory goes only if it
+        is empty -- one the project already had is the project's, and a turn ending is not a
+        reason for it to disappear.
     """
     import posixpath
     from pathlib import Path
 
-    planted: list[str] = []
-    making: set[str] = set()
     for whence, where in carries:
         root = Path(whence)
         at = posixpath.join(workspace, where)
@@ -815,7 +825,6 @@ def _carried(
             # a turn that runs without it rather than a run that will not start.
             log.warning("could not carry %s to %s: %s", whence, at, why)
         _ran(client, ["/bin/sh", "-c", _CLAIM, "humanize", at, whose], workspace)
-    return planted, sorted(making, reverse=True)
 
 
 def _there(client: RemoteClient, path: str) -> bool:
@@ -976,7 +985,11 @@ def _drives(
         except (OSError, ValueError):
             pass  # stdin closed under us, which is the end of the input either way
         finally:
-            handle.close_stdin()
+            # Suppressed for the same reason the read above is: the far end may already be
+            # gone, and a thread that raised on the way out would print a traceback over a
+            # turn that had finished perfectly well.
+            with contextlib.suppress(OSError, ValueError):
+                handle.close_stdin()
 
     reading = threading.Thread(target=upward, name="hmz-anchor-stdin", daemon=True)
     reading.start()
@@ -988,7 +1001,7 @@ def _drives(
         # says so. The second is aimed at this process, because a CLI that did not stop for
         # the first is one somebody is now pressing the key at -- and a relay that answered
         # every one of them by forwarding would be a relay nobody can get out of.
-        signals.signal(number, before.get(number, signals.SIG_DFL))
+        signals.signal(number, before.get(number) or signals.SIG_DFL)
         handle.signal(number)
 
     # Only from the main thread, which is the only one a handler may be installed from -- and
@@ -997,7 +1010,12 @@ def _drives(
     main = threading.current_thread() is threading.main_thread()
     before: dict[int, Any] = {}
     if main:
-        before = {number: signals.getsignal(number) for number in catching}
+        # `getsignal` answers None for a handler that was not installed from Python, and
+        # `signal` will not take None back -- so what is remembered is the default instead,
+        # which is what restoring one of those has to come to anyway.
+        before = {
+            number: signals.getsignal(number) or signals.SIG_DFL for number in catching
+        }
         for number in catching:
             signals.signal(number, onward)
     try:

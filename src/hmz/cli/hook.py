@@ -73,11 +73,14 @@ def hook(argv: list[str]) -> int:
         print(f"hmz hook: {args.at}: {why}", file=sys.stderr)
         held.close()
         return 0
-    with held, held.makefile("rwb") as stream:
+    answer = b""
+    # A flow that went between the question and the answer, which is a socket that ends the
+    # file or resets it depending on how it went. Both are the same nothing as a flow that was
+    # never there, and neither is a traceback to put in front of the agent: what this owes the
+    # CLI is a status of zero and a line it reads as the tool going ahead.
+    with contextlib.suppress(OSError), held, held.makefile("rwb") as stream:
         stream.write(said + b"\n")
         stream.flush()
-        # Nothing said back is a flow that went between the question and the answer, and is
-        # the same nothing as a flow that was never there.
         answer = stream.readline()
     with contextlib.suppress(OSError, ValueError):
         sys.stdout.buffer.write(answer)

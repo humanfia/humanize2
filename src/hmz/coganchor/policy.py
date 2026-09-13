@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import posixpath
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from hmz.coganchor.proto import (
@@ -105,6 +105,12 @@ class Router:
     #: about it that nobody here may assume, so the answer is fetched when it is wanted --
     #: which is never before the handshake, since no path is routed until the agent runs.
     platform: Callable[[], str] = _unknown_platform
+    #: What :attr:`settles` came to once the target had said what it is, remembered because
+    #: it is asked on the way into every syscall that names a path and because neither half
+    #: of it can change after that: the layouts are fixed at construction and a machine does
+    #: not become another one mid-session.  ``None`` until the target has answered at all,
+    #: so that the question is asked again rather than the pre-handshake answer kept.
+    _settled: bool | None = field(default=None, init=False, repr=False, compare=False)
 
     @property
     def insensitive(self) -> bool:
@@ -118,10 +124,22 @@ class Router:
         False for the ordinary session -- a Linux target, and a mirror at a path with one
         spelling -- and that is worth asking before a syscall's paths are read, because a
         session with nothing to settle and nothing to answer need not read them at all.
+
+        Which is also why the answer is kept: this is on the way into every path-bearing
+        syscall a tracee makes, and recomputing a regular expression over every layout root
+        thousands of times a turn is work for an answer that cannot have changed.  Kept only
+        once the target has said what it is, so that the "" a router answers before the
+        handshake is never the answer remembered.
         """
-        return self.insensitive or any(
+        if self._settled is not None:
+            return self._settled
+        said = self.platform()
+        settles = said in CASE_INSENSITIVE or any(
             spelled_twice(layout.local_root) for layout in self.layouts
         )
+        if said:
+            self._settled = settles
+        return settles
 
     def __post_init__(self) -> None:
         # Longest root first, so nested layouts win over their parents -- measured as the
@@ -160,7 +178,13 @@ class Router:
         A path outside every layout comes back exactly as it was named.  It is this machine's
         own business, and answering it with another would turn a file that is simply not there
         into one that could not be reached.
+
+        A session with nothing to settle answers with the path it was given without looking:
+        a target that spells everything one way and layouts at roots that do the same have
+        nothing another name could be, and this is called once per path per syscall.
         """
+        if not self.settles:
+            return local_path
         for layout in self.layouts:
             suffix = layout.below(local_path, insensitive=self.insensitive)
             if suffix is None:
