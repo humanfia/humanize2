@@ -79,8 +79,8 @@ mean the same thing whenever they are pressed.
 | Key | What it does |
 | --- | --- |
 | **enter** | Sends what is typed. Over an open [offers list](#completion), takes what is highlighted instead. |
-| **shift+enter** | Breaks the line, which is what enter would do anywhere else. |
-| **ctrl+j** | The same, for a terminal that cannot tell shift+enter from enter. |
+| **shift+enter** | Breaks the line, which is what enter would do anywhere else. On a [menu](#the-menus-and-when-what-they-hold-lands) it saves what the menu is holding. |
+| **ctrl+j** | The same, both of them, for a terminal that cannot tell shift+enter from enter. |
 | **esc** | Opens [`/monitor`](#watching-the-run), which is where the run is watched and the flow is drawn. Dismisses the offers list first, if one is open. |
 | **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the run if not. Twice stops the flow, a third press does not wait for it to unwind, and with nothing running twice leaves. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
@@ -159,7 +159,7 @@ list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
 | --- | --- | --- |
-| `/flow` | `[flow]` | The menu that is [which flow runs](#choosing-a-flow) and, inside the flow you open, [what each of its agents is](#what-each-agent-is). With a name or a path, opens already inside that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the flows, or inside the agents of the flow that is going. `save`, the last row inside a flow, saves the complete setup; esc is one step back, and then the way to save or discard on the way out. |
+| `/flow` | `[flow]` | The menu that is [which flow runs](#choosing-a-flow) and, inside the flow you open, [what each of its agents is](#what-each-agent-is). With a name or a path, opens already inside that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the flows, or inside the agents of the flow that is going. `save` — the row set below the choices, and **shift+enter** or **ctrl+j** from anywhere on the menu — saves the complete setup; esc is one step back, and then the way to save or discard on the way out. |
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. The same menu **v** opens on the flows; a command as well, because there are no flows to press it on while one is running. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/epics` | | The runs of this directory, newest first: what each was and how it went. **Enter** goes into one, which says where it is written down and offers [exporting it](/user/export) — trace and all — and carrying it on where its flow says it can be picked up. |
 | `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run you go into, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
@@ -230,15 +230,12 @@ where nothing is reading it — which is why `/exit` asks rather than assumes, a
 of the terminal is one of the answers rather than a command of its own:
 
 ```
-A flow is running here.
-Closing the interface is not, on its own, a thing to do to a run.
+A flow is running.
 
-  1  ▸ stop the flow, then leave
-        every agent takes no further turn, and the loop ends
-  2    leave it running, and let go of this terminal
-        the run carries on where nothing is reading it; `hmz` opens it again
+❯ 1. stop it, then leave
+  2. leave it running             `hmz` opens it again
 
-Enter to choose · Esc to stay here
+enter choose · esc stay
 ```
 
 Where the run is not being held — output going to a file, or a machine whose
@@ -540,22 +537,38 @@ cannot change under you mid-session.
 
 ## The menus, and when what they hold lands
 
-`/flow`, `/providers` and `/settings` are menus rather than walks. Three things are
+`/flow`, `/providers`, `/fallback` and `/settings` are menus rather than walks. What is
 true of all of them:
 
-- **No key is a chord.** A menu asks one thing and its keys are its own, so nothing here needs
-  a modifier held down.
+- **No key is a chord, except the one that saves.** A menu asks one thing and its keys are its
+  own, so nothing here needs a modifier held down — but saving has no bare key left to be, enter
+  opening the row under the cursor and every letter being taken. So it is **shift+enter**, and
+  **ctrl+j** beside it: a terminal reports shift+enter as itself only where it speaks a keyboard
+  protocol that can say so, and sends a plain carriage return where it cannot — which is enter,
+  and would take whatever the cursor was on. Both are said at the bottom of every menu that
+  holds anything, and neither is the only way through: saving is a row as well.
 - **Typing does not search.** Every letter is a key, so a search is asked for with **s** and
-  left with **esc**, which clears what was typed. While one is running the letters go into it.
-- **Nothing lands until you save.** `/flow` has a `save` row inside the flow it opened, for the
-  complete flow setup. Esc remains available on every menu: it asks in a box in the middle of the
-  screen, over the menu rather than instead of it, whether to save and close or discard and
-  close. Esc on the box is the way back to the menu. A menu you only looked at asks
-  nothing.
+  left with **esc**, which clears what was typed. While one is running the letters go into it,
+  and the row of keys says so.
+- **The keys are said at the bottom, and nowhere else.** The line above a menu says what the
+  menu is; the row under it says what the keys do. A key named in both is a key learned twice
+  and a line of width spent saying nothing.
+- **Nothing lands until you save.** Every menu that holds changes has a `save` row set below
+  the choices — below, and out of their numbering, because it is what to do with the menu
+  rather than one more thing to pick out of it — and takes the chord above from anywhere on it.
+  Esc remains available: it asks in a box in the middle of the screen, over the menu rather
+  than instead of it, whether to save or discard. Esc on the box is the way back to the menu. A
+  menu you only looked at asks nothing.
+- **A list you can add to has an `add` row**, set below the choices the way `save` is, as well
+  as the letter that does it. A key advertised only at the bottom of the screen is a key you
+  have to read the bottom of the screen to find.
+- **A row the arrows adjust is cycled by space too**, and says so: `↔` on the row means *this
+  one changes where it stands*, and `▸` means *this one opens something*. Space takes the next
+  value and comes round to the first at the end of the range, on every menu alike.
 
-`/epics` and `/flowverses` are lists of the same kind, and the first two are true of them as
-well. The third is not: neither holds a draft of anything, so what is asked for there happens
-as it is asked for and esc asks nothing on the way out.
+`/epics` and `/flowverses` are lists of the same kind, and all of that holds of them but the
+saving: neither holds a draft of anything, so what is asked for there happens as it is asked
+for, there is no `save` row, and esc asks nothing on the way out.
 
 Pages are parallel — two views of one question, either of which you might read first. A menu
 of several shows their titles across the top, and **tab** / **shift+tab** turn between them; a
@@ -580,16 +593,16 @@ place's flows and nothing else.
 ```
   Flow
 
-  Which flow the agents are driven through. The first thing you say once it is chosen is what
-  it is to do. A flow anywhere else is a path you type.
+  Which flow drives the agents; what it is to do is the next thing you say. A flow anywhere
+  else is a path you type.
 
-  official · local · user   ←/→ to switch
+  official · local · user   ←/→ switch
 
 ❯ 1. chat                    Chat — one agent, one session, and every line typed between…
   2. continue_loop           Continue loop (flowbench: continue_loop) — send the task once,…
   3. fixed_juice_ralph       Fixed-juice ralph (flowbench: fixed_juice_ralph) — a ralph loop…
 
-  Enter opens what drives it · f copies it here · v the flowverses · Esc to close · s to search
+  enter open · f copy here · v flowverses · shift+enter/ctrl+j save · esc close · s search
 ```
 
 | Key | |
@@ -621,7 +634,8 @@ read the other way round.
 Enter on a flow opens it: what that flow was last set up with here is read back,
 [what the flow itself takes](#setting-a-flow-up) is asked where it takes anything, and what
 drives it is what you land in — which is the next thing to answer. **Esc comes back to the
-flows**, one step, and esc again leaves the menu. The last row inside a flow, `save`, validates
+flows**, one step, and esc again leaves the menu. The `save` row inside a flow — set below its
+agents, and reachable on **shift+enter** or **ctrl+j** from either half of the menu — validates
 every agent and applies the flow and all its agents together.
 
 **There are no flows to choose from while one is running** — a flow is chosen in order to be
@@ -654,7 +668,7 @@ the rest — marked as not fetched yet](/demo/flowverses.png)
 | Key | |
 | --- | --- |
 | **enter** | What that flowverse holds: one row per flow, with the line it says about itself, and past them the row that takes the flowverse away. Reading the flows means importing them, so it is asked of the one you opened rather than of all of them at once. |
-| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under. |
+| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under. The `add` row below the list does the same. |
 | **r** | Fetch the one under the cursor again, or for the first time. `official` already holds `chat`, which came with humanize, and fetches the rest from its GitHub URL; `local` and `user` are directories of your own and say there is nothing to fetch. |
 
 **Taking one away is inside what it holds**, rather than a key on the list. What a flowverse
@@ -700,17 +714,18 @@ opens one. Everything that agent is is a row of one sheet:
 ```
   Set up builder
 
-  What this one agent is. Enter opens the row under the cursor, and the arrows step the ones
-  that are a rung rather than a list. Save accepts this setup.
+  What this one agent is: the CLI that takes its turns, the account they run as, and the
+  model at an effort.
 
   ❯ 1. cli          claude ▸                   which coding agent takes its turns
     2. provider     as local ▸                 the account those turns run as
     3. model        claude-opus-5 ▸            which of that CLI's models it runs
-    4. effort       high                       how hard it thinks
+    4. effort       high ↔                     how hard it thinks
     5. where        this machine ▸             the machine its work lands on
-    6. save                                    accept this agent setup
 
-  Enter to open · Esc to close
+       save                                    this agent
+
+  enter open · shift+enter/ctrl+j save · esc close
 ```
 
 **An agent is a CLI, an account, a model and an effort, and nothing else.** What it may do,
@@ -727,14 +742,16 @@ which models that CLI will name; the account settles which of them it may name. 
 CLI lets go of the model**, which belonged to the CLI before it.
 
 **The arrows step a row that is a rung in an order** — the effort, and swarm mode for a model
-that has one. Everything else opens a sheet of its own and comes back. `where` is a row only
-for an agent [the flow says may be pointed at a machine](#where-each-agent-works); for one the
-flow put in a container it is read rather than opened, and for one that works here it is not
-there at all.
+that has one — and **space** takes the next one, round to the first again at the end of the
+range. Those rows wear `↔`; the ones that open a sheet of their own wear `▸`. `where` is a row
+only for an agent [the flow says may be pointed at a machine](#where-each-agent-works); for one
+the flow put in a container it is read rather than opened, and for one that works here it is
+not there at all.
 
-`save` accepts this agent and returns straight to the flow's agents. It changes only the flow
-draft; the complete setup is written down when `save` is chosen there. Esc
-off the agent sheet remains a fallback: it asks whether to accept or discard changes.
+`save` — the row below them, and **shift+enter** or **ctrl+j** from anywhere on the sheet —
+accepts this agent and returns straight to the flow's agents. It changes only the flow draft;
+the complete setup is written down when `save` is chosen there. Esc off the agent sheet remains
+a fallback: it asks whether to accept or discard changes.
 
 ## Which CLI, and which account
 
@@ -751,18 +768,21 @@ rather than looked for, and says so on its row:
      2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      3. work                      login
 
-   a to make one · Enter to choose · Esc to cancel · s to search
+        add                       an account
+
+   a add · enter choose · esc back · s search
 ```
 
 `as local` — always the first row — is what every agent ran as before there were any accounts:
 the CLI signed in the way you signed it in, with nothing redirected.
 
-**`a` makes one without leaving the question.** This is the moment you find out that the account
-you want is not there, so it is the moment to be offered it: `a` asks how to sign in and what
-that way needs — the same walk [`/providers`](#the-accounts-themselves) runs, minus the question
-this row has already answered — hands the terminal to the CLI's own login where the way has one,
-and comes back with the new account chosen. A CLI with no accounts yet says
-`claude has no accounts here yet; a makes one` under the list.
+**`a`, and the `add` row below the list, make one without leaving the question.** This is the
+moment you find out that the account you want is not there, so it is the moment to be offered
+it: it asks how to sign in and what that way needs — the same walk
+[`/providers`](#the-accounts-themselves) runs, minus the question this row has already answered
+— hands the terminal to the CLI's own login where the way has one, and comes back with the new
+account chosen. A CLI with no accounts yet says `claude has no accounts here yet` under the
+list, with the `add` row under that.
 
 An agent given an account that has since been taken away is a red line when the flow is started,
 before any turn has run — never a traceback half an hour in.
@@ -775,12 +795,12 @@ The `model` row: which of that CLI's models, and under it the effort, stepped wh
    Select what claude runs
 
    Which model of claude takes this one's turns, and how hard it may be asked to think. These
-   are what it last said it runs as this account; r asks it again.
+   are what it last said it runs as this account.
 
      1. claude-opus-5           max, high
    ❯ 2. claude-sonnet-5         max, high
 
-   r to ask it again · Enter to choose · Esc to cancel · s to search
+   r ask it again · enter choose · esc back · s search
 ```
 
 **The list is what the account chosen above it may name**, not a list written into humanize: a
@@ -952,7 +972,8 @@ and a asking which backend a new one is for](/demo/accounts.gif)
 | Key | What it does |
 | --- | --- |
 | **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to, take it away |
-| **a** | Makes one: which CLI, then how to sign in, then what that way asks. The list of CLIs is also where a CLI of your own that speaks ACP is written down |
+| **a** | Makes one: which CLI, then how to sign in, then what that way asks. The `add` row below the list does the same. The list of CLIs is also where a CLI of your own that speaks ACP is written down |
+| **shift+enter** / **ctrl+j** | Saves what the menu is holding, which the `save` row below the list also does |
 | **esc** | Closes the menu, asking about anything it is holding |
 
 ![What enter opens on one account: correct what it holds, sign it in again, what it falls back
@@ -1006,34 +1027,38 @@ rate limit on the whole account rather than one request. How hard the agent thin
 may reach for are what that agent *is*, so they are not asked here and come across a step
 unchanged.
 
-`a` chooses the place that cannot run and then the place that takes its turns, each as three
-questions: the CLI, one of its accounts, one of the models it says it runs. Enter on a row asks
-the three things there are to say about a step — where its turns go, how many times over a
-failed turn is taken again first, and whether to be rid of it at all. Taking it away is the
+`a`, and the `add` row below the list, choose the place that cannot run and then the place that
+takes its turns, each as three questions: the CLI, one of its accounts, one of the models it
+says it runs. Enter on a row asks the three things there are to say about a step — where its
+turns go, how many times over a failed turn is taken again first, and whether to be rid of it
+at all. Taking it away is the
 last of those rather than a key on the list: what the step says is what says whether it is
 wanted, so it is decided beside the two things it says.
 
 The retry sheet answers in rungs rather than in numbers: the tries step through 0, 1, 2, 3, 5,
 8, 13 and 21, and the time the retrying is given through *as long as it takes*, 30s, 1m, 5m,
-15m and 1h. A text box for an integer is a text box to validate.
+15m and 1h, on the arrows or on space. A text box for an integer is a text box to validate.
 
 An account falling back to another account of the same CLI is not here: that happens inside the
 conversation that was running, so it is a thing about the account, and it is on
 [`/providers`](#the-accounts-themselves).
 
-Everything is held until the menu is saved on the way out, as everything on a menu is.
+Everything is held until the `save` row is chosen, the chord is pressed, or the menu is left
+and saving confirmed — as on every menu.
 
 ```
   Fallback
 
   Where a turn goes when the place taking it cannot take it at all. A place is a CLI, an
-  account and a model; the turn is taken again there as many times as this says, and then
-  in a session of its own at the place it falls back to.
+  account and a model.
 
   ❯ 1. claude@work/claude-opus-5   3 more tries, exponential · falls back to codex@key/gpt-5.6-sol
     2. codex@key/gpt-5.6-sol       falls back to dsh/deepseek-v4-flash
 
-  Enter for what happens · a adds one · Esc to close
+       add                         a step
+       save                        these steps
+
+  enter what happens · a add · shift+enter/ctrl+j save · esc close · s search
 ```
 
 A place cannot fall back to itself, and a chain that comes round on itself ends at the second
@@ -1048,10 +1073,14 @@ rather than two halves of one:
 ```
    Settings
 
-   Everywhere · This directory                       tab and shift+tab
+   Everywhere · This directory                       tab/shift+tab switch
 
-   ❯ 1. reports         on   report what goes wrong to humanize
-     2. sent                 what a report carries, and what it never does
+   ❯ 1. reports         on ↔   report what goes wrong to humanize
+     2. sent            ▸      what a report carries, and what it never does
+
+        save                   what is set here
+
+   ←/→ or space change · shift+enter/ctrl+j save · esc close
 ```
 
 **Everywhere** is what is true of this machine wherever humanize is run from: whether it
@@ -1064,8 +1093,8 @@ the setting, since a menu cannot change it.
 how many agents that flow was set up with, and a row that forgets the lot — leaving every other
 directory, and every setting, as it was.
 
-The arrows step the row under the cursor, and nothing lands until the menu is left and saving is
-confirmed.
+The arrows and space step the row under the cursor, and nothing lands until the `save` row is
+chosen, the chord is pressed, or the menu is left and saving is confirmed.
 
 ## Setting a flow up
 

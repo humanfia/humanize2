@@ -22,7 +22,7 @@ from hmz.coganchor.backends import Model
 from hmz.runtime.kept import Runs
 from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
-from hmz.tui.pick import Agent, Anchors, Catalogue, Clis, Confirms, Flows
+from hmz.tui.pick import _SAVE, Agent, Anchors, Catalogue, Clis, Confirms, Flows
 from tests.stubs import written
 
 from .test_app import drops, into_agent, keeps, onto, opens, rows, until
@@ -173,7 +173,7 @@ async def test_one_agent_is_one_sheet_of_rows_in_the_order_they_depend(
             "model",
             "effort",
             "where",
-            "save",
+            _SAVE,
         ]
         # The account nobody chose is always the first row of the list it is chosen from.
         assert "as local" in _value(app, "provider")
@@ -198,7 +198,7 @@ async def test_two_agents_are_two_rows_and_a_sheet_apiece(
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: len(listing.options) == 3, driver)
 
-        assert rows(app) == ["0", "1", "save"]
+        assert rows(app) == ["0", "1", _SAVE]
         assert "builder" in str(listing.get_option_at_index(0).prompt)
         assert "reviewer" in str(listing.get_option_at_index(1).prompt)
 
@@ -230,9 +230,9 @@ async def test_explicit_saves_accept_two_agents_then_apply_the_complete_flow(
         await driver.press("left")
         await driver.pause()
 
-        await opens(app, driver, "save")
+        await opens(app, driver, _SAVE)
         await until(lambda: isinstance(app.screen, Flows), driver)
-        assert rows(app) == ["0", "1", "save"]
+        assert rows(app) == ["0", "1", _SAVE]
 
         await onto(app, driver, "1")
         await driver.press("enter")
@@ -240,10 +240,10 @@ async def test_explicit_saves_accept_two_agents_then_apply_the_complete_flow(
         await onto(app, driver, "effort")
         await driver.press("right")
         await driver.pause()
-        await opens(app, driver, "save")
+        await opens(app, driver, _SAVE)
         await until(lambda: isinstance(app.screen, Flows), driver)
 
-        await onto(app, driver, "save")
+        await onto(app, driver, _SAVE)
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Flows), driver)
 
@@ -273,7 +273,7 @@ async def test_explicit_flow_save_refuses_an_agent_with_no_model(
             await driver.press("enter")
             await until(lambda: sheet._inside, driver)
 
-        await onto(app, driver, "save")
+        await onto(app, driver, _SAVE)
         await driver.press("enter")
         await driver.pause()
 
@@ -551,5 +551,5 @@ async def test_the_models_are_what_that_cli_last_said_and_are_asked_again_on_r(
         await until(lambda: isinstance(app.screen, Catalogue), driver)
         keys = str(app.screen.query_one("#keys", Label).content)
 
-        assert "r to ask it again" in keys
+        assert "r ask it again" in keys
         assert "ctrl" not in keys.lower()

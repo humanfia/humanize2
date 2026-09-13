@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import hmz.coganchor.models
+from hmz.runtime import telemetry
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -53,6 +54,11 @@ def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # for those as it opens, which is right at a prompt and wrong in a suite: a test must not
     # reach anybody's network, and one that is about the fetching points this at a file.
     monkeypatch.setenv("HUMANIZE_PRICES", "off")
+    # Whether the question about reporting has been answered is read once and kept for the
+    # life of the process, which is right at a prompt and wrong across a suite: a test that
+    # answers it -- and the ones about the question itself do -- leaves the answer behind for
+    # every test after it, and the next one that expects to be asked is never asked at all.
+    telemetry.again()
 
 
 @pytest.fixture(autouse=True)

@@ -16,7 +16,7 @@ Set TypingSpeed 40ms
 Hide
 Type "cd /work/demo && clear" Enter
 Type "hmz" Enter
-Wait+Screen /Say what to do/
+Wait+Screen /ctrl\+c exit/
 Show
 
 Sleep 400ms
@@ -31,7 +31,7 @@ Sleep 1400ms
 # account, taking it away among them, rather than four letters to read off the bottom of the
 # screen.
 Enter
-Wait+Screen /What to do with this account/
+Wait+Screen /correct what it holds/
 Sleep 1400ms
 Screenshot "/out/account-does.png"
 Sleep 400ms

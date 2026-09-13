@@ -22,6 +22,8 @@ from hmz.runtime.kept import Runs
 from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import (
+    _ADD,
+    _SAVE,
     _TAKES_AWAY,
     Account,
     Accounts,
@@ -401,7 +403,7 @@ async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
         # This machine's own first, which is what every agent ran as before there were any.
-        assert rows(app) == ["", "deepseek"]
+        assert rows(app) == ["", "deepseek", _ADD]
 
         await driver.press("down", "enter")
         await until(lambda: isinstance(app.screen, Agent), driver)
@@ -452,7 +454,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         await opens(app, driver, "provider")
         await until(lambda: isinstance(app.screen, Accounts), driver)
         # Nothing to choose but this machine's own, which is where somebody finds out.
-        assert rows(app) == [""]
+        assert rows(app) == ["", _ADD]
 
         await driver.press("a")
         # Straight to the ways in: the backend is the one the agent is already on.
@@ -558,10 +560,11 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
         said = str(app.screen.query_one("#tuning", Label).content)
 
         assert "claude has no accounts here yet" in said
-        # And says where one comes from without sending anybody out of the question: the
-        # moment somebody finds out they have none is the moment to be offered one.
-        assert "a makes one" in said
-        assert "a to make one" in str(app.screen.query_one("#keys", Label).content)
+        # And offers one without sending anybody out of the question: the moment somebody
+        # finds out they have none is the moment to be offered one. A row of the list as well
+        # as a key, a key said at the bottom of the screen being one to go looking for.
+        assert rows(app)[-1] == _ADD
+        assert "a add" in str(app.screen.query_one("#keys", Label).content)
 
 
 @pytest.mark.timeout(60)
@@ -996,9 +999,13 @@ async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> 
         assert [str(one.id) for one in listing.options if one.id] == [
             "=codex/work",
             "=codex/",
+            f"={_ADD}",
+            f"={_SAVE}",
         ]
-        assert "as local" in str(listing.options[-1].prompt)
-        assert "already signed in" in str(listing.options[-1].prompt)
+        # The two below them are about the list rather than accounts in it, so this
+        # machine's own is the last account rather than the last row.
+        assert "as local" in str(listing.options[-3].prompt)
+        assert "already signed in" in str(listing.options[-3].prompt)
 
         await driver.press("down")  # onto it
         await driver.pause()
