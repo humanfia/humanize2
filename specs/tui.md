@@ -67,10 +67,10 @@ line, with what the flow is doing beside the transcript.
 - `$<flow> <prompt>` MUST be the flow said outright: choose that flow, and say that to it. The
   two answers before a run -- which flow, and what to do -- are one line then, and the first of
   them is the same answer every morning. Where this workspace has already set that flow up it
-  MUST run on the spot: a menu of two pages of answers already given is a menu nobody would
-  open. Where it has not, the flow menu MUST open on that flow with the line held, and the
-  flow MUST run on it the moment the menu is saved -- a flow with no agents answered for is a
-  flow that stops on its first turn, and a prompt held is a prompt not typed twice.
+  MUST run on the spot: a menu of answers already given is a menu nobody would open. Where it
+  has not, the flow menu MUST open inside that flow with the line held, and the flow MUST run
+  on it the moment the menu is saved -- a flow with no agents answered for is a flow that stops
+  on its first turn, and a prompt held is a prompt not typed twice.
 - Set up here MUST mean a remembered agent for every place the flow declares now, under the
   name the flow calls that place and in the flow's own order -- so a flow that has grown,
   lost or renamed an agent since is one to be asked about rather than one whose reviewer
@@ -94,8 +94,8 @@ line, with what the flow is doing beside the transcript.
   next line typed is that answer, whatever it begins with, and a turn left waiting while a
   flow started elsewhere is a turn nobody ended.
 - A `$` line MUST be refused while a flow is running, and MUST leave that run exactly as it
-  was. It is choosing a flow, and the page that chooses one is shut while one runs; two ways
-  of saying the same thing that did opposite things would be one of them ending a day's work
+  was. It is choosing a flow, and choosing one is not offered while one runs; two ways of
+  saying the same thing that did opposite things would be one of them ending a day's work
   on a line meant to queue the next one up. It MUST NOT quietly become a word put into the
   running conversation either.
 - A `$` naming a flow and saying nothing after it MUST choose that flow and no more: there is
@@ -352,9 +352,19 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   search MUST be asked for -- on `s` -- and MUST be left on esc, which clears what was typed
   before it goes. While one is running the letters MUST reach it rather than the keys they
   otherwise are, and esc MUST come out of the search before it leaves the sheet.
-- A menu of several pages MUST show their titles, and tab and shift+tab MUST turn between
-  them: that is the one pair of keys a terminal has for exactly this. A page that may not be
-  opened MUST still be a title, struck through, and MUST be stepped over rather than opened.
+- Pages MUST be parallel: two views of one question, either of which may be read first. A
+  menu of several MUST show their titles, and tab and shift+tab MUST turn between them, that
+  being the one pair of keys a terminal has for exactly this. A page that may not be opened
+  MUST still be a title, struck through, and MUST be stepped over rather than opened. A menu
+  of one page MUST NOT draw a strip of titles at all: one title is nowhere to turn to, and a
+  row that offers nothing is a row taken off a terminal that has only so many.
+- What is reached by picking something MUST NOT be a page. It MUST be opened with enter on the
+  thing it is about and left on esc, which is one step back rather than a way out of the menu.
+  The distinction is what the keys say about what happened: a tab between two views of one
+  question is orientation, while a tab between a list and the thing picked out of it reads as
+  a view that was there all along -- so which thing was picked is a thing nobody can see they
+  chose, and turning back to the list looks like changing views rather than the way back out
+  of what they opened.
 - A page made of several lists MUST show what they are called, and the left and right arrows
   MUST step between them: the list itself is walked up and down, so across is what is left,
   and the titles are read the same way the pages' are.
@@ -370,9 +380,9 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 ### What lands, and when
 
 - A menu MUST hold everything changed in it until it is left and saving is confirmed. Turning
-  a page MUST apply nothing: what is read on the second page is what the first is holding, and
-  a menu that applied each page as it was left would be one where walking out changed things
-  nobody confirmed.
+  a page or walking into what was picked MUST apply nothing: what is read deeper in is what the
+  menu is holding, and a menu that applied each part as it was left would be one where walking
+  out changed things nobody confirmed.
 - Esc on a menu holding changes MUST ask whether to save them, and esc on that question MUST
   be the way back to the menu. Esc on a menu holding none MUST just leave: a walk in to look
   and out again is not a question anybody wants asked of them.
@@ -385,12 +395,20 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 
 ### Which flow, and what drives it
 
-- The flow menu MUST be two pages: which flow to run, and what each of its agents is. Two
-  because they are two questions about one thing and are not open at the same moments.
-- The page that chooses a flow MUST be shut while a flow is running: a flow is chosen in order
-  to be started, and there is one going. The page its agents are set up on MUST never be shut
-  -- an agent thinking too little, on the wrong account or allowed too much is found out
-  halfway through a run.
+- The flow menu MUST be the flows, and the agents of the one that was opened: a walk in, and
+  not two pages. A flow is picked out of a list and its agents are that flow's own, so enter
+  MUST open what drives the flow under the cursor, and esc MUST come back to the flows.
+- Choosing a flow MUST NOT be offered while a flow is running: a flow is chosen in order to be
+  started, and there is one going. The menu MUST open inside the agents then, and esc there
+  MUST leave, there being no list of flows behind it to step back to. The agents MUST be
+  reachable whatever is happening -- an agent thinking too little, on the wrong account or
+  allowed too much is found out halfway through a run.
+- A menu opened already naming a flow -- `/flow` given one, and a `$` naming one this
+  workspace has never set up -- MUST open inside that flow's agents. The flow has been named,
+  so what is left to answer is what drives it, and one named as a path is not in the list to
+  be chosen from at all. Esc there MUST leave, as it does while a flow runs: a step back to a
+  list nobody walked through is a step nobody took, and on a `$` it would swallow the line
+  that was typed to start something.
 - What is saved while a flow runs MUST reach the agents that are running, as far as it can:
   each of them MUST be set up as it now stands from its next turn on. A CLI that has changed
   MUST NOT be swapped under the flow holding that agent -- a backend is the class the agent is
@@ -418,12 +436,15 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   background: it is here because its flows are wanted, and a list with nothing in it and a
   key to press about it is a step nobody would choose to take. It MUST NOT hold the menu up,
   MUST NOT move what is being read, and MUST be tried once per opening however it goes -- a
-  machine with no network says so once rather than on every keystroke.
-- Adding a flowverse, fetching one again and taking one away MUST NOT be keys of this page.
+  machine with no network says so once rather than on every keystroke. While it runs, the menu
+  where flows come from MUST NOT be opened from here, and the key MUST say why: two clones of
+  one place land in one directory, and the one that loses takes the other's work with it.
+- Adding a flowverse, fetching one again and taking one away MUST NOT be keys of the flows.
   They are things done to the list of places rather than to the flow under the cursor, and a
   sheet that asks `which flow` with three keys on it about something else is a sheet asking
-  two questions. `/flowverses` is where they are, and stepping between the places stays here:
-  that is about which list of flows is being read.
+  two questions. The menu where flows come from is where they are, reached on a key of the
+  flows, and stepping between the places stays here: that is about which list of flows is
+  being read.
 - Setting the flow itself up MUST be asked as the flow is chosen, between the flow and its
   agents, rather than being a key or a page of its own: a flow that takes settings is chosen
   in order to be run with settings, and that is the one moment somebody is thinking about the
@@ -433,8 +454,8 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - Each flow MUST say what it does beside its name, which is the line the flow itself says. What
   is typed MUST narrow the list by name and not by that line: a subsequence of a sentence is a
   match nobody typed.
-- Choosing a flow MUST read back what that flow was last set up with here, and MUST end on the
-  page its agents are on: that is the next thing to answer.
+- Choosing a flow MUST read back what that flow was last set up with here, and MUST end inside
+  its agents: that is the next thing to answer.
 - The menu MUST be the one place a flow is set up, however it was reached for: `/flow`, and a
   `$` naming a flow this workspace has never set up. Two screens asking which agents drive a
   flow would be two to answer differently.
@@ -493,11 +514,22 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 
 ### Where flows come from
 
-- `/flowverses` MUST list every place there is, saying where each came from and which have
-  not been fetched, and MUST be the four things there are to do with one: what it holds, one
-  added, one fetched again, one taken away. It MUST be the same store `/flow` reads the flows
-  out of and the same one :attr:`hmz.sdk.Hmz.verses` walks -- one place a thing is kept is
-  one place it is kept, whichever way somebody reached it.
+- The menu of places MUST list every place there is, saying where each came from and which
+  have not been fetched, and MUST be the four things there are to do with one: what it holds,
+  one added, one fetched again, one taken away. It MUST be the same store `/flow` reads the
+  flows out of and the same one :attr:`hmz.sdk.Hmz.verses` walks -- one place a thing is kept
+  is one place it is kept, whichever way somebody reached it.
+- It MUST be reachable from the flows, on a key of theirs: the places are where the flows
+  being read come from, so somebody looking for a flow that is not in the list is somebody
+  looking for the place it would come from, and sending them to a command they must first
+  know about loses the question they were answering. `/flowverses` MUST also open it, that
+  being the way in while a flow is running: choosing a flow is not offered then, so neither is
+  the list the key belongs to.
+- It MUST NOT be a deeper view of the flow menu, whatever it is reached from. That menu holds
+  everything until it is saved, and everything here happens as it is asked for, so a view of
+  it that ran git would be one part of a sheet breaking the contract the whole sheet
+  advertises -- and a menu that is honest about what it holds is the whole of why the menus
+  hold anything.
 - Enter MUST say what one holds, which MUST be read only of the flowverse it was asked of: a
   flow is read by running it, so what a place holds is the one question about it with no cheap
   answer. `a` MUST add one; `r` MUST fetch one again; `d` twice MUST take one away.

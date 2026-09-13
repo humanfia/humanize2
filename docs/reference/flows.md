@@ -206,7 +206,7 @@ def run(agents: Agents, task: str) -> None:
 The names are not only for the flow's own readability. Everything that has to talk about an
 agent uses them:
 
-- The agents page of `/flow` asks what *the reviewer* runs, rather than what agent 2 of 2 runs.
+- Opening the flow in `/flow` asks what *the reviewer* runs, rather than what agent 2 of 2 runs.
 - The line above the prompt says `reviewer · claude/claude-opus-4-8:high`.
 - A [trace](/reference/tracing) groups that agent's sessions under `reviewer`.
 - What each agent was set to run is [remembered per role](/reference/tui#what-it-remembers), so a flow
@@ -403,8 +403,8 @@ $ hmz exec -f pursuing -a pi/openai-codex/gpt-5.5:high "fix the build"
 hmz exec: error: pursuing: worker is run under a goal, which pi has no feature for
 ```
 
-and the agents page of `/flow` offers only the CLIs that would work for that place, so it cannot
-be chosen wrong there at all.
+and opening that flow in `/flow` offers only the CLIs that would work for that place, so it
+cannot be chosen wrong there at all.
 
 **And anything else only some backends serve, the same way.** `Needs` beside the place names
 what the backend filling it has to serve, by the names
@@ -718,7 +718,7 @@ def engine(agents: Agents, task: str) -> None:
 
 It remains directly callable by `<flow>:engine`; `selectable=False` changes discovery only.
 
-Each of them declares its own agents and its own settings, so the agents page asks two questions
+Each of them declares its own agents and its own settings, so opening one asks about two agents
 rather than five and setting one up shows one phase's flags rather than three phases' at once. What
 passes between them is whatever they write — a file, usually.
 

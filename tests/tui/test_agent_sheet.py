@@ -145,7 +145,7 @@ def _value(app: Humanize, held: str) -> str:
 
 
 async def _open(app: Humanize, driver: Pilot[None], flow: str) -> None:
-    """Opens the flow menu already holding one flow, and turns to its agents."""
+    """Opens the flow menu on one flow -- which is inside it -- and then one of its agents."""
     await driver.press(*f"/flow {flow}")
     await driver.press("enter")
     await until(lambda: isinstance(app.screen, Flows), driver)
@@ -185,15 +185,16 @@ async def test_two_agents_are_two_rows_and_a_sheet_apiece(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
 ) -> None:
-    """The page lists what the flow drives, by the name the flow calls each of them."""
+    """Opening a flow lists what it drives, by the name the flow calls each of them."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/flow pair")
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Flows), driver)
         sheet = cast("Flows", app.screen)
-        await driver.press("tab")
-        await until(lambda: sheet._tab == 1, driver)
+        # A menu opened already naming a flow opens inside it: the flow has been named, so
+        # what is left to answer is what drives it.
+        await until(lambda: sheet._inside, driver)
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: len(listing.options) == 3, driver)
 
@@ -268,9 +269,9 @@ async def test_explicit_flow_save_refuses_an_agent_with_no_model(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Flows), driver)
         sheet = cast("Flows", app.screen)
-        if sheet._tab != 1:
-            await driver.press("tab")
-            await until(lambda: sheet._tab == 1, driver)
+        if not sheet._inside:
+            await driver.press("enter")
+            await until(lambda: sheet._inside, driver)
 
         await onto(app, driver, "save")
         await driver.press("enter")

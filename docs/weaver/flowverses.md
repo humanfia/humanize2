@@ -50,9 +50,10 @@ git remote add origin git@github.com:you/my-flowverse.git
 git push -u origin main
 ```
 
-3. **Add it.** At the prompt, `/flowverses` and **a**: a URL or an `owner/repo`, and `yours` as
-   the name to keep it under. That clones the repository into `~/.humanize/flowverses/yours/`,
-   and **enter** on it reads back what it holds by the name `-f` takes. From a script the same
+3. **Add it.** At the prompt, **v** in `/flow` — or `/flowverses` — and then **a**: a URL or
+   an `owner/repo`, and `yours` as the name to keep it under. That clones the repository into
+   `~/.humanize/flowverses/yours/`, and **enter** on it reads back what it holds by the name
+   `-f` takes. From a script the same
    two are [`Hmz().verses`](/reference/sdk#flowverses):
 
 ```python
@@ -130,7 +131,7 @@ See [SDK reference](/reference/sdk#flowverses).
 
 ### At the prompt
 
-`/flowverses` is the places themselves:
+**v** in `/flow` opens the places themselves, and `/flowverses` opens the same menu:
 
 ![/flowverses: the places flows come from, and what one of them holds](/demo/flowverses.gif)
 
@@ -159,15 +160,20 @@ Which flow to run is `/flow`'s question, and it steps between the same places:
 | --- | --- |
 | **←** **→** | Step between the places flows come from, a list apiece — every flowverse, ending with `local` and `user` where either holds anything |
 | **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
+| **v** | The places themselves, which is this menu; **esc** comes back to the flows |
 
 A flow whose file will not import is still listed there, under the name it would have had and
 with nothing beside it. It is a flow somebody named. Saying so where it is chosen beats leaving
 it off the list and letting you wonder where it went.
 
-The two pages are apart because they are two questions: which flow to run, and what places
-there are. What stays on `/flow` is **f**, which is about the flow you are looking at — the
-moment you find out it is *nearly* what you want. A flow is a directory, so the copy is the
-whole of it, skills and all, and it lands under the name it already had. Yours are looked in
+The two are apart because they are two questions: which flow to run, and what places there
+are. Walked to rather than turned to, and a sheet of its own rather than a deeper view of the
+flow menu: that menu holds everything until you save it, and adding a place, fetching one and
+taking one away each run git the moment you ask. `/flowverses` stays a command as well, since
+the key belongs to the flows and there are none to choose from while a flow is running. What
+stays on the flows is **f**, which is about the flow you are looking at — the moment you find
+out it is *nearly* what you want. A flow is a directory, so the copy is the whole of it, skills
+and all, and it lands under the name it already had. Yours are looked in
 first, so from then on that name means your copy. Editing a flowverse's own copy would not
 keep, since fetching it again takes what that repository says now.
 

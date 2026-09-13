@@ -48,8 +48,8 @@ between keystrokes.
 /flow ./flows/mine
 ```
 
-Nothing else completes either. Model ids are chosen where an agent is set up, which is the
-agents page of `/flow`, and you choose from the list the CLI itself said it runs. There is no
+Nothing else completes either. Model ids are chosen where an agent is set up, which is inside
+a flow in `/flow`, and you choose from the list the CLI itself said it runs. There is no
 completion for a task, because a task is prose.
 
 ## Searching on a sheet

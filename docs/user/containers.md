@@ -104,7 +104,7 @@ anywhere.
 **For the weaver.** `Annotated[Agent, Isolated("python:3.12")]` beside the place, as in [Try
 it](#try-it) above, is the usual way for one agent. The image is the flow's, and the workspace
 is the directory the flow is running in; nothing can point that agent anywhere else, including
-you. The agents page of `/flow` reads it back on that agent's `where` row as `in a container of
+you. Opening that flow in `/flow` reads it back on that agent's `where` row as `in a container of
 python:3.12`, with `the flow settled this` beside it — a row to read rather than one to open.
 
 ## From Python

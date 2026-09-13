@@ -54,11 +54,11 @@ do, on one line:
 $ralph_loop Fix the bug in calc.py.
 ```
 
-`$` names a flow, and this directory has never run that one, so `/flow` opens with the cursor
-already on it and your line held. Two pages answer what runs it: which flow, and then what its
-one agent is — the CLI you are already logged into, which of its models, and how hard it should
-think. The models offered are the ones **your account** may name, asked of the CLI itself
-rather than written into humanize. `save` on the last row starts the flow, on the line you
+`$` names a flow, and this directory has never run that one, so `/flow` opens inside it with
+your line held. Two questions answer what runs it: which flow — which the line already named —
+and then what its one agent is: the CLI you are already logged into, which of its models, and
+how hard it should think. The models offered are the ones **your account** may name, asked of
+the CLI itself rather than written into humanize. `save` on the last row starts the flow, on the line you
 typed.
 
 You answer that once. What you chose is remembered for this directory, so the next `hmz` here
