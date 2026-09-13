@@ -167,6 +167,12 @@ line, with what the flow is doing beside the transcript.
   line: an account outlives the flow that was set up with it, and the one place a person is
   asked anything is the one place a credential can be typed. It is the one thing said in both
   places, and the same store either way.
+- The commands MUST be declared in one table: what each is called, the line said about it in
+  the list, what may be written after its name, and what carries it out. Adding one MUST be
+  one entry rather than one in the list of names, one in the help and one more branch in
+  whatever dispatches a sent line -- three declarations kept in step by a test is a command
+  that works and is offered to nobody, or is offered and does nothing, for as long as it takes
+  somebody to run the suite.
 - `hmz anchor` MUST NOT be a command here: it is not a thing to do to a flow that is running,
   and a command that only ever means one thing is a command line. Gathering a trace MUST NOT
   be one either -- it is a thing done to a run that has already happened, so it is one of the
@@ -223,6 +229,16 @@ line, with what the flow is doing beside the transcript.
   asking MUST start allowed, so that an agent that really needs a person gets one unless it has
   been said that none is there. A question still up when the flow ends or is stopped MUST end
   with it, so that stopping a flow is never blocked on one.
+- The status line MUST say which of those two modes the interface is in, for as long as it is
+  in one. Each is switched by a line that says which way it went and then scrolls away, and
+  neither changes anything else that is drawn -- so a mode nobody can see they are in is one
+  they find out about from what did not happen. `/afk` above all: it decides whether an agent
+  may stop and ask you at all, and a person who cannot see that they are away finds out from
+  a flow that carried on past the one question it needed answered.
+- That marker MUST be where a narrow terminal cannot take it away. The keys are clipped from
+  the front to make room and the flow and the directory can fill a small screen between them,
+  so a marker put among either is one that is there until the moment there is no room for it,
+  which is a marker nobody has.
 - `ctrl+c` MUST take back the nearest thing there is to take back: what is half-typed if
   anything is, and the run if not. The run MUST be asked for twice -- the first press saying
   what the next one does, the second one stopping the flow -- because a day's work is behind a
@@ -249,14 +265,20 @@ line, with what the flow is doing beside the transcript.
   terminal closing cannot reach, leave it running and let go of this terminal. Where it is
   not, the second answer MUST be staying here instead: an answer that cannot be carried out
   is not one to offer.
+- It MUST be the one way out. Letting go of the terminal MUST NOT also be a command of its
+  own: both words are about the same running flow, and two ways of saying one thing is one of
+  them typed by somebody who meant the other. What is said about `/exit` in the list of
+  commands MUST therefore say that a flow that is running can be left running -- that is the
+  one thing here that does not end what it closes, and a line reading `exit` is a line nobody
+  would read as an offer to leave a day's work going.
 - Every key that leaves MUST put the same question. A key bound to leaving outright is a way
   round the one thing this asks about, so a terminal's own habit -- `ctrl+q`, which is what a
   full-screen program is left on everywhere -- MUST mean what `/exit` means rather than being
   taken away: a key somebody's fingers know is a key they will press.
-- `/detach` MUST let go of the terminal and leave the flow running, which is the other half
-  of the same question asked outright. Where nothing is holding the run it MUST say so rather
-  than do nothing: what would be let go of is the terminal the interface is in, and closing
-  that closes the run.
+- Letting go of the terminal MUST leave the flow running: what is closed is the terminal
+  rather than the run, and `hmz` in this directory opens it again. It MUST be offered only
+  where something outside this terminal is holding the run, since where nothing is, closing
+  the terminal is what closes the run.
 - What is holding the run MUST be `hmz.sdk.Session` and no more of it: how many terminals are
   reading, and how to let go of them. The interface MUST name no daemon -- it draws on a
   terminal, and which terminal is not a thing it is told.
@@ -274,25 +296,10 @@ line, with what the flow is doing beside the transcript.
   editor MUST be copied from the same way, holding a selection of its own so that the screen's
   has nothing in it. That something was copied MUST be said for a moment, since a clipboard is
   written to silently and a gesture that says nothing is one nobody knows worked.
-- `/export` MUST write the whole run rather than the screen: what happened, what each of its
-  sessions was logged as by the backend that ran it, and the transcript beside those. The
-  screen was never the run -- the turns went to a coding agent that wrote its own log, and the
-  run points at that log by a link rather than holding it. A bundle sent to whoever is being
-  asked to fix something MUST therefore follow every one of those links and carry what is
-  behind it, since a link is worth nothing on any machine but the one that made it. It is
-  `hmz.runtime.exporting`, which is also what a run exported from `/epics` and
-  :meth:`hmz.sdk.Hmz.epics.bundled` ask: one archive, made one way, whichever way somebody
-  reached it.
-- The transcript that goes in MUST be the text the transcript was written as rather than the
-  rows it was drawn as, for the reason a selection gives back that text: a file of lines
-  broken where the terminal ran out of room is one nothing reads back.
-- It MUST say where the archive landed and how big it came out, and MUST NOT hold the
-  interface still while it is written: following a day's logs and compressing them is seconds,
-  and an interface that stopped redrawing for them would look as though it had gone away.
-- The run it exports MUST be the run this interface is showing, asked of the agents it drove
-  rather than of which directory sorts last -- a flow that is going is exported as itself.
-  A directory nothing has ever been run in MUST be said rather than answered with an archive
-  of no run.
+- Packaging a run up to send MUST NOT be a command here. It is a thing done to a run that has
+  already happened, like gathering its trace, so it is one of the things `/epics` offers about
+  the run under its cursor rather than a command about whichever run this screen happens to be
+  showing -- which is one of the runs in that list and not always the one somebody means.
 
 ## `selecting.py`
 
@@ -605,10 +612,13 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   session of the workspace, and nothing typed and nothing drawn calls it that way.
 - A run MUST also be exportable from here, beside gathering its trace: both are reading one
   back afterwards, and a report about something that went wrong last week is written about a
-  run out of this list rather than about the one on the screen. What is written MUST be the
-  same archive `/export` writes, less the transcript -- what is on the screen is not that run,
-  which may be a week old, and a screen of somebody else's run in it would be a bundle saying
-  something that is not true.
+  run out of this list rather than about the one on the screen. What is written MUST be what
+  `hmz.runtime.exporting` writes and MUST carry no transcript -- what is on the screen is not
+  that run, which may be a week old, and a screen of somebody else's run in it would be a
+  bundle saying something that is not true. Where the archive landed and how big it came out
+  MUST be said, and writing it MUST NOT hold the interface still: following a day's logs and
+  compressing them is seconds, and an interface that stopped redrawing for them would look as
+  though it had gone away.
 - Carrying a run on MUST run that run's own flow, on that run's own agents, with what it was
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came
@@ -814,12 +824,23 @@ a flow being a Python file that may branch any way it likes.
 ## `complete.py`
 
 ```python
-def offered(typed: str, commands: tuple[str, ...]) -> list[str]: ...
-def flows(where: str | None = None) -> list[str]: ...
+@dataclass(frozen=True)
+class Command:
+    name: str
+    about: str
+    does: Callable[[Humanize, list[str]], object]
+    takes: str = ""
+
+
+def offered(typed: str, commands: tuple[Command, ...]) -> list[str]: ...
+def hinted(typed: str, commands: tuple[Command, ...]) -> str: ...
 ```
 
 What the editor offers to finish, which is the only way anything is chosen.
 
+- A command MUST be one of these and nothing besides: the name, the line said about it, what
+  may be written after it, and what running it does. What is offered here MUST be read off the
+  same rows that carry a sent line out, so that a command cannot be offered and do nothing.
 - Nothing MUST be chosen from a dialog. A `/` MUST offer the commands, and a flag MUST offer
   whatever it is for -- the flows below this directory, the backends an agent runs on -- so
   that there is one way to say a thing and it is the way it is written down.

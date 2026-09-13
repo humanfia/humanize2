@@ -237,10 +237,10 @@ def _tui(argv: list[str]) -> int:
 def opens() -> int:
     """Opens the interface, on this terminal or on one a run of its own is being held on.
 
-    A run of a flow outlives the terminal it was started from, which is what makes `/detach`
-    a thing there is: the interface goes on running where nothing is reading it, and `hmz` in
-    this directory opens it again. So a line that opens the interface reads whichever run is
-    already being held here, and starts one where none is.
+    A run of a flow outlives the terminal it was started from, which is what makes leaving it
+    running an answer to `/exit`: the interface goes on running where nothing is reading it, and
+    `hmz` in this directory opens it again. So a line that opens the interface reads whichever
+    run is already being held here, and starts one where none is.
 
     A terminal is what makes that worth doing. With nothing to attach -- output going to a
     file, a test driving the interface itself -- the interface is opened here, in this
@@ -297,8 +297,8 @@ def apart(session: Held) -> None:
     and were only ever arguments here while a line could name them.
 
     Args:
-      session: What is holding the run, which is what `/detach` lets go of and what draws
-        the screen again for a terminal that has just arrived.
+      session: What is holding the run, which is what leaving it running lets go of and what
+        draws the screen again for a terminal that has just arrived.
     """
     # Here rather than inside the line that opens the interface: this is the one function
     # that runs in the process holding a run, which is the other side of a fork and has none

@@ -19,7 +19,7 @@ from hmz.coganchor.backends import Model
 from hmz.runtime.kept import Runs
 from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
-from hmz.tui.app import _OWN, Editor
+from hmz.tui.app import _COMMANDS, Editor
 from hmz.tui.complete import offered
 from hmz.tui.pick import Flows
 from hmz.tui.selecting import Transcript
@@ -366,10 +366,14 @@ def test_the_flows_there_are_are_offered_under_the_sigil_that_starts_one() -> No
     from hmz.flows import found
 
     every = [f"${one.name}" for one in found()]
-    assert offered("$", _OWN) == every
-    assert offered("$cha", _OWN) == [one for one in every if one.startswith("$cha")]
-    assert offered("$chat", _OWN) == []  # written out already, so enter sends the line
-    assert offered("$chat fix the", _OWN) == []  # the prompt, which is prose
+    assert offered("$", _COMMANDS) == every
+    assert offered("$cha", _COMMANDS) == [
+        one for one in every if one.startswith("$cha")
+    ]
+    assert (
+        offered("$chat", _COMMANDS) == []
+    )  # written out already, so enter sends the line
+    assert offered("$chat fix the", _COMMANDS) == []  # the prompt, which is prose
 
 
 @pytest.mark.timeout(60)

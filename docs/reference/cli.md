@@ -367,7 +367,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/daemons/<project>-<digest>/daemon.sock` | `hmz` with no command | The socket a terminal reaches a [held run](/reference/daemon) through. `0600`. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.json` | the same | Which process is holding it, which workspace, and since when. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.log` | the same | Whatever could not be said through a terminal about that run — what the daemon itself could not say, and what went wrong in a process reaching for its socket. |
-| `.humanize/<run>.epic.tar.gz` | `/export` | One whole run, packaged up to send: its records, its session logs in full, the transcript, and a manifest. `0600`. |
+| `.humanize/<run>.epic.tar.gz` | **export it**, on a run of `/epics` | One whole run, packaged up to send: its records, its session logs in full, and a manifest. `0600`. |
 | `~/.humanize/flowverses/<name>/` | **a** in `/flowverses` | A [flowverse](/weaver/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
 | `.humanize/flows/*/` | you | This project's own flows, offered as `local/<flow>`. |

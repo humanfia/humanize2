@@ -16,78 +16,55 @@ from __future__ import annotations
 
 import functools
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from hmz.flows import Offer
 
-__all__ = ["about", "hinted", "offered"]
+    from .app import Humanize
 
-#: What each command does, shown beside its name.
-_ABOUT = {
-    "flow": "Switch flow",
-    "btw": "Ask a side question",
-    "flowverses": "Manage the places flows come from",
-    "providers": "Manage the accounts agents run as",
-    "fallback": "Where a turn goes when the place taking it cannot take it at all",
-    "epics": "The runs of this directory, and what to do with one",
-    "resume": "Carry the last run here on from where it stopped",
-    "settings": "What humanize remembers, here and everywhere",
-    "monitor": "Watch the run: the flow drawn, and the board",
-    "clear": "Clear the screen",
-    "details": "Toggle tool calls and thinking",
-    "afk": "Toggle whether an agent may ask you",
-    "export": "Package this whole run up to send",
-    "detach": "Let go of this terminal, leaving the flow running",
-    "exit": "Exit humanize",
-}
+__all__ = ["Command", "hinted", "offered"]
 
 
-#: What a command takes after its name, shown beside it so that the list says what may be
-#: written and not only what may be started. A switch takes `on` or `off` as well as being
-#: flipped, and nothing says so unless the list does.
-_TAKES = {
-    "afk": "[on|off]",
-    "btw": "<question>",
-    "details": "[on|off]",
-    "flow": "[flow]",
-}
+@dataclass(frozen=True)
+class Command:
+    """One command of the editor, declared once and whole.
+
+    Everything there is to know about a command is here: what it is called, what it is for,
+    what may be written after its name, and what carries it out. Three of those used to be
+    declared in three files that a test kept in step, which is a command added in two of them
+    and missing from the third until somebody ran the suite -- offered but doing nothing, or
+    working but offered to nobody.
+    """
+
+    #: What is typed after the slash.
+    name: str
+    #: What it is for, shown beside its name in the list.
+    about: str
+    #: What running it does, given the interface and whatever was written after the name.
+    #: What it answers with is nothing to the caller -- a worker, a None -- so it says
+    #: nothing about that.
+    does: Callable[[Humanize, list[str]], object]
+    #: How its arguments are written, shown beside it so that the list says what may be
+    #: written and not only what may be started. A switch takes `on` or `off` as well as
+    #: being flipped, and nothing says so unless the list does. "" takes none.
+    takes: str = ""
+
 
 #: `/flow` and the name being typed after it. A third word is a line that has moved on.
 _FLOW_AND_NAME = 2
 
 
-def takes(name: str) -> str:
-    """What a command takes after its name.
-
-    Args:
-      name: The command, without its slash.
-
-    Returns:
-      How its arguments are written, or "" for a command that takes none.
-    """
-    return _TAKES.get(name, "")
-
-
-def about(name: str) -> str:
-    """What a command is for.
-
-    Args:
-      name: The command, without its slash.
-
-    Returns:
-      The one line said about it, or "" if it is not one to offer.
-    """
-    return _ABOUT.get(name, "")
-
-
-def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
+def offered(typed: str, commands: tuple[Command, ...]) -> list[str]:
     """What the line being typed could be finished with.
 
     Args:
       typed: The line as it stands.
-      commands: The commands there are, without their slashes.
+      commands: The commands there are.
 
     Returns:
       Everything the last word could become, in full, so that taking one replaces what was
@@ -111,9 +88,9 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     elif not typed.startswith("/"):
         return []
     elif len(words) == 1:  # still naming the command
-        if tail.removeprefix("/") in commands:
+        if any(tail.removeprefix("/") == one.name for one in commands):
             return []
-        offers = sorted(f"/{name}" for name in commands if name in _ABOUT)
+        offers = sorted(f"/{one.name}" for one in commands)
     # The flow is the one thing `/flow` takes, so it is offered while that word is the one
     # being typed and not after it: a line that already names a flow is a finished line.
     elif words[0] == "/flow" and len(words) == _FLOW_AND_NAME:
@@ -166,12 +143,12 @@ def _found(_moment: int, _where: str) -> tuple[Offer, ...]:
     return tuple(found())
 
 
-def hinted(typed: str, commands: tuple[str, ...]) -> str:
+def hinted(typed: str, commands: tuple[Command, ...]) -> str:
     """The command a line is writing, for as long as it is still being written.
 
     Args:
       typed: The line as it stands.
-      commands: The commands there are, without their slashes.
+      commands: The commands there are.
 
     Returns:
       The command the line names, without its slash, or "" if it names none. Shown rather
@@ -183,4 +160,4 @@ def hinted(typed: str, commands: tuple[str, ...]) -> str:
     if not typed.startswith("/"):
         return ""
     named = typed[1:].partition(" ")[0]
-    return named if named in commands and about(named) else ""
+    return named if any(named == one.name for one in commands) else ""

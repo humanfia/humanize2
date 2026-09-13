@@ -39,7 +39,7 @@ whole piece of work start to finish; everything under them is for looking up.
 | [Falling back](/user/fallback) | `/fallback`: where a turn goes when what was taking it cannot |
 | [Completion](/user/completion) | What a half-typed line could become, under the editor |
 | [History](/user/history) | Everything typed here before, on ↑ and ↓ |
-| [Exporting a run](/user/export) | `/export` packages the whole run up as one archive to send |
+| [Exporting a run](/user/export) | **export it**, on a run of `/epics`: the whole run as one archive to send |
 | [What a project remembers](/user/settings) | Reopening finds it set up the way you left it |
 | [Stopping](/user/stopping) | **ctrl+c** twice ends the flow; what that does to a turn |
 
