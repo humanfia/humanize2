@@ -555,6 +555,26 @@ making.
 - A menu MUST NOT be saved holding an agent that names no model: a flow driven by one is a flow
   that stops on its first turn, and the page it would be answered on is the page to be looking
   at when that is said.
+- What a run of the flow may spend MUST be settable from the menu, and MUST be a row on the
+  page the flow's agents are on rather than a page the walk goes through: every flow has an
+  allowance, most runs want the one they already have, and a page that had to be pressed past
+  on the way to the agents is a question asked of somebody who has answered it. It MUST NOT be
+  asked among the flow's own settings -- it is a setting of the run, and a flow's model refuses
+  fields it never declared -- and it MUST be held with the rest of the menu until it is saved.
+- That row MUST say what the run is held to without being opened. An allowance nobody can see
+  without opening something is one nobody checks, and the thing worth seeing on it is that
+  there is no cap at all.
+- Saving a run that nothing will stop MUST ask once whether that is what was meant. Three
+  dimensions and none of them set is a run that goes until somebody notices, for whatever days
+  of a model cost; that is a fair thing to ask for and a poor thing to arrive at by not
+  answering three questions, and the two are identical afterwards. It MUST be asked at the one
+  exit that produces an answer, so that the save row and the question on the way out are asked
+  the same thing. It MUST be worded as the question rather than as a receipt: what is kept
+  goes to a file that may not be writable, and a box saying the run was saved would claim
+  something nothing here can know.
+- A flow that said in its own file that it is meant to run unbounded MUST NOT be asked. The
+  claim MUST be read off the flow rather than matched against a list of names here, which
+  would be the same list kept in the interface, the command line and the settings alike.
 
 ### What one agent is
 

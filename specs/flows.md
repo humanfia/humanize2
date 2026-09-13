@@ -73,6 +73,7 @@ class Flow:
     skills: tuple[str, ...] = ()
     resumable: bool = False
     selectable: bool = True
+    budget: Allowance | None = None
 
 
 class Offer(NamedTuple):
@@ -89,7 +90,11 @@ def flow[**P, T](
     about: str = "",
     skills: Iterable[str] = (),
     resumable: bool = False,
+    budget: Allowance | None = None,
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+
+def declared(flow: str | os.PathLike[str]) -> Allowance | None: ...
 
 
 def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]: ...
@@ -144,6 +149,19 @@ def __getattr__(name: str) -> object: ...
   somebody pressing esc. Such a flow MUST be handed a dict as its last argument, holding what
   it wrote there last time -- so that what it is keeping track of is the flow's own handful of
   things rather than a second copy of the transcript, which the backends already keep.
+- A flow MUST NOT hold itself to a budget of its own. What a run may spend MUST be held to
+  once, centrally, off the meters every backend already feeds -- a cap a flow implements is a
+  cap only that flow has, reading only the tokens that flow happened to count, and one nobody
+  can set from the menu they set everything else with. A flow MAY say what a run of it is
+  worth by default, which is `budget=`, and MUST be overridable by whoever starts the run.
+- That default MUST have three states and not two, because the third is what keeps a flow
+  that is meant to run unbounded from being asked about it every time. Saying nothing MUST be
+  a flow with no opinion, which runs under whatever the workspace was set up with; an
+  `Allowance` with something in it MUST be the flow's own default; and an `Allowance()`
+  written out MUST be a flow claiming in its own file that it is meant to run under nothing at
+  all. Whatever asks somebody to confirm an unbounded run MUST read that claim rather than
+  name a flow, so that the exemption is one reviewable line in the flow's file and MUST NOT be
+  a list of names kept in the interface, the command line and the settings alike.
 - What a flow says about itself MUST be the first line of its docstring where the decorator was
   not told one, and for a file that is one flow MUST fall back to the file's own docstring: a
   file that is one flow is documented as that flow.
@@ -670,6 +688,14 @@ own.
   reachable or a bound tight, and nothing MUST follow a value through a call -- a flow that
   keeps its loop in one function and its bound in another is a flow this reading trusts,
   since a rule that guessed further would refuse flows that run.
+- A loop that takes a turn of an agent MUST NOT be read as one nothing can end. Every session
+  of every backend is held to the run's allowance, and a turn taken once that is spent raises
+  rather than answering -- so such a loop ends wherever it is, and calling it an error would
+  be the checker requiring the very thing a flow MUST NOT do, which is hold itself to a budget
+  of its own. It MUST still be said, as a warning: a loop whose only end is the allowance
+  stops rather than finishes, and how long that takes is what somebody set rather than
+  anything the flow decided. What the warning tells a flow to add MUST NOT be a budget read
+  off `spent()`.
 - What an agent may be asked MUST be read off the interfaces in `agent.py` themselves, which
   is `surface`, and what a flow may import MUST be read off this package's own tables, which
   is `offered`: the checker states what the interface is, so a second copy of either would be
@@ -742,6 +768,11 @@ at once and costs what the scenario says.
 - The world a proof runs in MUST sleep for free and MUST work in a scratch directory taken
   away with the process: the rest a loop takes between rounds and the files it writes while
   being proved are no part of its shape.
+- The stubs MUST be held to the allowance the flow itself declared and to no other. A real
+  run's allowance is whoever started it's, and a proof standing on one would pass a loop that
+  never ends because somebody's money ran out -- which is a proof of nothing about the flow.
+  A flow that declared one and reaches the end of it MUST read as a flow that finished: it
+  claimed in its own file that a run of it ends there, and this is that claim being tried.
 - A flow the loading refuses MUST come back as a `refused-load` finding rather than a raise,
   and the config rules MUST be run again on the model the loading actually resolved: a model
   built out of the static reading's sight is still the one whoever sets the flow up meets.
