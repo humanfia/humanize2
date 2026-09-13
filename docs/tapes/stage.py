@@ -319,8 +319,8 @@ def _runs() -> None:
     its own record, linking each session to the transcript above and keeping what a flow that
     can be picked up left behind.
     """
-    from hmz import epic as written_as
     from hmz.coganchor.agents import AgentConfig
+    from hmz.runtime import epic as written_as
 
     moments = iter(
         [_stamped(0), _stamped(LATER)]

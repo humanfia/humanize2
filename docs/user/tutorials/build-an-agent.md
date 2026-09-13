@@ -303,9 +303,10 @@ hmz
 ```
 
 Three runs happened here, one per phase, and each is its own **epic** — a directory under
-`~/.humanize/epics/`. `/epics` lists all three, newest first, and **enter** on one offers
-*collect a trace* — that run's sessions and no other's, written into `traces/` inside it. So
-the three phases are three traces, each gathered from the run it is of.
+`~/.humanize/epics/`. `/epics` lists all three, newest first, and **enter** goes into one, where
+*export it* gathers a trace of that run's sessions and no other's into `traces/` inside it and
+packs the run around it. So the three phases are three traces, each gathered from the run it is
+of.
 
 The `rlcr` trace is the interesting one. The builder is a single long track, and the reviewer
 is a row of short ones — and the gaps between them are where the hook fired.

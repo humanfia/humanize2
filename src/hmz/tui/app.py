@@ -72,6 +72,7 @@ from .history import History
 from .monitor import Monitor, short, thousands
 from .pick import (
     DETACHES,
+    RESUMES,
     STOPS,
     Adjusted,
     Adjusts,
@@ -87,7 +88,6 @@ from .pick import (
     Providers,
     Reports,
     Runs,
-    carries_on,
     config_of,
     model_of,
     opens_on,
@@ -2790,24 +2790,25 @@ class Humanize(App[None]):
     async def action_epics(self) -> None:
         """Opens the runs of this directory, which is what `/epics` is for.
 
-        Every run of a flow here, newest first: what it was, how it went, and what there is
-        to do with it. Read while a flow runs -- what has already happened does not change
-        under one -- but a run picked up is a flow started, so that half is refused while
-        one is going, on the sheet where it was asked for.
+        Every run of a flow here, newest first: what it was and how it went, with enter
+        going into one. Read while a flow runs -- what has already happened does not change
+        under one -- but a run picked up is a flow started, so that half is refused while one
+        is going, on the sheet where it was asked for. Whether one is going is asked there
+        rather than handed over, since this list outlives the run it was opened during.
         """
-        said = await self.push_screen_wait(Epics(running=bool(self._agents)))
+        said = await self.push_screen_wait(Epics(running=lambda: bool(self._agents)))
         if said is None:
             return
         for one in said.said:
             self.show(one)
-        if said.doing == carries_on and said.epic is not None:
+        if said.doing == RESUMES and said.epic is not None:
             self._carries_on(said.epic)
 
     def action_resume(self, argv: Sequence[str] = ()) -> None:
         """Carries the last run in this directory on, which is what `/resume` is for.
 
-        `/epics` already offers this of whichever run the cursor is on, and needing to find
-        that row is the whole of what is wrong with it: a loop is left running overnight, the
+        `/epics` already offers this of whichever run you go into, and needing to find that
+        row is the whole of what is wrong with it: a loop is left running overnight, the
         machine goes down, and what somebody who comes back to a stopped one wants is the
         work carried on rather than a list to look for it in. So this is the last run here
         and no other -- there is nothing to choose, which is why it is a command rather than
@@ -2827,10 +2828,6 @@ class Humanize(App[None]):
                 "red",
             )
             return
-        # Before anything is read, since it is the one refusal that is about now rather than
-        # about the record: a run picked up is a flow started, and there is one going.
-        if self._mid_run("no picking a run up"):
-            return
         runs = self.hmz.epics.all()  # oldest first, so the last of them is the last run
         if not runs:
             self.show(
@@ -2838,35 +2835,10 @@ class Humanize(App[None]):
                 "red",
             )
             return
-        epic = runs[-1]
-        ran = self.hmz.epics.read(epic)
-        if ran is None:
-            self.show(
-                f"hmz: {escape(epic.name)} cannot be read back, so there is nothing to "
-                "carry on from",
-                "red",
-            )
-            return
-        if not self._picks_up(ran.flow):
-            self.show(
-                f"hmz: {escape(ran.flow)} does not say it can be picked up, so there is "
-                f"nothing to carry on from in {escape(ran.name)}",
-                "red",
-            )
-            return
-        # Nothing left behind is a run that stopped before it wrote down where it had got
-        # to, or one that emptied what it had written -- which is a flow saying the next run
-        # here starts clean. Either way carrying it on would be a run starting from the top
-        # wearing a line that says which run it came from, which is a record of something
-        # that did not happen. So it says what the next move is instead.
-        if not self.hmz.epics.state(epic, ran.flow):
-            self.show(
-                f"hmz: {escape(ran.name)} left nothing behind, so there is nothing to "
-                "carry on from: say what to do and the flow starts from the top",
-                "red",
-            )
-            return
-        self._carries_on(epic)
+        # Which run is the whole of what this command settles. Why a run cannot be carried
+        # on is settled in one place for both ways in, so that a run walked into on `/epics`
+        # is turned down for the same reasons in the same words.
+        self._carries_on(runs[-1])
 
     def _picks_up(self, flow: str) -> bool:
         """Whether one flow says now that it can be picked up.
@@ -2900,14 +2872,46 @@ class Humanize(App[None]):
         from what the interface happens to be set up on: picking up a run means running what
         ran, and an agent swapped under it would be a different run wearing its name.
 
+        What stands in the way of carrying one on is read here and nowhere else, whether the
+        run was named by `/resume` or walked into on `/epics`: two ways in that turned the
+        same run down for different reasons -- or one that took up what the other refused --
+        would be two answers to one question. The flow is therefore asked again here, having
+        been asked to draw the row: a flow is a file, and the one that matters is the one it
+        is when somebody presses the key rather than when the list was drawn.
+
         Args:
           epic: The run to pick up, by the directory it is written in.
         """
+        # Before anything is read, since it is the one refusal that is about now rather than
+        # about the record: a run picked up is a flow started, and there is one going.
+        if self._mid_run("no picking a run up"):
+            return
         ran = self.hmz.epics.read(epic)
         if ran is None:
-            self.show(f"hmz: {escape(str(epic))} is not a run", "red")
+            self.show(
+                f"hmz: {escape(epic.name)} cannot be read back, so there is nothing to "
+                "carry on from",
+                "red",
+            )
             return
-        if self._mid_run("no picking a run up"):
+        if not self._picks_up(ran.flow):
+            self.show(
+                f"hmz: {escape(ran.flow)} does not say it can be picked up, so there is "
+                f"nothing to carry on from in {escape(ran.name)}",
+                "red",
+            )
+            return
+        # Nothing left behind is a run that stopped before it wrote down where it had got
+        # to, or one that emptied what it had written -- which is a flow saying the next run
+        # here starts clean. Either way carrying it on would be a run starting from the top
+        # wearing a line that says which run it came from, which is a record of something
+        # that did not happen. So it says what the next move is instead.
+        if not self.hmz.epics.state(epic, ran.flow):
+            self.show(
+                f"hmz: {escape(ran.name)} left nothing behind, so there is nothing to "
+                "carry on from: say what to do and the flow starts from the top",
+                "red",
+            )
             return
         # The person at the prompt is not one of the agents anybody chooses, so a flow that
         # talks to one wrote down an agent nothing on a command line names -- and the run

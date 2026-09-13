@@ -189,7 +189,7 @@ login. Everything the agent *does* happens in the container.
 The work therefore happens in a **mirror** rather than in this directory, and the backend logs
 the agent's turns under a path this project has never heard of. It makes no difference: the run
 wrote down the ids of the sessions it opened, and that is what its trace is gathered by —
-`/epics`, enter on the run, then **collect a trace**.
+`/epics`, enter to go into the run, then **export it**.
 
 The run itself is still written down here. An [epic](/user/tracing#what-a-run-writes-down)
 belongs to the directory the flow ran in, and is a directory of its own with a `sessions/` in
@@ -208,8 +208,8 @@ tester-codex@local-0a1b2c3d-1a2b-3c4d-5e6f-708192a3b4c5
 
 The id is the end of the name, and a leading part of it is enough to name that session to
 [`Hmz().epics.trace(sessions=…)`](/user/tracing) — the tester's is the one that worked in
-the container. `/epics` finds the same directory at the prompt: enter on the run, then
-**where it is**.
+the container. `/epics` finds the same directory at the prompt: enter on the run, and the
+path is drawn at the top of what opens.
 
 ## Isolation here is about environment, not permission
 

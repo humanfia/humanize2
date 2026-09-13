@@ -239,15 +239,18 @@ git log --oneline
 hmz
 ```
 
-Then `/epics`, **enter** on the run at the top of the list, and *collect a trace*. The line
-under the list says where it went: `traces/`, inside that run's own directory.
+Then `/epics`, **enter** on the run at the top of the list to go into it, and *export it*.
+Exporting gathers the trace on its way in, and the line under the list says where the archive
+went and what went into the trace — which is also written to `traces/`, inside that run's own
+directory.
 
 In [ui.perfetto.dev](https://ui.perfetto.dev) this run looks quite different from
 [`flame_chase`](/user/tutorials/take-home). The actor is one long track — a single session, one
 slice per turn, running the length of the trace. The reviewer is a row of short separate
 tracks, one per round, each starting and ending inside a single round.
 
-That picture is the flow. If you ever want to know what a flow does, collect a trace of it.
+That picture is the flow. If you ever want to know what a flow does, export a run of it and
+open the trace inside.
 
 ## What to change
 
