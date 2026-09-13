@@ -62,6 +62,11 @@ class FlowSnapshot:
     observations: tuple[Observation, ...] = ()
     waiting: int = 0
     spent: tuple[tuple[str, int, float, float | None], ...] = ()
+    #: What went on each kind of token over the whole run, and whether each figure is the
+    #: whole of it. Beside the per-model spending rather than inside it: a bill is made of the
+    #: kinds whichever model bought them, and an agent answering about what a run has cost has
+    #: to be able to tell a figure that is the total from one that is a floor under it.
+    kinds: tuple[tuple[str, float, bool], ...] = ()
     waiting_for_input: bool = False
 
 
@@ -133,7 +138,7 @@ def format_snapshot(snapshot: FlowSnapshot, question: str) -> str:
         spent = snapshot.spent[:_MAX_SPENDING]
         lines.extend(
             f"- {compact(model, 240)}: {max(tokens, 0)} token(s), "
-            f"{max(rate, 0.0):.1f}/s"
+            f"{max(rate, 0.0):.1f} output token(s)/s"
             # Left off entirely for a model nobody prices, rather than said as nothing: an
             # agent answering a side question must not read a missing price as a free run.
             + (f", {money(max(dollars, 0.0))}" if dollars is not None else "")
@@ -143,6 +148,19 @@ def format_snapshot(snapshot: FlowSnapshot, question: str) -> str:
             lines.append(
                 f"- (spending entries omitted: {len(snapshot.spent) - len(spent)})"
             )
+    else:
+        lines.append("- none reported")
+
+    lines.append("tokens_by_kind:")
+    if snapshot.kinds:
+        # Said apart from the total, and each marked: a figure short of what one agent's CLI
+        # never counts is a floor, and an agent asked what the run has cost must not read one
+        # as the whole of it.
+        lines.extend(
+            f"- {compact(kind, 64)}: {max(tokens, 0.0):.0f}"
+            + ("" if whole else " (a floor: not every agent here reports this kind)")
+            for kind, tokens, whole in snapshot.kinds
+        )
     else:
         lines.append("- none reported")
 

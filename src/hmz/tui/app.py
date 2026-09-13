@@ -1543,6 +1543,11 @@ class Humanize(App[None]):
         spending = self._monitor.spending()
         spent = sum(spend.tokens for spend in spending)
         rate = sum(spend.rate for spend in spending)
+        # What went on each kind of token, which is the reading anybody has a use for: an
+        # input token, an output token and a cached read are three different things bought at
+        # three different prices, and one number over the lot of them answers no question.
+        # Marked where a figure is short of what an agent of this run spends without counting.
+        counted = self._monitor.reckoning()
         # What the run has cost in money, and whether that is the whole of it: a model
         # nobody prices adds tokens to the count and nothing to the bill, so the figure is
         # marked as a floor rather than quietly reported as the total.
@@ -1608,7 +1613,19 @@ class Humanize(App[None]):
         ]
         if spent:
             costing = f"{money(bill)}{floor}{_DOT}" if bill is not None else ""
-            lines.append(f"{thousands(spent)} tokens{_DOT}{costing}{rate:.0f}/s")
+            # Two lines rather than one: five kinds, a bill and a rate on one row come to a
+            # row wider than the terminal, and what sits above the editor is read at a glance.
+            lines.append(
+                _DOT.join(
+                    f"{one.kind} {thousands(one.tokens)}{'' if one.whole else '+'}"
+                    for one in counted
+                )
+                or f"{thousands(spent)} tokens"
+            )
+            # Output alone, and said so: the input of a turn is the conversation so far, sent
+            # again at every request and mostly served out of a cache, so a rate counting it
+            # says how long the transcript has got rather than how fast the model is writing.
+            lines.append(f"{costing}{rate:.0f} out/s")
         # Beside it, and cut to what it leaves: the two are one block, and a pinned line
         # the width of the screen would push what the run is running as off the side of it.
         waiting = self._waiting_lines(max(len(line) for line in lines) + 2)
@@ -2093,6 +2110,13 @@ class Humanize(App[None]):
             (entry.model, entry.tokens, entry.rate, entry.dollars)
             for entry in self._monitor.spending(now=ended or moment)
         )
+        # Beside it rather than inside it: the kinds are the run's rather than any one
+        # model's, a bill being made of them whichever model bought them, and each says
+        # whether the figure is the whole of what went on that kind or a floor under it.
+        counted = tuple(
+            (one.kind, one.tokens, one.whole)
+            for one in self._monitor.reckoning(now=ended or moment)
+        )
         # Keep the role separate from the stable id used by the monitor and handover records.
         labelled = tuple(
             AgentProgress(
@@ -2115,6 +2139,7 @@ class Humanize(App[None]):
             observations=observations,
             waiting=waiting,
             spent=spent,
+            kinds=counted,
             waiting_for_input=self._awaiting,
         )
 
@@ -3131,8 +3156,22 @@ class Humanize(App[None]):
         with self._saying:
             self._queued, self._given, self._handed = [], [], False
 
+        from hmz.coganchor.agents import HumanAgent
+
         for agent in agents:
             agent.watch(self._heard)
+            if not isinstance(agent, HumanAgent):
+                # What its backend counts, said before its first turn: a kind nothing was
+                # spent on this turn is missing from that turn's reckoning exactly as a kind
+                # the CLI never counts is, and what is drawn of a run driving two backends has
+                # to tell the two apart to say which of its figures are whole. The person is
+                # not one of these -- nobody counts what a person costs -- and counting them
+                # as a backend that reports nothing would mark every figure of a run they are
+                # in as short of tokens nobody ever spent. What the CLI's own log says is
+                # added to this by the tally, once it has actually read one: Codex's server
+                # never names a cached read and the rollout it writes does, but a rollout
+                # written on another machine is one nothing here reads.
+                self._monitor.reporting(agent.id, type(agent).counts)
             # Whichever turn starts next takes the oldest line that was held.
             agent.waiting = self._at_turn_start
             # Bound to the agent, so that each of these answers about the flow that is
@@ -3237,12 +3276,34 @@ class Humanize(App[None]):
         # First, whatever else happens: showing a line raises once the interface has gone, and
         # what a watcher raises is swallowed, so accounting after it would be lost.
         # The kinds go with the tokens where a turn spent them all on one model, which is the
-        # ordinary turn: `spent` is that whole turn's cost by kind, and there is no saying how
-        # one lot of kinds divides between two models. Without them there is no bill, only a
-        # count -- an input token and an output token differ in price several times over.
-        broken = dict(event.spent) if len(event.tokens) == 1 else None
+        # ordinary turn: `spent` is that whole turn's cost by kind. A turn that named two --
+        # an agent that reached for a cheaper model for a sub-turn -- says what each of them
+        # cost and says the kinds of the pair together, and nothing in it says which of the
+        # two a cached read was made against. So they are divided by what each model took,
+        # rather than dropped: a turn whose kinds are dropped is a turn counted as tokens of
+        # no kind at all, which is a turn missing from every per-kind figure and priced at
+        # nothing. Where the CLI's own log is read as well, the exact split is in it, and the
+        # fullest reckoning is the one the money and the kinds are both read off.
+        whole = sum(event.tokens.values())
         for model, tokens in event.tokens.items():
+            if not event.spent:
+                broken = None
+            elif len(event.tokens) == 1:
+                broken = dict(event.spent)  # the whole turn, on the one model it named
+            elif whole > 0:
+                broken = {
+                    kind: spent * tokens / whole for kind, spent in event.spent.items()
+                }
+            else:
+                # Two models and nothing on either. There is nothing to divide by and
+                # nothing to divide, and a turn whose accounting raised would lose the
+                # line it was about: what a watcher raises is swallowed.
+                broken = None
             self._monitor.spend(agent.id, tokens, model=model, kinds=broken)
+        # Anything at all the agent did, token or not: a tool, a word, an answer. A turn
+        # spends most of its minutes between the counts it reports, and a figure worked out
+        # only when one arrives stands still through all of them.
+        self._monitor.stirring()
         self._remember_btw(agent, event)
         if event.kind == "took":
             # The agent saying a word put into its turn is now in front of it, which is the

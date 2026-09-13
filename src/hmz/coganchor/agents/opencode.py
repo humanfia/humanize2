@@ -314,6 +314,13 @@ class OpencodeAgentConfig(AgentConfig):
 class OpencodeAgent(AgentBase):
     """opencode, driven through its own command line, one run per turn."""
 
+    #: What it counts, read off the same tables its driver reads a step's usage with. Every
+    #: kind there is: opencode counts its reasoning beside the output rather than inside it,
+    #: and says what a cache read and a cache write came to on their own.
+    counts: ClassVar[frozenset[str]] = frozenset(_COUNTED) | {
+        f"cache_{named}" for named in _CACHED
+    }
+
     def new(self, cwd: str | os.PathLike[str] | None = None) -> OpencodeSession:
         """Opens a new opencode session, in the directory it is given or in this one."""
         return OpencodeSession(self, cwd)

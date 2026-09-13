@@ -36,7 +36,16 @@ from .config import (
 )
 from .cursor import CursorAgent, CursorAgentConfig, CursorSession
 from .dsh import DshAgent, DshAgentConfig, DshSession
-from .event import Event, Failed, Question, Saying, Stopped, Unrecoverable, Usage
+from .event import (
+    KINDS,
+    Event,
+    Failed,
+    Question,
+    Saying,
+    Stopped,
+    Unrecoverable,
+    Usage,
+)
 from .grok import GrokBuildAgent, GrokBuildAgentConfig, GrokBuildSession
 from .hooks import (
     EVERYWHERE,
@@ -109,6 +118,7 @@ __all__ = [
     "DRIVEN",
     "EVERYWHERE",
     "FLOW",
+    "KINDS",
     "OUTCOMES",
     "PERMISSIONS",
     "SERVICE_TIERS",

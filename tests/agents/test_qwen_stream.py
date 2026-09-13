@@ -128,7 +128,7 @@ def test_plain_turns_reuse_process_without_reusing_usage_or_display_state(
     second = list(session.stream("second"))
     assert [event.kind for event in second] == ["text", "result"]
     assert first[-1].spent.total == second[-1].spent.total == 5
-    assert dict(second[-1].spent) == {"input_tokens": 2, "output_tokens": 3}
+    assert dict(second[-1].spent) == {"input": 2, "output": 3}
     calls = qwen.calls()
     assert calls[0]["pid"] == calls[1]["pid"]
     assert calls[0]["session"] == calls[1]["session"] == session.id
@@ -430,7 +430,7 @@ def test_usage_counts_each_model_request_once_across_warm_turns(qwen: _Qwen) -> 
     session = qwen.agent.new()
     for _ in range(2):
         events = list(session.stream("many"))
-        assert dict(events[-1].spent) == {"input_tokens": 4000, "output_tokens": 160}
+        assert dict(events[-1].spent) == {"input": 4000, "output": 160}
         assert events[-1].tokens == {"test-model": 4160}
 
 
@@ -442,7 +442,7 @@ def test_repeated_message_id_is_not_metered_twice(qwen: _Qwen) -> None:
 
 def test_explicit_zero_message_counters_override_terminal_usage(qwen: _Qwen) -> None:
     events = list(qwen.agent.new().stream("zero"))
-    assert dict(events[-1].spent) == {"input_tokens": 0, "output_tokens": 0}
+    assert dict(events[-1].spent) == {"input": 0, "output": 0}
 
 
 def test_result_only_counters_survive_shaped_turns_and_process_restarts(
@@ -451,7 +451,7 @@ def test_result_only_counters_survive_shaped_turns_and_process_restarts(
     session = qwen.agent.new()
     for schema in (None, _Answer, None):
         events = list(session.stream("result-only", schema=schema))
-        assert dict(events[-1].spent) == {"input_tokens": 2, "output_tokens": 3}
+        assert dict(events[-1].spent) == {"input": 2, "output": 3}
     assert len({call["pid"] for call in qwen.calls()}) == 3
 
 
@@ -474,7 +474,7 @@ def test_error_usage_is_not_charged_to_the_next_success(
     with pytest.raises(Failed, match="turn refused"):
         session("fail")
     events = list(session.stream("result-only"))
-    assert dict(events[-1].spent) == {"input_tokens": 2, "output_tokens": 3}
+    assert dict(events[-1].spent) == {"input": 2, "output": 3}
 
 
 @pytest.mark.parametrize("opened", [False, True])
@@ -487,7 +487,7 @@ def test_failed_shaped_process_does_not_recharge_its_terminal_usage(
     with pytest.raises(Failed):
         session("bad-exit", schema=_Answer)
     events = list(session.stream("result-only"))
-    assert dict(events[-1].spent) == {"input_tokens": 2, "output_tokens": 3}
+    assert dict(events[-1].spent) == {"input": 2, "output": 3}
 
 
 def test_concurrent_first_turns_keep_one_effort_file_and_each_process_warm(

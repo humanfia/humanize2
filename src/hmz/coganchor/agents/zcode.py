@@ -1120,6 +1120,11 @@ class ZcodeAgent(AgentBase):
     #: ZCode keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True
 
+    #: What it counts, read off the same table its driver reads a usage with. Two kinds
+    #: and no more: ZCode counts its reasoning and its cached reads inside these, so a
+    #: third here would be reporting some of the same tokens twice.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose app server is not running yet.
 

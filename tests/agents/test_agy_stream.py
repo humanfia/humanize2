@@ -212,8 +212,8 @@ def test_local_slash_command_preserves_conversation_usage_baseline(agy: _Agy) ->
         dict(first.spent)
         == dict(third.spent)
         == {
-            "input_tokens": 2,
-            "output_tokens": 3,
+            "input": 2,
+            "output": 3,
         }
     )
     assert {call["session"] for call in agy.calls()} == {session.id}
@@ -427,17 +427,17 @@ def test_a_backwards_native_counter_charges_the_whole_turn(agy: _Agy) -> None:
     assert list(session.stream("second"))[-1].spent.total == 5
     # The counter is back to what one turn costs: what this turn spent is all of it.
     assert dict(list(session.stream("recount"))[-1].spent) == {
-        "input_tokens": 2,
-        "output_tokens": 3,
+        "input": 2,
+        "output": 3,
     }
 
 
 def test_one_counter_going_backwards_starts_the_whole_count_again(agy: _Agy) -> None:
     """A restart is the count's, not one column's: kinds still above their old total are new."""
     session = agy.agent.new()
-    session._previous = Usage({"input_tokens": 100.0, "output_tokens": 50.0})
-    fresh = Usage({"input_tokens": 120.0, "output_tokens": 40.0})
-    assert dict(session._delta(fresh)) == {"input_tokens": 120.0, "output_tokens": 40.0}
+    session._previous = Usage({"input": 100.0, "output": 50.0})
+    fresh = Usage({"input": 120.0, "output": 40.0})
+    assert dict(session._delta(fresh)) == {"input": 120.0, "output": 40.0}
 
 
 def test_a_native_home_flag_naming_nothing_leaves_the_default_home(
