@@ -22,6 +22,7 @@ from hmz.runtime.kept import Runs
 from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import (
+    _TAKES_AWAY,
     Account,
     Accounts,
     Agent,
@@ -34,6 +35,7 @@ from hmz.tui.pick import (
 
 from .test_app import (
     _transcript,
+    drops,
     into_agent,
     into_flows,
     keeps,
@@ -57,6 +59,13 @@ def _under(app: Humanize) -> str:
     return str(app.screen.query_one("#tuning", Label).content)
 
 
+def _drawn(app: Humanize) -> str:
+    """Every row the sheet on top has put up, as one block to read."""
+    return "\n".join(
+        str(one.prompt) for one in app.screen.query_one("#choices", OptionList).options
+    )
+
+
 async def _no_copies(app: Humanize, driver: Pilot[None]) -> None:
     """Walks past the question of which other backends to write the new account down for.
 
@@ -78,9 +87,9 @@ async def _no_copies(app: Humanize, driver: Pilot[None]) -> None:
 async def _doing(app: Humanize, driver: Pilot[None], held: str) -> None:
     """Opens what there is to do with the account under the cursor, and picks one of them.
 
-    Which is what enter on an account is now: three questions about it -- correct it, sign it
-    in again, where it falls back to -- rather than three letter keys on the list of
-    accounts.
+    Which is what enter on an account is now: four questions about it -- correct it, sign it
+    in again, where it falls back to, be rid of it -- rather than four letter keys on the
+    list of accounts.
 
     Args:
       app: The interface.
@@ -772,9 +781,9 @@ async def test_a_chain_pointed_at_an_account_the_same_save_takes_away_goes_nowhe
             "=codex/work",
         ]
 
-        await driver.press(
-            "d", "d"
-        )  # `spare`, marked to be taken away when this is saved
+        # `spare`, held to be taken away when this menu is saved.
+        await _doing(app, driver, _TAKES_AWAY)
+        await until(lambda: isinstance(app.screen, Providers), driver)
         await driver.press("down")  # onto `work`
         await _doing(app, driver, "falls")
         await until(lambda: isinstance(app.screen, Falls), driver)
@@ -806,16 +815,8 @@ async def test_taking_an_account_away_says_what_went_with_it() -> None:
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        # Twice, because it cannot be undone -- and held until the menu is saved.
-        await driver.press("d")
-        await until(
-            lambda: (
-                "press d again" in str(app.screen.query_one("#tuning", Label).content)
-            ),
-            driver,
-        )
-        assert providers.find("claude", "deepseek") is not None
-        await driver.press("d")
+        # From inside what there is to do with it, and held until the menu is saved.
+        await _doing(app, driver, _TAKES_AWAY)
         await until(
             lambda: (
                 "when this menu is saved"
@@ -831,6 +832,88 @@ async def test_taking_an_account_away_says_what_went_with_it() -> None:
 
     assert "claude/deepseek is gone, credentials and all" in said
     assert providers.find("claude", "deepseek") is None
+
+
+@pytest.mark.timeout(60)
+async def test_an_account_held_to_go_is_offered_the_way_back() -> None:
+    """Nothing has happened yet, so the row that marked it is the row that unmarks it."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await _doing(app, driver, _TAKES_AWAY)
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        assert "to be taken away" in _drawn(app)
+
+        # Open again and the row says the opposite, rather than offering the same thing.
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Account), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        assert "keep it after all" in str(
+            app.screen.query_one("#choices", OptionList).options[-1].prompt
+        )
+        await onto(app, driver, _TAKES_AWAY)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(lambda: "deepseek stays" in _under(app), driver)
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert providers.find("claude", "deepseek") is not None
+
+
+@pytest.mark.timeout(60)
+async def test_an_account_held_to_go_stays_where_the_menu_is_not_saved() -> None:
+    """It is a draft until the menu is saved, and credentials are not thrown away on a walk."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await _doing(app, driver, _TAKES_AWAY)
+        await until(lambda: isinstance(app.screen, Providers), driver)
+
+        await drops(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert providers.find("claude", "deepseek") is not None
+
+
+@pytest.mark.timeout(60)
+async def test_the_key_that_used_to_take_an_account_away_takes_nothing_away() -> None:
+    """Asking twice was for a key that acted on the spot, and there is no such key here now."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("d")
+        await driver.press("d")
+        await driver.pause()
+
+        assert "press d again" not in _under(app)
+        assert "to be taken away" not in _drawn(app)
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert providers.find("claude", "deepseek") is not None
 
 
 def test_an_agent_is_made_as_the_account_it_was_given() -> None:
@@ -919,14 +1002,10 @@ async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> 
 
         await driver.press("down")  # onto it
         await driver.pause()
-        # There is nothing to take away about it, and pressing d says so.
-        await driver.press("d")
-        await driver.pause()
-        assert "there is nothing to" in _under(app)
-        assert isinstance(app.screen, Providers)
 
-        # Correcting it and signing it in are not offered at all, with the reason said where
-        # they would have been: humanize did not make that account and keeps nothing for it.
+        # Correcting it, signing it in and taking it away are not offered at all, with the
+        # reason said where they would have been: humanize did not make that account and
+        # keeps nothing for it.
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Account), driver)
         await until(
@@ -937,6 +1016,7 @@ async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> 
             for one in app.screen.query_one("#choices", OptionList).options
         ] == ["falls"]
         assert "keeps no credentials for it" in _under(app)
+        assert "take away" in _under(app)
         await driver.press("escape")
         await until(lambda: isinstance(app.screen, Providers), driver)
 

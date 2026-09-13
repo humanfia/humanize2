@@ -76,6 +76,12 @@ you have to go and open is a board nobody reads.
 | enter | change the line under the cursor |
 | `d` twice | take it off the board |
 
+The board is the one place taking something away is still a key pressed twice. Everywhere else
+in the interface a row opens onto a menu about itself, and being rid of it is a row in there;
+enter on a line of the board opens the words of that line, which has no room for one. And it
+lands the moment it is pressed — there is no menu to save and no walk out to change your mind on
+— so the first press says what the second will do, and moving the cursor puts it down again.
+
 ## Whose each line is
 
 A flow writing down how far through it is does not want that edited underneath it, and a list

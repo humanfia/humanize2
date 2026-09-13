@@ -1004,8 +1004,8 @@ whatever you put there. They are listed as flowverses all the same, so that one 
 a flow is called and one list says where they are. `add`, `fetch` and `remove` all refuse them.
 
 In the [interface](/reference/tui), `/flowverses` is where they live: `a` adds one, `r` fetches
-the one under the cursor again, `d` twice takes an added one away, and enter says what one
-holds. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
+the one under the cursor again, and enter says what one holds — and, past the flows, takes the
+whole place away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
 repository's own name is not the one you want. `/flow` keeps the two keys that are about flows
 rather than about places: left and right, which walk these same places because that is which
 list of flows is being read, and `f`, which copies the flow under the cursor into this project.
