@@ -238,6 +238,20 @@ class Out:
         if not self._json:
             print(said)
 
+    def aside(self, said: str) -> None:
+        """Something about the run itself rather than about its answer, said on stderr.
+
+        Written whoever is reading, and never on stdout: a fact about how the run was set up
+        is not part of the answer a program is parsing, and one written there would be a
+        stream that will not parse. It is what a command line has in place of a question --
+        a run with nobody at a terminal cannot be asked anything, so what it can be told is
+        told plainly and the run goes on.
+
+        Args:
+          said: The line.
+        """
+        print(said, file=sys.stderr)
+
     @property
     def console(self) -> Console:
         """The console a run is drawn on, which is stderr and is built when it is first used.

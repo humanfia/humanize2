@@ -21,11 +21,12 @@ from hmz.coganchor import backends
 if TYPE_CHECKING:
     import os
     from argparse import ArgumentParser
-    from collections.abc import Awaitable, Sequence
+    from collections.abc import Awaitable, Mapping, Sequence
 
     from pydantic import BaseModel
 
     from hmz.coganchor.agents import AgentBase
+    from hmz.coganchor.agents.allowance import Allowance
     from hmz.flows.driving import Entry
 
 __all__ = ["Runner", "flow_and_agents", "read_agent", "set_up_from"]
@@ -86,6 +87,7 @@ class Runner:
         config: BaseModel | dict[str, Any] | None = None,
         resume: str | os.PathLike[str] | None = None,
         container: str = "",
+        budget: Allowance | Mapping[str, Any] | None = None,
     ) -> None:
         """Loads the flow and holds the agents to drive it with.
 
@@ -107,6 +109,11 @@ class Runner:
             one container, points every agent of the run at it, and lets the flow's own code
             reach it through `hmz.flows.container()` -- which is what a run in a container
             is, said once from outside rather than agent by agent inside.
+          budget: What this run may spend, as an `Allowance` or the three fields to build one
+            from -- which is what a `budget:` in a YAML file reads as. None takes the flow's
+            own default, and the flow having none is a run under nothing at all. Given
+            rather than read off the flow, because what a run is worth is whoever started it
+            to say and the flow only ever said a default.
 
         Raises:
           NotAFlow: If the flow is not there, is not a flow -- nothing in it marked
@@ -118,6 +125,7 @@ class Runner:
             reached.
         """
         from hmz.coganchor.agents import HumanAgent
+        from hmz.coganchor.agents.allowance import allowed
         from hmz.flows.driving import (
             NotAFlow,
             carries,
@@ -202,6 +210,12 @@ class Runner:
         #: which run that was. Asked here rather than when the run starts, so that an epic
         #: named at the prompt is one whoever named it hears about before anything runs.
         self._resumable = mark.resumable
+        #: What this run may spend, settled here so that every way of starting a flow reaches
+        #: one answer: what the line or the menu said, else what the flow declared, else
+        #: nothing at all. What the flow declared is kept beside it, because the two together
+        #: are what says whether an unbounded run is one anybody meant.
+        self._declared = mark.budget
+        self._budget = allowed(budget, mark.budget)
         #: The image the whole run works in, or "" for a run on this machine. The container
         #: is started as the flow starts rather than here: constructing a runner reads a
         #: flow, and reading one must not pull an image.
@@ -222,6 +236,37 @@ class Runner:
         """
         return self._driven
 
+    @property
+    def budget(self) -> Allowance:
+        """What this run will be held to, whoever or whatever settled it."""
+        return self._budget
+
+    @property
+    def unwatched(self) -> bool:
+        """Whether nothing at all will stop this run and nobody has said that is the point.
+
+        Asked of a runner rather than worked out again wherever one is started, so that the
+        menu's second confirmation and the command line's line on stderr are the same
+        question about the same run.
+        """
+        from hmz.coganchor.agents.allowance import unwatched
+
+        return unwatched(self._budget, self._declared)
+
+    def unreadable(self) -> str:
+        """Which of the caps this run was given nothing in it can read, in words.
+
+        Answered before the first turn rather than at the end of a run that never stopped: a
+        dollars cap on a model nobody prices is a cap that cannot bite, and it reads exactly
+        like one that has not bitten yet.
+
+        Returns:
+          One line about them, or "" where every cap set can be read.
+        """
+        from hmz.coganchor.agents.allowance import Ledger, unreadable
+
+        return unreadable(Ledger(self._budget, self._driven).reads().blind)
+
     def run(self, task: str) -> None:
         """Runs the flow in this directory, for as long as it keeps running.
 
@@ -239,6 +284,7 @@ class Runner:
         """
         import inspect
 
+        from hmz.coganchor.agents.allowance import Ledger
         from hmz.flows.driving import contained, entered, lands_in, left
 
         from .epic import Epic, state
@@ -270,8 +316,15 @@ class Runner:
                     profile=Settings().profiling,
                 ) as epic,
             ):
+                # One reckoning for the run, and every agent holds it: an allowance is the
+                # run's money rather than any one agent's, and a clone made mid-flow joins
+                # it as it is made. Here rather than wherever a run is started from, so that
+                # `hmz exec`, the interface and a flow calling another all get it -- nothing
+                # a flow can be started by has to remember to hang one on.
+                ledger = Ledger(self._budget, self._driven)
                 for agent in self._driven:
                     agent.epic = epic
+                    agent.allowance = ledger
                 if where_ is not None:
                     lands_in(self._driven, where_)
                 # As it was set up, or as it comes: a flow that takes a config takes None
@@ -326,7 +379,7 @@ def read_agent(spec: str) -> tuple[str, backends.Profile, str, str, str]:
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, Allowance | None, bool]:
     """Reads an `hmz exec` line into a flow, the agents to drive it, the task, and its setup.
 
     A flow says how many agents it drives and what it calls each of them, and this is where
@@ -339,8 +392,9 @@ def flow_and_agents(
     Returns:
       The flow's path, the agents to drive it with in the order the flow takes them, the task,
       what to set the flow up with -- the YAML file `-c` named, read but not yet checked
-      against the flow's own model, or None where the line named none -- and whether a program
-      is reading the run rather than a person.
+      against the flow's own model, or None where the line named none -- what that file said
+      the run may spend or None where it said nothing, and whether a program is reading the
+      run rather than a person.
 
     Raises:
       SystemExit: If the line does not name a flow and an agent apiece, names a place the flow
@@ -381,7 +435,9 @@ def flow_and_agents(
         "--config",
         metavar="PATH",
         help="a YAML file of what to set the flow up with, one field per line, as the flow "
-        "declares them; only for a flow that says it can be set up",
+        "declares them; only for a flow that says it can be set up. Its `budget:` is the "
+        "run's own rather than the flow's -- `{hours: 6, tokens: 10, dollars: 50}`, each "
+        "0 or absent for no limit on that one",
     )
     parser.add_argument(
         "--json",
@@ -395,10 +451,11 @@ def flow_and_agents(
         help="what the flow is to have the agents do, after -- if it starts with a dash",
     )
     args = parser.parse_args(argv)
-    held = None
+    held: dict[str, Any] | None = None
+    budget: Allowance | None = None
     if args.config is not None:
         try:
-            held = set_up_from(args.config)
+            held, budget = set_up_from(args.config)
         except ValueError as why:
             parser.error(str(why))
 
@@ -431,6 +488,7 @@ def flow_and_agents(
         _as_declared(parser, args.flow, agents, places),
         args.task,
         held,
+        budget,
         args.as_json,
     )
 
@@ -503,32 +561,50 @@ def _as_declared(
     return [held[one] for one in declared]
 
 
-def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:
-    """Reads what a flow is to be set up with out of a file of it.
+def set_up_from(
+    said: str | os.PathLike[str],
+) -> tuple[dict[str, Any], Allowance | None]:
+    """Reads what a flow is to be set up with, and what the run may spend, out of a file.
 
     The file is what the flow menu would have asked, written down: one field per
     line, under the names the flow declared. It is not checked here -- the flow's own model
     is what checks it, and the model is not there until the flow is loaded.
 
+    One key of it is reserved and is not the flow's: `budget`, which is the run's allowance
+    rather than a setting of the flow. Taken out here rather than left in, because the flow's
+    own model refuses a field it never declared -- and it is a mapping of the three
+    dimensions rather than a bare number, which is refused loudly for saying nothing about
+    which of the three it meant.
+
     Args:
       said: The path to the YAML.
 
     Returns:
-      What it holds, field by field, and nothing at all for a file that is empty.
+      What it holds field by field with the reserved key taken out, and the run's allowance
+      or None where the file said nothing about one.
 
     Raises:
-      ValueError: If the file cannot be read, or holds something that is not a mapping.
+      ValueError: If the file cannot be read, holds something that is not a mapping, or says
+        a budget that cannot be read as one.
     """
     import yaml
+
+    from hmz.coganchor.agents.allowance import KEY, written
 
     try:
         held = yaml.safe_load(Path(said).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as why:
         raise ValueError(f"cannot read {said}: {why}") from why
     if held is None:
-        return {}
+        return {}, None
     if not isinstance(held, dict):
         raise ValueError(  # noqa: TRY004 -- a file to correct, not a caller's type error
             f"{said}: a flow is set up from a mapping, not a {type(held).__name__}"
         )
-    return cast("dict[str, Any]", held)
+    fields = cast("dict[str, Any]", held)
+    if KEY not in fields:
+        return fields, None
+    # Copied rather than popped in place: what was handed in is the caller's, and a reader
+    # that emptied it would be a file that reads differently the second time it is read.
+    rest = {name: value for name, value in fields.items() if name != KEY}
+    return rest, written(fields[KEY], str(said))

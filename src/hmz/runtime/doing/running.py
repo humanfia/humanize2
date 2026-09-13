@@ -43,6 +43,19 @@ class Run:
         return self._runner.agents
 
     @property
+    def unwatched(self) -> bool:
+        """Whether nothing at all will stop this run and nobody has said that is the point."""
+        return self._runner.unwatched
+
+    def unreadable(self) -> str:
+        """Which of the caps this run was given nothing in it can read, in words.
+
+        Returns:
+          One line about them, or "" where every cap set can be read.
+        """
+        return self._runner.unreadable()
+
+    @property
     def running(self) -> bool:
         """Whether the flow is still going, which is False before it is started."""
         return self._thread is not None and self._thread.is_alive()
