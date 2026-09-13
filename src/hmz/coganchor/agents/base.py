@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from hmz.coganchor.machines import MachineConfig
     from hmz.coganchor.providers import Provider
 
+    from .allowance import Ledger
     from .config import AgentConfig, Budget
 
 
@@ -959,6 +960,39 @@ class SessionBase(ABC):
             clock.cancel()
         self._sofar = []
 
+    def _allowed(self) -> None:
+        """Refuses the turn where the run has already spent everything it was allowed.
+
+        Blocked means raising rather than waiting or answering empty. Waiting is a deadlock:
+        an allowance only ever runs out -- time and tokens rise and never fall -- so nothing
+        that waits here is ever released. Answering "" is worse than a deadlock, because a
+        flow cannot tell an exhausted turn from a failed one: a Ralph loop's stall counter
+        would take three empty rounds to notice, and a goal loop would spin on empty answers
+        for as long as it was left alone.
+
+        Raises:
+            Stopped: If the run is over its allowance. `Stopped` rather than a failure,
+                because a flow that catches a failed turn goes round again -- which would be
+                the run taking every remaining round for nothing.
+        """
+        if (held := self._agent.allowance) is not None and (why := held.over()):
+            # Every session of the run at once rather than this one: the allowance is the
+            # run's, so the moment one reading says it is full it is full for all of them,
+            # and there is no set of blocked sessions to collect before the run can stop.
+            held.stops()
+            raise Stopped(f"{self._agent.id}: {why} spent")
+
+    def _reckoned(self) -> None:
+        """Reads the run against its allowance now this turn has added what it added.
+
+        At both edges of a turn rather than only at the front, because for a loop that drops
+        its session every round the turn edges are the session edges -- and a run read only
+        as a turn opens would take one whole turn more than it was allowed, which for a model
+        thinking at length is the expensive one.
+        """
+        if (held := self._agent.allowance) is not None and held.over():
+            held.stops()
+
     def _cutting(self) -> str:
         """Why the turn now running is to stop short, or "" while it is not."""
         return self._over or self._cut
@@ -1202,6 +1236,21 @@ class SessionBase(ABC):
         Yields:
           What the agent said, in the order it said it.
         """
+        # Before the turn opens on anything, whether the run has anything left to spend.
+        # Here rather than on `SESSION_START` and `SESSION_END`, for three reasons a reader
+        # will otherwise look for those moments and not find this: their verdict is thrown
+        # away today, and making them refusable would change a hook contract that is
+        # published as non-refusable; `SESSION_END` never fires for a session a Ralph loop
+        # drops mid-round, which is the commonest shape a long run has; and a moment is the
+        # *flow's* seam, so an allowance a person set would be defeatable by a flow hanging a
+        # hook on it. This is `SessionBase`'s own, every driver inherits it, and no driver
+        # can opt out.
+        #
+        # Ahead of the stop rather than behind it, because a run out of money stops its own
+        # agents: every turn after the first one to notice would otherwise be refused with
+        # `was stopped`, which is true and says nothing about why. What a person needs off
+        # the first line of a stopped run is which of the three ran out.
+        self._allowed()
         if self._agent._stopped:
             raise Stopped(f"{self._agent.id} was stopped")
         # Before anything else, for a session that is a fork and has not opened yet: this
@@ -1333,6 +1382,12 @@ class SessionBase(ABC):
                 prompt, again = stopping.because, again + 1
         finally:
             self._budgeted()
+            # And what the turn just spent, read against the run's allowance. The turn that
+            # ended still yields what it said -- the same argument a per-turn budget's `end`
+            # makes: a turn cut off has still done what it did, its edits are on disk, and a
+            # loop reading an exception in place of them would take the round again. What
+            # this does is make it the last one.
+            self._reckoned()
             self._heard(Event(kind="ends", text=""))
 
     def _falling_back(
@@ -1941,6 +1996,13 @@ class SessionBase(ABC):
         if self._started and not self._ended:
             self._ended = True
             self._fire(Moment.SESSION_END)
+            # One reading as the conversation ends, so that a run whose last session closes
+            # on the end of its allowance is written down as spent rather than as done. It
+            # reads and does not stop: stopping an agent closes its sessions, which comes
+            # back through here, and `Ledger.stops` is what makes that safe rather than this
+            # being the place to find out.
+            if (held := self._agent.allowance) is not None:
+                held.over()
         self._shut()
         # And whatever this conversation was offering the agent: a callback that outlived the
         # conversation offering it would be one the flow can no longer see the point of.
@@ -3154,6 +3216,12 @@ class AgentBase(ABC):
         #: every session this agent opens. Left unset by an agent driven by hand, which is
         #: not a run of anything.
         self.epic: Journal | None = None
+        #: What the whole run this agent is part of may spend, and what it has spent so far,
+        #: set by whatever is driving the flow. Every agent of one run holds the same ledger:
+        #: an allowance is the run's money and not any one agent's, so two agents under one
+        #: allowance spend one allowance. Left unset by an agent driven by hand, which is not
+        #: a run of anything and so is nobody's budget.
+        self.allowance: Ledger | None = None
         #: The skills the flow driving this agent brings, mounted onto every session it
         #: opens. Set by whatever started the flow, since a skill is the flow's rather than
         #: the agent's: the same agent under another flow carries that flow's instead.
@@ -3308,6 +3376,12 @@ class AgentBase(ABC):
         nothing, is watched by nobody, has no hook hung on it, and is being written down
         nowhere. Two agents, which is what they are.
 
+        With one exception, and it is the run's allowance. Tracing is about identity, so two
+        agents are two lines and a clone is written down as itself; an allowance is about the
+        run's money, and a clone spends the run's. A flow that does all of its work through
+        clones -- which is how a flow that recurses is written -- would otherwise read as
+        having spent nothing at all, and run under an allowance that could never bite.
+
         And nothing about it can be said afterwards. That is the whole of the point: what an
         agent is, is settled where it is made, and this is where a second one is made.
 
@@ -3329,6 +3403,7 @@ class AgentBase(ABC):
         """
         made = self._remade(self._config if config is None else config, name)
         made.loads(self._loads if skills is None else skills)
+        self._also_allowed(made)
         return made
 
     def _remade(self, config: AgentConfig, name: str | None) -> Self:
@@ -3345,6 +3420,20 @@ class AgentBase(ABC):
           The new agent.
         """
         return type(self)(config, name=name)
+
+    def _also_allowed(self, made: AgentBase) -> None:
+        """Has another agent of this run spend out of this run's allowance.
+
+        The one place a second agent joins the reckoning, so that a clone and a stand-in are
+        counted the same way: a turn that moved is still this run's turn, and money spent
+        under a name the run chose for itself is still money the run spent.
+
+        Args:
+          made: The agent that is to spend out of it.
+        """
+        if (held := self.allowance) is not None:
+            made.allowance = held
+            held.enrol(made)
 
     def rename(self, name: str) -> None:
         """Calls this agent what the flow driving it calls it, if it has no name of its own.
@@ -3669,6 +3758,10 @@ class AgentBase(ABC):
             if made:
                 made.loads(self._loads)
                 made.epic = self.epic
+                # And this run's allowance, because a turn taken by a stand-in is this run's
+                # turn: an account that went down is not a reason for the money to stop being
+                # counted.
+                self._also_allowed(made)
                 # Only the steps after its own: a chain read again from the top by each hop
                 # would be a chain that walks the agents before it a second time.
                 made._beyond = walked[1:]
