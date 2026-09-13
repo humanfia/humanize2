@@ -198,6 +198,59 @@ def test_a_config_is_read_back_through_the_flows_own_model(tmp_path: Path) -> No
     assert not refused.outcomes[0].finished
 
 
+#: A loop with no exit of its own at all, which is what a flow looks like once it stops
+#: implementing a budget: what ends it is the allowance it declares.
+DECLARED = '''
+"""A loop that ends when the allowance the flow declared is spent."""
+
+from hmz.flows import Agent, Allowance, flow
+
+
+@flow(budget=Allowance(tokens=0.3))
+def run(agents: tuple[Agent], task: str) -> None:
+    (agent,) = agents
+    while True:
+        agent(task, suppress=True)
+'''
+
+#: The same loop saying nothing about what a run of it is worth, which is a flow with
+#: nothing inside it to end it at all.
+UNDECLARED = DECLARED.replace("@flow(budget=Allowance(tokens=0.3))", "@flow").replace(
+    ", Allowance,", ","
+)
+
+
+def test_the_allowance_a_flow_declares_is_what_ends_its_proof(tmp_path: Path) -> None:
+    """So that a flow holding itself to nothing is still proved to end somewhere.
+
+    Which is the whole point of the allowance being the run's rather than each flow's: the
+    loop below has no `break`, no `return` and no cap, and it ends.
+    """
+    at = written(tmp_path, "declared", textwrap.dedent(DECLARED))
+
+    proof = proved(at, scenarios=(NEVER_DONE,))
+
+    assert proof.findings == ()
+    assert proof.outcomes[0].finished
+    # 0.3 million at 100k a turn is three turns, as it would be for a cap the flow read off
+    # `spent()` itself -- which is what this replaces.
+    assert proof.outcomes[0].turns == 3
+
+
+def test_a_flow_that_declares_nothing_is_held_to_nothing_here(tmp_path: Path) -> None:
+    """A proof of the flow does not stand on an allowance the flow never claimed.
+
+    The one a real run has is whoever started it's rather than the flow's, and a loop
+    passing because somebody's money ran out is a loop nobody proved anything about.
+    """
+    at = written(tmp_path, "undeclared", textwrap.dedent(UNDECLARED))
+
+    proof = proved(at, scenarios=(NEVER_DONE,))
+
+    assert not proof.outcomes[0].finished
+    assert "still going" in proof.outcomes[0].said
+
+
 def test_an_empty_proof_only_loads_and_reads_the_live_config(tmp_path: Path) -> None:
     at = written(tmp_path, "one", textwrap.dedent(CONFIGURED))
     proof = proved(at, scenarios=())

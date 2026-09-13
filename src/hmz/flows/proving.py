@@ -4,9 +4,9 @@
 running can show -- the annotation built at runtime, the config model declared in a helper,
 the loop that looks bounded and is not. This is that second reading. The flow is loaded and
 driven for real, in a subprocess of its own, by agents that are stubs: every turn lands at
-once, answers deterministically, and costs what the scenario says a turn costs -- so a loop
-held to a budget walks to the end of it in milliseconds, and what is being proved is the
-flow's own shape rather than any model's mood.
+once, answers deterministically, and costs what the scenario says a turn costs -- so a flow
+that declared an allowance of its own walks to the end of it in milliseconds, and what is
+being proved is the flow's own shape rather than any model's mood.
 
 The scenarios are the questions worth asking of a loop. `NEVER_DONE` is the reviewer that
 never says the work is done: a flow with a bound of its own still ends, and one without is
@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from hmz.coganchor.agents import AgentBase, Event
+    from hmz.coganchor.agents.allowance import Allowance
 
     from .driving import Place
 
@@ -72,7 +73,8 @@ class Scenario(NamedTuple):
         is what a failed turn answers.
       answer: What a plain turn answers, and what every string field of a shaped one says.
       climb: What each turn adds to what the agent has spent, in output tokens, so that a
-        loop held to a budget walks to the end of it in a handful of turns.
+        flow declaring an allowance of its own walks to the end of it in a handful of
+        turns rather than in the hundred thousand a real run would take.
       turns: How many turns the flow may take before it is read as one that does not stop.
       seconds: How long the scenario's process may live before the clock kills it.
     """
@@ -85,9 +87,12 @@ class Scenario(NamedTuple):
     seconds: float = 60.0
 
 
-#: The reviewer that never says the work is done. A flow with a bound of its own -- a
-#: budget, a cap on the rounds -- still ends here, and one that waits forever on a verdict
-#: is caught by the turn cap: the executable proof that a run of it can end.
+#: The reviewer that never says the work is done. A flow with a bound of its own -- a cap on
+#: the rounds, a clock, an allowance it declared -- still ends here, and one that waits
+#: forever on a verdict is caught by the turn cap: the executable proof that a run of it can
+#: end. What a real run has underneath all of them is the allowance somebody set when they
+#: started it, which is not a thing a proof of the flow can stand on: the flow is on trial,
+#: and a run stopped for running out of money did not end because of anything the flow did.
 NEVER_DONE = Scenario("never-done", verdict=False, answer="did some of it")
 
 #: The shortest road through: every verdict is yes, so what is proved is that the flow can
@@ -307,6 +312,30 @@ async def _rested_for(seconds: float, result: Any = None) -> Any:
     return result
 
 
+def _allowed(driven: list[AgentBase], declared: Allowance | None) -> None:
+    """Holds the stubs to the allowance the flow itself declared, and to no other.
+
+    The flow's own or none at all. A real run is held to whatever the person starting it
+    set, and a proof that stood on one of those would be proving something about a number
+    somebody typed rather than about the flow -- a loop that never ends would pass, having
+    been stopped by money. What the flow declared is the flow's, so it is on trial with the
+    rest of it: a flow saying `@flow(budget=Allowance(tokens=10))` is a flow claiming that
+    ten million output tokens is where a run of it ends, and this is that claim being tried.
+
+    Args:
+      driven: The stubs, which is every agent the flow declared.
+      declared: What the flow said, or None for a flow with no opinion -- which is left with
+        no allowance at all, so that the turn cap is what ends it exactly as before.
+    """
+    if declared is None or not declared.bounded:
+        return
+    from hmz.coganchor.agents.allowance import Ledger
+
+    ledger = Ledger(declared, driven)
+    for agent in driven:
+        agent.allowance = ledger
+
+
 class _Enough(BaseException):
     """The turn cap, raised past everything a flow catches: a proof is over when it is.
 
@@ -373,15 +402,24 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
             return answered
     if scenario is None:
         return answered
+    from hmz.coganchor.agents import Stopped
+
     steps = _Steps(scenario.turns)
     settings = () if setting is None else (given,)
     held: tuple[dict[str, Any], ...] = ({},) if mark.resumable else ()
+    driven = _crewed(places, scenario, steps)
+    _allowed(driven, mark.budget)
     try:
-        out = run(make(_crewed(places, scenario, steps)), _TASK, *settings, *held)
+        out = run(make(driven), _TASK, *settings, *held)
         if inspect.isawaitable(out):
             import asyncio
 
             asyncio.run(_awaited(out))
+        finished, turns, said = True, steps.taken, ""
+    except Stopped:
+        # The flow's own declared allowance, run out. It ended, and it ended the way its
+        # author said it should -- a loop that goes until the money it asked for is gone is
+        # a loop with a bound, and this is that bound being reached rather than a crash.
         finished, turns, said = True, steps.taken, ""
     except _Enough:
         finished, turns = False, scenario.turns
