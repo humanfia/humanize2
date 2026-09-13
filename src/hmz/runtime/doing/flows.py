@@ -334,6 +334,17 @@ class Flows:
 
         return configures(named)
 
+    def declared(self, named: str | os.PathLike[str]) -> Allowance | None:
+        """What a flow says a run of it may spend by default, or None for one with no opinion.
+
+        `Allowance()` is neither: it is a flow saying in its own file that it is meant to run
+        under nothing at all, which is what keeps a conversation from being asked to confirm
+        an unbounded run every time it is picked.
+        """
+        from hmz.flows.driving import declared
+
+        return declared(named)
+
     def resumes(self, named: str | os.PathLike[str]) -> bool:
         """Whether a flow says it can be picked up where the last run of it left off."""
         from hmz.flows import resumes

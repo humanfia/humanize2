@@ -211,7 +211,9 @@ def test_the_exec_line_reads_the_config_it_names(tmp_path: Path) -> None:
 
 def test_the_exec_line_without_a_config_says_nothing_about_one(tmp_path: Path) -> None:
     """Which is every line written before there was such a thing, and is a flow as it comes."""
-    _, _, _, held, budget, _ = flow_and_agents(["-f", "flow", "-a", "claude/m:high", "go"])
+    _, _, _, held, budget, _ = flow_and_agents(
+        ["-f", "flow", "-a", "claude/m:high", "go"]
+    )
 
     assert held is None
     assert budget is None

@@ -88,7 +88,9 @@ from .pick import (
     Providers,
     Reports,
     Runs,
+    budget_of,
     config_of,
+    dimensions,
     model_of,
     opens_on,
     places_of,
@@ -917,6 +919,10 @@ class Humanize(App[None]):
         self._config = config or config_of(
             self._flow_named, self.settings.config(self._flow_named)
         )
+        #: What a run of it here may spend, or None for a flow nobody has set one for --
+        #: which is a run under whatever the flow itself declares. Beside the config and not
+        #: inside it: it is a setting of the run rather than one of the flow's own.
+        self._budget = budget_of(self._flow_named)
         #: What has been typed here before, which the arrows walk. Read now rather than each
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
@@ -2524,6 +2530,7 @@ class Humanize(App[None]):
                 self._config if holding else None,
                 agents,
                 self.settings.flows(),
+                budget=self._budget if holding else None,
                 unavailable=frozenset(unavailable),
                 running=running,
                 # A flow that was named has been chosen, so what is left to answer is what
@@ -2638,10 +2645,11 @@ class Humanize(App[None]):
             told -- which is what every other way of choosing a flow leaves it doing.
         """
         places = places_of(chosen.flow)
-        same = (chosen.flow, list(chosen.agents), chosen.config) == (
+        same = (chosen.flow, list(chosen.agents), chosen.config, chosen.budget) == (
             self._flow_named,
             self._models,
             self._config,
+            self._budget,
         )
         if not running and not same:
             # A flow is chosen in order to be run, so whatever is running stops: the interface
@@ -2652,6 +2660,7 @@ class Humanize(App[None]):
         self._flow_named, self._models = chosen.flow, list(chosen.agents)
         self._wanted = places if places is not None else self._places_of(chosen.flow)
         self._config = chosen.config
+        self._budget = chosen.budget
         self.settings.remember(
             chosen.flow,
             self._named_by,
@@ -2659,6 +2668,9 @@ class Humanize(App[None]):
             chosen.config.model_dump(mode="json")
             if chosen.config is not None
             else None,
+            # An allowance of nothing is written down as nothing, which is how the menu says
+            # a flow is back to running under whatever the flow itself declares.
+            dimensions(chosen.budget) if chosen.budget is not None else None,
         )
         if running:
             self._reconfigured()
@@ -2979,6 +2991,7 @@ class Humanize(App[None]):
         ]
         self._wanted = self._places_of(ran.flow)
         self._config = config_of(ran.flow, self.settings.config(ran.flow))
+        self._budget = budget_of(ran.flow)
         named = [part for runs in self._models for part in ("-a", runs.spec)]
         self.show(
             f"[dim]carrying on from {escape(ran.name)}: {escape(ran.flow)} on what that "
@@ -3220,7 +3233,9 @@ class Humanize(App[None]):
             # through this interface like everything else. How the flow itself is set up
             # goes with them: it is a setting of the flow rather than of any agent, so it
             # is not on the line that says what each of them runs.
-            runner = self.hmz.runner(path, chosen, self._config, resume=resume)
+            runner = self.hmz.runner(
+                path, chosen, self._config, resume=resume, budget=self._budget
+            )
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             self.show(f"hmz: {why}", "red")
             return
